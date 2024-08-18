@@ -57,11 +57,11 @@ def get_imap_client():
     logger.info("Successfully connected to Gmail IMAP server")
     return client
 
-def get_recent_emails(client):
+def get_recent_emails(client, hours):
     logger.info("Selecting INBOX folder...")
     client.select_folder('INBOX')
-    yesterday = datetime.now() - timedelta(days=1)
-    date_criterion = yesterday.strftime("%d-%b-%Y")
+    time_ago = datetime.now() - timedelta(hours=hours)
+    date_criterion = time_ago.strftime("%d-%b-%Y")
     logger.info(f"Searching for emails since {date_criterion}...")
     messages = client.search(['SINCE', date_criterion])
     logger.info(f"Found {len(messages)} recent emails")
@@ -263,17 +263,20 @@ def main():
     logger.info("Starting Gmail Categorizer")
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama")
     parser.add_argument("--ollama-host", default="http://10.1.1.131:11343", help="Ollama server host (default: http://10.1.1.131:11343)")
+    parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails (default: 1)")
     args = parser.parse_args()
 
     ollama_url = args.ollama_host
+    hours = args.hours
     logger.info(f"Using Ollama server at: {ollama_url}")
+    logger.info(f"Fetching emails from the last {hours} hour(s)")
 
     if not check_ollama_connectivity(ollama_url):
         logger.error("Terminating program due to Ollama connectivity failure")
         return
 
     client = get_imap_client()
-    message_ids = get_recent_emails(client)
+    message_ids = get_recent_emails(client, hours)
 
     category_counter = Counter()
 
