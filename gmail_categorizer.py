@@ -9,29 +9,38 @@ from imapclient import IMAPClient
 from email import message_from_bytes
 import imaplib
 from bs4 import BeautifulSoup
+import anthropic
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def check_ollama_connectivity(ollama_url, max_retries=3, retry_delay=5):
-    logger.info(f"Checking connectivity to Ollama host: {ollama_url}")
+def check_api_connectivity(api_type, api_url=None, api_key=None, max_retries=3, retry_delay=5):
+    logger.info(f"Checking connectivity to {api_type} API")
     for attempt in range(max_retries):
         try:
-            response = requests.get(f"{ollama_url}/api/tags")
-            if response.status_code == 200:
-                logger.info("Successfully connected to Ollama host")
+            if api_type == "Ollama":
+                response = requests.get(f"{api_url}/api/tags")
+                if response.status_code == 200:
+                    logger.info("Successfully connected to Ollama host")
+                    return True
+            elif api_type == "Anthropic":
+                client = anthropic.Anthropic(api_key=api_key)
+                client.completions.create(
+                    model="claude-3-sonnet-20240229",
+                    max_tokens_to_sample=1,
+                    prompt="Test"
+                )
+                logger.info("Successfully connected to Anthropic API")
                 return True
-            else:
-                logger.warning(f"Failed to connect to Ollama host. Status code: {response.status_code}")
-        except requests.RequestException as e:
-            logger.warning(f"Error connecting to Ollama host: {e}")
+        except Exception as e:
+            logger.warning(f"Error connecting to {api_type} API: {e}")
         
         if attempt < max_retries - 1:
             logger.info(f"Retrying in {retry_delay} seconds...")
             time.sleep(retry_delay)
     
-    logger.error("Failed to connect to Ollama host after multiple attempts")
+    logger.error(f"Failed to connect to {api_type} API after multiple attempts")
     return False
 
 def get_imap_client():
@@ -73,22 +82,29 @@ def get_sender_email(email_message):
         return sender.split('<')[1].split('>')[0]
     return sender
 
-def ollama_generic(purpose, prompt, subject, body, sender, ollama_url):
+def generate_response(purpose, prompt, api_type, api_url=None, api_key=None):
     logger.info(f"Initiating {purpose}...")
-    response = requests.post(f"{ollama_url}/api/generate", json={
-        "model": "llama3.1:8b",
-        "prompt": prompt,
-        "stream": False
-    })
+    if api_type == "Ollama":
+        response = requests.post(f"{api_url}/api/generate", json={
+            "model": "llama3.1:8b",
+            "prompt": prompt,
+            "stream": False
+        })
+        if response.status_code == 200:
+            return response.json()['response'].strip()
+        else:
+            logger.error(f"Error: Unable to {purpose}. Status code: {response.status_code}")
+            raise Exception(f"Failed to {purpose}")
+    elif api_type == "Anthropic":
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.completions.create(
+            model="claude-3-sonnet-20240229",
+            max_tokens_to_sample=100,
+            prompt=f"{anthropic.HUMAN_PROMPT} {prompt}{anthropic.AI_PROMPT}"
+        )
+        return response.completion.strip()
 
-    if response.status_code == 200:
-        resp = response.json()['response'].strip()
-        return resp
-    else:
-        logger.error(f"Error: Unable to {purpose}. Status code: {response.status_code}")
-        raise Exception(f"Failed to {purpose}")
-
-def foo(subject, body, sender, ollama_url):
+def categorize_email_new(subject, body, sender, api_type, api_url=None, api_key=None):
     purpose = "Categorize email NEW"
     prompt = f"""
 You are an expert email classifier. Your task is to categorize emails based on their subject and contents. Provide a brief category label of one or two words for each email. Focus only on the following categories:
@@ -126,10 +142,10 @@ Subject: [{subject}]
 Content: [{body}]
 """
 
-    return ollama_generic(purpose, prompt, subject, body, sender, ollama_url)
+    return generate_response(purpose, prompt, api_type, api_url, api_key)
 
 
-def categorize_email(subject, body, sender, ollama_url):
+def categorize_email(subject, body, sender, api_type, api_url=None, api_key=None):
     if sender.endswith('@accounts.google.com'):
         logger.info("Email from accounts.google.com, categorizing as Personal")
         return "Personal"
@@ -156,22 +172,9 @@ Body: {body}
 
 Category: [Single word]"""
 
-    logger.info("Sending request to Ollama server...")
-    response = requests.post(f"{ollama_url}/api/generate", json={
-        "model": "llama3.1:8b",
-        "prompt": prompt,
-        "stream": False
-    })
+    return generate_response("categorize email", prompt, api_type, api_url, api_key)
 
-    if response.status_code == 200:
-        category = response.json()['response'].strip()
-        logger.info(f"Email categorized as: {category}")
-        return category
-    else:
-        logger.error(f"Error: Unable to categorize email. Status code: {response.status_code}")
-        raise Exception("Failed to categorize email")
-
-def is_email_summary_advertisement(subject, summary, ollama_url):
+def is_email_summary_advertisement(subject, summary, api_type, api_url=None, api_key=None):
     logger.info("Summarizing Email Category...")
     prompt = f"""You are a laconic assistant that only speaks in single words. Could the following email summary be considered Advertisement? Respond with Yes or No and no trailing period.
 
@@ -181,20 +184,7 @@ Summary: {summary}
 
 Category: [Single word]"""
 
-    logger.info("Sending request to Ollama server...")
-    response = requests.post(f"{ollama_url}/api/generate", json={
-        "model": "llama3.1:8b",
-        "prompt": prompt,
-        "stream": False
-    })
-
-    if response.status_code == 200:
-        category = response.json()['response'].strip()
-        logger.info(f"Email categorized as: {category}")
-        return category
-    else:
-        logger.error(f"Error: Unable to summarize email. Status code: {response.status_code}")
-        raise Exception("Failed to summarize email")
+    return generate_response("summarize email", prompt, api_type, api_url, api_key)
 
 def set_email_label(client, msg_id, label):
     logger.info(f"Setting label '{label}' for email {msg_id}")
@@ -208,7 +198,7 @@ def extract_html_content(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     return soup.get_text(separator=' ', strip=True)
 
-def is_human_readable(text, ollama_url):
+def is_human_readable(text, api_type, api_url=None, api_key=None):
     logger.info(f"Checking if text is human readable: {text}")
     prompt = f"""
 You are an expert in natural language processing and computer science. Your task is to analyze the following text and determine whether it's human-readable or computer-oriented. 
@@ -231,34 +221,38 @@ Please analyze the following text and respond with either "Human-readable" or "C
 
 Text to analyze: {text}
 """
-    response = requests.post(f"{ollama_url}/api/generate", json={
-        "model": "llama3.1:8b",
-        "prompt": prompt,
-        "stream": False
-    })
-
-    if response.status_code == 200:
-        category = response.json()['response'].strip()
-        logger.info(f"Text categorized as: {category}")
-        return category
-    else:
-        logger.error(f"Error: Unable to categorize text. Status code: {response.status_code}")
-        raise Exception("Failed to categorize text")
+    return generate_response("categorize text", prompt, api_type, api_url, api_key)
 
 def main():
     logger.info("Starting Gmail Categorizer")
-    parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama")
-    parser.add_argument("--ollama-host", default="http://10.1.1.131:11343", help="Ollama server host (default: http://10.1.1.131:11343)")
+    parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama or Anthropic API")
+    parser.add_argument("--ollama-host", help="Ollama server host (e.g., http://10.1.1.131:11343)")
+    parser.add_argument("--anthropic-api-key", help="Anthropic API key")
     parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails (default: 1)")
     args = parser.parse_args()
 
-    ollama_url = args.ollama_host
+    if args.ollama_host and args.anthropic_api_key:
+        logger.error("Please provide either --ollama-host or --anthropic-api-key, not both")
+        return
+
+    if args.ollama_host:
+        api_type = "Ollama"
+        api_url = args.ollama_host
+        api_key = None
+    elif args.anthropic_api_key:
+        api_type = "Anthropic"
+        api_url = None
+        api_key = args.anthropic_api_key
+    else:
+        logger.error("Please provide either --ollama-host or --anthropic-api-key")
+        return
+
     hours = args.hours
-    logger.info(f"Using Ollama server at: {ollama_url}")
+    logger.info(f"Using {api_type} API")
     logger.info(f"Fetching emails from the last {hours} hour(s)")
 
-    if not check_ollama_connectivity(ollama_url):
-        logger.error("Terminating program due to Ollama connectivity failure")
+    if not check_api_connectivity(api_type, api_url, api_key):
+        logger.error(f"Terminating program due to {api_type} API connectivity failure")
         return
 
     client = get_imap_client()
@@ -275,7 +269,6 @@ def main():
         sender = get_sender_email(email_message)
         body = ''
 
-        body = ''
         if email_message.is_multipart():
             for part in email_message.walk():
                 content_type = part.get_content_type()
@@ -295,7 +288,7 @@ def main():
                 body = extract_html_content(html_content)
 
         try:
-            category = foo(subject, body, sender, ollama_url)
+            category = categorize_email_new(subject, body, sender, api_type, api_url, api_key)
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Category: {category}")
