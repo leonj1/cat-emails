@@ -100,7 +100,7 @@ Category: [Single word]"""
 
 def is_email_summary_advertisement(subject, summary, ollama_url):
     logger.info("Summarizing Email Category...")
-    prompt = f"""You are a laconic assistant that only speaks in single words. Could the following email summary be considered Advertisement? Respond with Yes or No.
+    prompt = f"""You are a laconic assistant that only speaks in single words. Could the following email summary be considered Advertisement? Respond with Yes or No and no trailing period.
 
 Subject: {subject}
 
@@ -173,9 +173,8 @@ def main():
 
         try:
             category = categorize_email(subject, body, ollama_url)
-            if check_string(category):
-              if is_email_summary_advertisement(subject, category, ollama_url):
-                category = "Advertisement"
+            if is_email_summary_advertisement(subject, category, ollama_url):
+              category = "Advertisement"
             logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Category: {category}")
             logger.info("---")
