@@ -33,7 +33,11 @@ This Python script logs into a Gmail account using IMAP, scans emails from the l
 
 ### Docker Setup
 
-1. Create a `.env` file in the project root with your Gmail credentials:
+1. Copy the `.env.example` file to `.env` in the project root:
+   ```
+   cp .env.example .env
+   ```
+   Then edit the `.env` file with your actual Gmail credentials:
    ```
    GMAIL_EMAIL=your.email@gmail.com
    GMAIL_PASSWORD=your_password_or_app_specific_password
