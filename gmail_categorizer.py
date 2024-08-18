@@ -75,7 +75,6 @@ def get_sender_email(email_message):
 
 def ollama_generic(purpose, prompt, subject, body, sender, ollama_url):
     logger.info(f"Initiating {purpose}...")
-    logger.info("Sending request to Ollama server...")
     response = requests.post(f"{ollama_url}/api/generate", json={
         "model": "llama3.1:8b",
         "prompt": prompt,
@@ -84,7 +83,6 @@ def ollama_generic(purpose, prompt, subject, body, sender, ollama_url):
 
     if response.status_code == 200:
         resp = response.json()['response'].strip()
-        logger.info(f"LLM response completed: {resp}")
         return resp
     else:
         logger.error(f"Error: Unable to {purpose}. Status code: {response.status_code}")
@@ -117,6 +115,8 @@ Examples:
 - Email from a gmail.com address: "Personal"
 - Email about a security breach: "Alert"
 - Contents or Subject that talk about politics or political parties: "Politics"
+- Contents or Subject that talk about promotions: "Advertisement"
+- Contents or Subject that talk about ads or advertisements or saving money: "Advertisement"
 
 For each email, analyze the sender's email address, subject line, and any provided content. Then respond with only the category label, nothing else.
 
@@ -296,16 +296,15 @@ def main():
 
         try:
             category = foo(subject, body, sender, ollama_url)
-            logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Sender: {sender}")
+            logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Category: {category}")
-            logger.info("---")
             category_counter[category] += 1
-            
             if category.lower() == "advertisement":
                 set_email_label(client, msg_id, "Advertisement")
             if category.lower() == "politics":
                 set_email_label(client, msg_id, "Politics")
+            logger.info("---")
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
             logger.info("Terminating program due to categorization failure")
