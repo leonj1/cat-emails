@@ -66,7 +66,7 @@ Category:"""
         return category
     else:
         logger.error(f"Error: Unable to categorize email. Status code: {response.status_code}")
-        return "Other"
+        raise Exception("Failed to categorize email")
 
 def main():
     logger.info("Starting Gmail Categorizer")
@@ -101,8 +101,9 @@ def main():
             logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Category: {category}")
             logger.info("---")
-        except requests.RequestException as e:
-            logger.error(f"Error connecting to Ollama server at {ollama_url}: {e}")
+        except Exception as e:
+            logger.error(f"Error categorizing email: {e}")
+            logger.info("Terminating program due to categorization failure")
             break
 
     logger.info("Logging out from Gmail IMAP server")
