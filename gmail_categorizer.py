@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from imapclient import IMAPClient
 from email import message_from_bytes
 import imaplib
+from bs4 import BeautifulSoup
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -203,6 +204,10 @@ def set_email_label(client, msg_id, label):
     except Exception as e:
         logger.error(f"Error setting label: {e}")
 
+def extract_html_content(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    return soup.get_text(separator=' ', strip=True)
+
 def is_human_readable(text, ollama_url):
     logger.info(f"Checking if text is human readable: {text}")
     prompt = f"""
@@ -281,13 +286,24 @@ def main():
         sender = get_sender_email(email_message)
         body = ''
 
+        body = ''
         if email_message.is_multipart():
             for part in email_message.walk():
-                if part.get_content_type() == "text/plain":
+                content_type = part.get_content_type()
+                if content_type == "text/plain":
                     body = part.get_payload(decode=True).decode(errors='ignore')
                     break
+                elif content_type == "text/html":
+                    html_content = part.get_payload(decode=True).decode(errors='ignore')
+                    body = extract_html_content(html_content)
+                    break
         else:
-            body = email_message.get_payload(decode=True).decode(errors='ignore')
+            content_type = email_message.get_content_type()
+            if content_type == "text/plain":
+                body = email_message.get_payload(decode=True).decode(errors='ignore')
+            elif content_type == "text/html":
+                html_content = email_message.get_payload(decode=True).decode(errors='ignore')
+                body = extract_html_content(html_content)
 
         try:
             category = foo(subject, body, sender, ollama_url)
