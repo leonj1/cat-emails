@@ -66,17 +66,25 @@ def get_recent_emails(client):
 
 def categorize_email(subject, body, ollama_url):
     logger.info("Categorizing email...")
-    prompt = f"""Categorize the following email into one of these categories: Order Receipt, Advertisement, Personal Response, or Other.
+    prompt = f"""You are a laconic assistant that only speaks in single words. You will be given the content of an email. Your task is to categorize this email into one of the following categories:
+
+- Order Receipt
+- Advertisement
+- Personal Response
+- Other
+
+Please analyze the content of the email and determine which category it best fits into. Consider the purpose, tone, and typical characteristics of each category.
+Respond with only the category name, using one or two words at most. Do not provide any explanation or additional commentary.
 
 Subject: {subject}
 
 Body: {body}
 
-Category:"""
+Category: [Single word]"""
 
     logger.info("Sending request to Ollama server...")
     response = requests.post(f"{ollama_url}/api/generate", json={
-        "model": "llama2",
+        "model": "llama3.1:8b",
         "prompt": prompt,
         "stream": False
     })
