@@ -2,6 +2,7 @@ import os
 import requests
 import argparse
 import logging
+import time
 from datetime import datetime, timedelta
 from imapclient import IMAPClient
 from email import message_from_bytes
@@ -9,6 +10,26 @@ from email import message_from_bytes
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+def check_ollama_connectivity(ollama_url, max_retries=3, retry_delay=5):
+    logger.info(f"Checking connectivity to Ollama host: {ollama_url}")
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(f"{ollama_url}/api/tags")
+            if response.status_code == 200:
+                logger.info("Successfully connected to Ollama host")
+                return True
+            else:
+                logger.warning(f"Failed to connect to Ollama host. Status code: {response.status_code}")
+        except requests.RequestException as e:
+            logger.warning(f"Error connecting to Ollama host: {e}")
+        
+        if attempt < max_retries - 1:
+            logger.info(f"Retrying in {retry_delay} seconds...")
+            time.sleep(retry_delay)
+    
+    logger.error("Failed to connect to Ollama host after multiple attempts")
+    return False
 
 def get_imap_client():
     # Replace with your Gmail IMAP settings
@@ -76,6 +97,10 @@ def main():
 
     ollama_url = args.ollama_host
     logger.info(f"Using Ollama server at: {ollama_url}")
+
+    if not check_ollama_connectivity(ollama_url):
+        logger.error("Terminating program due to Ollama connectivity failure")
+        return
 
     client = get_imap_client()
     message_ids = get_recent_emails(client)
