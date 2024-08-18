@@ -13,6 +13,9 @@ def get_imap_client():
     if not EMAIL or not PASSWORD:
         raise ValueError("Please set GMAIL_EMAIL and GMAIL_PASSWORD environment variables")
 
+    print(f"Logging in with username: {EMAIL}")
+    print(f"Password length: {len(PASSWORD)}")
+
     client = IMAPClient(IMAP_HOST, port=IMAP_PORT, use_uid=True, ssl=True)
     client.login(EMAIL, PASSWORD)
     return client
