@@ -2,3 +2,4 @@ imapclient==2.3.1
 requests==2.26.0
 beautifulsoup4==4.9.3
 anthropic==0.3.0
+pydantic>=1.10.0,<2.0.0
