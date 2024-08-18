@@ -57,7 +57,7 @@ Category:"""
 
 def main():
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama")
-    parser.add_argument("--ollama-host", default="http://localhost:11343", help="Ollama server host (default: http://localhost:11343)")
+    parser.add_argument("--ollama-host", default="http://10.1.1.131:11343", help="Ollama server host (default: http://10.1.1.131:11343)")
     args = parser.parse_args()
 
     ollama_url = args.ollama_host
