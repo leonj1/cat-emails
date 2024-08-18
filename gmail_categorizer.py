@@ -51,10 +51,10 @@ def main():
         if email_message.is_multipart():
             for part in email_message.walk():
                 if part.get_content_type() == "text/plain":
-                    body = part.get_payload(decode=True).decode()
+                    body = part.get_payload(decode=True).decode(errors='ignore')
                     break
         else:
-            body = email_message.get_payload(decode=True).decode()
+            body = email_message.get_payload(decode=True).decode(errors='ignore')
 
         category = categorize_email(subject, body)
         print(f"Subject: {subject}")

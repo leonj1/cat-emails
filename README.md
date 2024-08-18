@@ -1,8 +1,10 @@
 # Gmail Categorizer
 
-This Python script logs into a Gmail account using IMAP, scans emails from the last 24 hours, and categorizes them based on their content.
+This Python script logs into a Gmail account using IMAP, scans emails from the last 24 hours, and categorizes them based on their content. It can be run locally or within a Docker container.
 
 ## Setup and Usage
+
+### Local Setup
 
 1. Set up environment variables:
    - Set `GMAIL_EMAIL` to your Gmail email address
@@ -29,7 +31,23 @@ This Python script logs into a Gmail account using IMAP, scans emails from the l
    make
    ```
 
-4. The script will connect to your Gmail account, scan your recent emails, and categorize them.
+### Docker Setup
+
+1. Create a `.env` file in the project root with your Gmail credentials:
+   ```
+   GMAIL_EMAIL=your.email@gmail.com
+   GMAIL_PASSWORD=your_password_or_app_specific_password
+   ```
+
+2. Build the Docker image:
+   ```
+   make build
+   ```
+
+3. Run the script in a Docker container:
+   ```
+   make docker-run
+   ```
 
 ## Categories
 
@@ -50,3 +68,4 @@ This script requires access to your Gmail account. Make sure to review the code 
 - Never share your Gmail password or app-specific password with others.
 - Be cautious when setting environment variables, especially on shared systems.
 - Consider using OAuth2 for more secure authentication in a production environment.
+- When using Docker, ensure that your `.env` file is not committed to version control.
