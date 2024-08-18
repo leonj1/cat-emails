@@ -71,6 +71,62 @@ def get_sender_email(email_message):
         return sender.split('<')[1].split('>')[0]
     return sender
 
+def ollama_generic(purpose, prompt, subject, body, sender, ollama_url):
+    logger.info(f"Initiating {purpose}...")
+    logger.info("Sending request to Ollama server...")
+    response = requests.post(f"{ollama_url}/api/generate", json={
+        "model": "llama3.1:8b",
+        "prompt": prompt,
+        "stream": False
+    })
+
+    if response.status_code == 200:
+        resp = response.json()['response'].strip()
+        logger.info(f"LLM response completed: {resp}")
+        return resp
+    else:
+        logger.error(f"Error: Unable to {purpose}. Status code: {response.status_code}")
+        raise Exception(f"Failed to {purpose}")
+
+def foo(subject, body, sender, ollama_url):
+    purpose = "Categorize email NEW"
+    prompt = f"""
+You are an expert email classifier. Your task is to categorize emails based on their subject and contents. Provide a brief category label of one or two words for each email. Focus only on the following categories:
+
+1. Order Placed
+2. Order Shipped
+3. Order Cancelled
+4. Alert
+5. Bank
+6. Personal
+7. Advertisement
+8. Politics
+
+Guidelines:
+- Emails from e-commerce businesses are typically advertisements unless they are specifically about an order.
+- Emails from banks should be categorized as "Bank".
+- Emails from personal email addresses (e.g., gmail.com) should be categorized as "Personal".
+- "Order" categories should only be used for emails directly related to a specific customer order.
+
+Examples:
+- Email from shipment-tracking@amazon.com about a package: "Order Shipped"
+- Email from jcpenny.com about a sale: "Advertisement"
+- Email from chase.com: "Bank"
+- Email from a gmail.com address: "Personal"
+- Email about a security breach: "Alert"
+- Contents or Subject that talk about politics or political parties: "Politics"
+
+For each email, analyze the sender's email address, subject line, and any provided content. Then respond with only the category label, nothing else.
+
+Email to categorize:
+Sender: [{sender}]
+Subject: [{subject}]
+Content: [{body}]
+"""
+
+    return ollama_generic(purpose, prompt, subject, body, sender, ollama_url)
+
+
 def categorize_email(subject, body, sender, ollama_url):
     if sender.endswith('@accounts.google.com'):
         logger.info("Email from accounts.google.com, categorizing as Personal")
@@ -135,8 +191,45 @@ Category: [Single word]"""
         logger.info(f"Email categorized as: {category}")
         return category
     else:
-        logger.error(f"Error: Unable to categorize email. Status code: {response.status_code}")
-        raise Exception("Failed to categorize email")
+        logger.error(f"Error: Unable to summarize email. Status code: {response.status_code}")
+        raise Exception("Failed to summarize email")
+
+def is_human_readable(text, ollama_url):
+    logger.info(f"Checking if text is human readable: {text}")
+    prompt = f"""
+You are an expert in natural language processing and computer science. Your task is to analyze the following text and determine whether it's human-readable or computer-oriented. 
+
+Human-readable text typically has these characteristics:
+1. Follows grammatical structures of natural language
+2. Uses common words and phrases
+3. Has a logical flow of ideas
+4. Contains punctuation and proper capitalization
+5. May include some technical terms, but in a context understandable to humans
+
+Computer-oriented text typically has these characteristics:
+1. Contains programming code, markup, or machine-readable data formats
+2. Uses specialized syntax or symbols not common in natural language
+3. May have long strings of numbers or seemingly random characters
+4. Often lacks natural language sentence structure
+5. May include file paths, URLs, or other computer-specific references
+
+Please analyze the following text and respond with either "Human-readable" or "Computer-oriented", followed by a brief explanation of your reasoning.
+
+Text to analyze: {text}
+"""
+    response = requests.post(f"{ollama_url}/api/generate", json={
+        "model": "llama3.1:8b",
+        "prompt": prompt,
+        "stream": False
+    })
+
+    if response.status_code == 200:
+        category = response.json()['response'].strip()
+        logger.info(f"Text categorized as: {category}")
+        return category
+    else:
+        logger.error(f"Error: Unable to categorize text. Status code: {response.status_code}")
+        raise Exception("Failed to categorize text")
 
 def check_string(text):
     # Convert to lowercase for case-insensitive comparison
@@ -188,9 +281,12 @@ def main():
             body = email_message.get_payload(decode=True).decode(errors='ignore')
 
         try:
-            category = categorize_email(subject, body, sender, ollama_url)
-            if category != "Personal" and is_email_summary_advertisement(subject, category, ollama_url):
-                category = "Advertisement"
+            #category = categorize_email(subject, body, sender, ollama_url)
+            category = foo(subject, body, sender, ollama_url)
+            #if not is_human_readable(subject, ollama_url):
+            #    category = "Unknown"
+            #if is_email_summary_advertisement(subject, category, ollama_url):
+            #    category = "Advertisement"
             logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Category: {category}")
