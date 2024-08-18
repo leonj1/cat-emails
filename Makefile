@@ -1,19 +1,10 @@
-.PHONY: setup run build docker-run
-
-setup:
-	@echo "Setting up the project..."
-	pip install -r requirements.txt
-	@echo "Setup complete."
-
-run:
-	@echo "Running the Gmail Categorizer..."
-	python gmail_categorizer.py
+.PHONY: build run
 
 build:
 	@echo "Building Docker image..."
 	docker build -t gmail-categorizer .
 
-docker-run:
+run:
 	@echo "Running Gmail Categorizer in Docker..."
 	docker run --env-file .env gmail-categorizer
 
