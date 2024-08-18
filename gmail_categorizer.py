@@ -7,6 +7,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 from imapclient import IMAPClient
 from email import message_from_bytes
+import imaplib
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -194,6 +195,14 @@ Category: [Single word]"""
         logger.error(f"Error: Unable to summarize email. Status code: {response.status_code}")
         raise Exception("Failed to summarize email")
 
+def set_email_label(client, msg_id, label):
+    logger.info(f"Setting label '{label}' for email {msg_id}")
+    try:
+        client.add_gmail_labels(msg_id, [label])
+        logger.info(f"Label '{label}' set successfully")
+    except Exception as e:
+        logger.error(f"Error setting label: {e}")
+
 def is_human_readable(text, ollama_url):
     logger.info(f"Checking if text is human readable: {text}")
     prompt = f"""
@@ -281,17 +290,15 @@ def main():
             body = email_message.get_payload(decode=True).decode(errors='ignore')
 
         try:
-            #category = categorize_email(subject, body, sender, ollama_url)
             category = foo(subject, body, sender, ollama_url)
-            #if not is_human_readable(subject, ollama_url):
-            #    category = "Unknown"
-            #if is_email_summary_advertisement(subject, category, ollama_url):
-            #    category = "Advertisement"
             logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Category: {category}")
             logger.info("---")
             category_counter[category] += 1
+            
+            if category.lower() == "advertisement":
+                set_email_label(client, msg_id, "Advertisement")
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
             logger.info("Terminating program due to categorization failure")
