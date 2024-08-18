@@ -1,34 +1,27 @@
 import os
-import pickle
 from datetime import datetime, timedelta
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
+from imapclient import IMAPClient
+from email import message_from_bytes
 
-# If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+def get_imap_client():
+    # Replace with your Gmail IMAP settings
+    IMAP_HOST = 'imap.gmail.com'
+    IMAP_PORT = 993
+    EMAIL = os.environ.get('GMAIL_EMAIL')
+    PASSWORD = os.environ.get('GMAIL_PASSWORD')
 
-def get_gmail_service():
-    creds = None
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-    return build('gmail', 'v1', credentials=creds)
+    if not EMAIL or not PASSWORD:
+        raise ValueError("Please set GMAIL_EMAIL and GMAIL_PASSWORD environment variables")
 
-def get_recent_emails(service):
+    client = IMAPClient(IMAP_HOST, port=IMAP_PORT, use_uid=True, ssl=True)
+    client.login(EMAIL, PASSWORD)
+    return client
+
+def get_recent_emails(client):
+    client.select_folder('INBOX')
     yesterday = datetime.now() - timedelta(days=1)
-    query = f'after:{yesterday.strftime("%Y/%m/%d")}'
-    results = service.users().messages().list(userId='me', q=query).execute()
-    messages = results.get('messages', [])
+    date_criterion = yesterday.strftime("%d-%b-%Y")
+    messages = client.search(['SINCE', date_criterion])
     return messages
 
 def categorize_email(subject, body):
@@ -45,27 +38,30 @@ def categorize_email(subject, body):
         return 'Other'
 
 def main():
-    service = get_gmail_service()
-    messages = get_recent_emails(service)
+    client = get_imap_client()
+    message_ids = get_recent_emails(client)
 
-    for message in messages:
-        msg = service.users().messages().get(userId='me', id=message['id']).execute()
-        subject = ''
-        body = ''
-        for header in msg['payload']['headers']:
-            if header['name'] == 'Subject':
-                subject = header['value']
-                break
+    for msg_id in message_ids:
+        email_data = client.fetch([msg_id], ['RFC822'])[msg_id][b'RFC822']
+        email_message = message_from_bytes(email_data)
         
-        if 'parts' in msg['payload']:
-            body = msg['payload']['parts'][0]['body']['data']
+        subject = email_message['Subject']
+        body = ''
+
+        if email_message.is_multipart():
+            for part in email_message.walk():
+                if part.get_content_type() == "text/plain":
+                    body = part.get_payload(decode=True).decode()
+                    break
         else:
-            body = msg['payload']['body']['data']
+            body = email_message.get_payload(decode=True).decode()
 
         category = categorize_email(subject, body)
         print(f"Subject: {subject}")
         print(f"Category: {category}")
         print("---")
+
+    client.logout()
 
 if __name__ == '__main__':
     main()
