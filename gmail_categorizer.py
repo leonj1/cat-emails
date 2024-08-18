@@ -299,6 +299,8 @@ def main():
             
             if category.lower() == "advertisement":
                 set_email_label(client, msg_id, "Advertisement")
+            if category.lower() == "politics":
+                set_email_label(client, msg_id, "Politics")
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
             logger.info("Terminating program due to categorization failure")
