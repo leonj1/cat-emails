@@ -75,6 +75,9 @@ def categorize_email(subject, body, sender, ollama_url):
     if sender.endswith('@accounts.google.com'):
         logger.info("Email from accounts.google.com, categorizing as Personal")
         return "Personal"
+    if sender.endswith('shipment-tracking@amazon.com'):
+        logger.info("Email from Amazon shipment, categorizing as Shipment")
+        return "Shipment"
     logger.info("Categorizing email...")
     prompt = f"""You are a laconic assistant that only speaks in single words. You will be given the content of an email. Your task is to categorize this email into one of the following categories:
 
