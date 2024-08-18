@@ -65,7 +65,16 @@ def get_recent_emails(client):
     logger.info(f"Found {len(messages)} recent emails")
     return messages
 
-def categorize_email(subject, body, ollama_url):
+def get_sender_email(email_message):
+    sender = email_message['From']
+    if '<' in sender:
+        return sender.split('<')[1].split('>')[0]
+    return sender
+
+def categorize_email(subject, body, sender, ollama_url):
+    if sender.endswith('@accounts.google.com'):
+        logger.info("Email from accounts.google.com, categorizing as Personal")
+        return "Personal"
     logger.info("Categorizing email...")
     prompt = f"""You are a laconic assistant that only speaks in single words. You will be given the content of an email. Your task is to categorize this email into one of the following categories:
 
@@ -161,6 +170,7 @@ def main():
         email_message = message_from_bytes(email_data)
         
         subject = email_message['Subject']
+        sender = get_sender_email(email_message)
         body = ''
 
         if email_message.is_multipart():
@@ -172,10 +182,11 @@ def main():
             body = email_message.get_payload(decode=True).decode(errors='ignore')
 
         try:
-            category = categorize_email(subject, body, ollama_url)
-            if is_email_summary_advertisement(subject, category, ollama_url):
-              category = "Advertisement"
+            category = categorize_email(subject, body, sender, ollama_url)
+            if category != "Personal" and is_email_summary_advertisement(subject, category, ollama_url):
+                category = "Advertisement"
             logger.info(f"Email {i} - Subject: {subject}")
+            logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Category: {category}")
             logger.info("---")
             category_counter[category] += 1
