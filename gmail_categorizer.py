@@ -100,7 +100,7 @@ def generate_response(purpose, prompt, api_type, api_url=None, api_key=None):
         response = client.completions.create(
             model="claude-3-sonnet-20240229",
             max_tokens_to_sample=100,
-            prompt=f"{anthropic.HUMAN_PROMPT} {prompt}{anthropic.AI_PROMPT}"
+            prompt=f"\n\nHuman: {prompt}\n\nAssistant:"
         )
         return response.completion.strip()
 
