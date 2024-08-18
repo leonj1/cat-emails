@@ -31,6 +31,11 @@ This Python script logs into a Gmail account using IMAP, scans emails from the l
    make
    ```
 
+   You can specify a custom Ollama host using the `--ollama-host` argument:
+   ```
+   python gmail_categorizer.py --ollama-host http://custom-ollama-host:11343
+   ```
+
 ### Docker Setup
 
 1. Copy the `.env.example` file to `.env` in the project root:
