@@ -16,8 +16,12 @@ def get_imap_client():
     print(f"Logging in with username: {EMAIL}")
     print(f"Password length: {len(PASSWORD)}")
 
+    # Encode EMAIL and PASSWORD to ASCII, replacing non-ASCII characters
+    EMAIL_encoded = EMAIL.encode('ascii', 'ignore').decode('ascii')
+    PASSWORD_encoded = PASSWORD.encode('ascii', 'ignore').decode('ascii')
+
     client = IMAPClient(IMAP_HOST, port=IMAP_PORT, use_uid=True, ssl=True)
-    client.login(EMAIL, PASSWORD)
+    client.login(EMAIL_encoded, PASSWORD_encoded)
     return client
 
 def get_recent_emails(client):
