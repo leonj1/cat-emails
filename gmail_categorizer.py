@@ -3,6 +3,7 @@ import requests
 import argparse
 import logging
 import time
+from collections import Counter
 from datetime import datetime, timedelta
 from imapclient import IMAPClient
 from email import message_from_bytes
@@ -152,6 +153,8 @@ def main():
     client = get_imap_client()
     message_ids = get_recent_emails(client)
 
+    category_counter = Counter()
+
     for i, msg_id in enumerate(message_ids, 1):
         logger.info(f"Processing email {i} of {len(message_ids)}")
         email_data = client.fetch([msg_id], ['RFC822'])[msg_id][b'RFC822']
@@ -176,6 +179,7 @@ def main():
             logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Category: {category}")
             logger.info("---")
+            category_counter[category] += 1
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
             logger.info("Terminating program due to categorization failure")
@@ -183,6 +187,11 @@ def main():
 
     logger.info("Logging out from Gmail IMAP server")
     client.logout()
+
+    logger.info("Category Summary:")
+    for category, count in category_counter.most_common():
+        logger.info(f"{category}: {count}")
+
     logger.info("Gmail Categorizer finished")
 
 if __name__ == '__main__':
