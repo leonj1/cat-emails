@@ -43,7 +43,7 @@ Body: {body}
 Category:"""
 
     response = requests.post(f"{ollama_url}/api/generate", json={
-        "model": "llama3",
+        "model": "llama3.1",
         "prompt": prompt,
         "stream": False
     })
