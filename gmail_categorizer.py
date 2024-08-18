@@ -1,7 +1,10 @@
 import os
+import requests
 from datetime import datetime, timedelta
 from imapclient import IMAPClient
 from email import message_from_bytes
+
+OLLAMA_URL = "http://10.1.1.131:11343/api/generate"
 
 def get_imap_client():
     # Replace with your Gmail IMAP settings
@@ -32,17 +35,26 @@ def get_recent_emails(client):
     return messages
 
 def categorize_email(subject, body):
-    subject = subject.lower()
-    body = body.lower()
-    
-    if 'order' in subject or 'receipt' in subject or 'invoice' in subject:
-        return 'Order Receipt'
-    elif 'advertisement' in subject or 'promo' in subject or 'sale' in body:
-        return 'Advertisement'
-    elif 're:' in subject or 'fw:' in subject:
-        return 'Personal Response'
+    prompt = f"""Categorize the following email into one of these categories: Order Receipt, Advertisement, Personal Response, or Other.
+
+Subject: {subject}
+
+Body: {body}
+
+Category:"""
+
+    response = requests.post(OLLAMA_URL, json={
+        "model": "llama2",
+        "prompt": prompt,
+        "stream": False
+    })
+
+    if response.status_code == 200:
+        category = response.json()['response'].strip()
+        return category
     else:
-        return 'Other'
+        print(f"Error: Unable to categorize email. Status code: {response.status_code}")
+        return "Other"
 
 def main():
     client = get_imap_client()
@@ -63,10 +75,14 @@ def main():
         else:
             body = email_message.get_payload(decode=True).decode(errors='ignore')
 
-        category = categorize_email(subject, body)
-        print(f"Subject: {subject}")
-        print(f"Category: {category}")
-        print("---")
+        try:
+            category = categorize_email(subject, body)
+            print(f"Subject: {subject}")
+            print(f"Category: {category}")
+            print("---")
+        except requests.RequestException as e:
+            print(f"Error connecting to Ollama server: {e}")
+            break
 
     client.logout()
 
