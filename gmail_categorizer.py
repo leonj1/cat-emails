@@ -97,6 +97,45 @@ Category: [Single word]"""
         logger.error(f"Error: Unable to categorize email. Status code: {response.status_code}")
         raise Exception("Failed to categorize email")
 
+def is_email_summary_advertisement(subject, summary, ollama_url):
+    logger.info("Summarizing Email Category...")
+    prompt = f"""You are a laconic assistant that only speaks in single words. Could the following email summary be considered Advertisement? Respond with Yes or No.
+
+Subject: {subject}
+
+Summary: {summary}
+
+Category: [Single word]"""
+
+    logger.info("Sending request to Ollama server...")
+    response = requests.post(f"{ollama_url}/api/generate", json={
+        "model": "llama3.1:8b",
+        "prompt": prompt,
+        "stream": False
+    })
+
+    if response.status_code == 200:
+        category = response.json()['response'].strip()
+        logger.info(f"Email categorized as: {category}")
+        return category
+    else:
+        logger.error(f"Error: Unable to categorize email. Status code: {response.status_code}")
+        raise Exception("Failed to categorize email")
+
+def check_string(text):
+    # Convert to lowercase for case-insensitive comparison
+    text_lower = text.lower()
+
+    # Check for 'email' or 'html'
+    if 'email' in text_lower or 'html' in text_lower:
+        return True
+
+    # Check if more than 2 words
+    if len(text.split()) > 2:
+        return True
+
+    return False
+
 def main():
     logger.info("Starting Gmail Categorizer")
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama")
@@ -131,6 +170,9 @@ def main():
 
         try:
             category = categorize_email(subject, body, ollama_url)
+            if check_string(category):
+              if is_email_summary_advertisement(subject, category, ollama_url):
+                category = "Advertisement"
             logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Category: {category}")
             logger.info("---")
