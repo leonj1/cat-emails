@@ -76,7 +76,7 @@ Category:"""
 
     logger.info("Sending request to Ollama server...")
     response = requests.post(f"{ollama_url}/api/generate", json={
-        "model": "llama3.1",
+        "model": "llama2",
         "prompt": prompt,
         "stream": False
     })
