@@ -245,20 +245,6 @@ Text to analyze: {text}
         logger.error(f"Error: Unable to categorize text. Status code: {response.status_code}")
         raise Exception("Failed to categorize text")
 
-def check_string(text):
-    # Convert to lowercase for case-insensitive comparison
-    text_lower = text.lower()
-
-    # Check for 'email' or 'html'
-    if 'email' in text_lower or 'html' in text_lower:
-        return True
-
-    # Check if more than 2 words
-    if len(text.split()) > 2:
-        return True
-
-    return False
-
 def main():
     logger.info("Starting Gmail Categorizer")
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama")
