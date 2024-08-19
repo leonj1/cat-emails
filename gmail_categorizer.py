@@ -368,6 +368,7 @@ def main():
 
         try:
             hide = ["advertisement", "politics", "notification", "helpful", "information", "spam", "marketting", "disclaimer", "marketing"]
+            ok = ["order", "personal", "bank", "alert", "legal", "document"]
             category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Subject: {subject}")
@@ -379,7 +380,8 @@ def main():
                 if has_two_words_or_less(proposed_category.lower()):
                     set_email_label(client, msg_id, proposed_category.lower())
                     category = proposed_category
-            if word_in_list(category.lower(), hide):
+            # checking if the category is in the accepted categories list to keep. If not the set label to skip the inbox
+            if not word_in_list(category, ok):
                 set_email_label(client, msg_id, "SkipInbox")
             logger.info(f"Email {i} - Category: {category}")
             logger.info("---")
