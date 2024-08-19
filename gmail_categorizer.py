@@ -223,6 +223,29 @@ Text to analyze: {text}
 """
     return generate_response("categorize text", prompt, api_type, api_url, api_key)
 
+def has_two_words_or_less(text):
+    # Split the string into words
+    words = text.split()
+    
+    # Check if the number of words is 2 or less
+    return len(words) <= 2
+
+def word_in_list(word, string_list):
+    # Convert the word to lowercase for case-insensitive comparison
+    word = word.lower()
+    
+    # Iterate through each string in the list
+    for string in string_list:
+        # Split the string into words and convert to lowercase
+        words = string.lower().split()
+        
+        # Check if the word is in the list of words
+        if word in words:
+            return True
+    
+    # If we've checked all strings and haven't found the word, return False
+    return False
+
 def main():
     logger.info("Starting Gmail Categorizer")
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama or Anthropic API")
@@ -288,15 +311,18 @@ def main():
                 body = extract_html_content(html_content)
 
         try:
+            hide = ["advertisement", "politics"]
             category = categorize_email_new(subject, body, sender, api_type, api_url, api_key)
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Subject: {subject}")
             logger.info(f"Email {i} - Category: {category}")
             category_counter[category] += 1
-            if category.lower() == "advertisement":
-                set_email_label(client, msg_id, "Advertisement")
-            if category.lower() == "politics":
-                set_email_label(client, msg_id, "Politics")
+            if has_two_words_or_less(category.lower()):
+                set_email_label(client, msg_id, category.lower())
+            #else:
+            #    is_email_summary_advertisement()
+            if word_in_list(category.lower(), hide):
+                set_email_label(client, msg_id, "SkipInbox")
             logger.info("---")
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
