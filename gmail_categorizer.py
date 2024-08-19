@@ -72,8 +72,8 @@ def get_recent_emails(client, hours):
     time_ago = datetime.now() - timedelta(hours=hours)
     date_criterion = time_ago.strftime("%d-%b-%Y")
     logger.info(f"Searching for emails since {date_criterion}...")
-    messages = client.search(['SINCE', date_criterion])
-    logger.info(f"Found {len(messages)} recent emails")
+    messages = client.search(['SINCE', date_criterion, 'NOT', 'KEYWORD', 'SkipInbox'])
+    logger.info(f"Found {len(messages)} recent emails without 'SkipInbox' label")
     return messages
 
 def get_sender_email(email_message):
@@ -279,7 +279,21 @@ def main():
         return
 
     client = get_imap_client()
+    
+    # Get total number of emails in the specified time range
+    client.select_folder('INBOX')
+    time_ago = datetime.now() - timedelta(hours=hours)
+    date_criterion = time_ago.strftime("%d-%b-%Y")
+    all_messages = client.search(['SINCE', date_criterion])
+    total_emails = len(all_messages)
+    
+    # Get emails without 'SkipInbox' label
     message_ids = get_recent_emails(client, hours)
+    skipped_emails = total_emails - len(message_ids)
+    
+    logger.info(f"Total emails in the last {hours} hour(s): {total_emails}")
+    logger.info(f"Emails skipped due to 'SkipInbox' label: {skipped_emails}")
+    logger.info(f"Emails to process: {len(message_ids)}")
 
     category_counter = Counter()
 
