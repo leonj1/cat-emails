@@ -163,6 +163,7 @@ Guidelines:
 - Emails from banks should be categorized as "Bank".
 - Emails from personal email addresses (e.g., gmail.com) should be categorized as "Personal".
 - "Order" categories should only be used for emails directly related to a specific customer order.
+- Instead of using the category name "Spam" use "Junk" instead.
 
 Examples:
 - Email from shipment-tracking@amazon.com about a package: "Order Shipped"
@@ -207,6 +208,7 @@ def categorize_email(subject, body, sender, api_type, model, api_url=None, api_k
 
 Please analyze the content of the email and determine which category it best fits into. Consider the purpose, tone, and typical characteristics of each category.
 Respond with only the category name, using one or two words at most. Do not provide any explanation or additional commentary.
+Instead of using the category name "Spam" use "Junk" instead.
 
 Subject: {subject}
 
@@ -234,6 +236,7 @@ def set_email_label(client, msg_id, label):
         client.add_gmail_labels(msg_id, [label])
         logger.info(f"Label '{label}' set successfully")
         if label == "SkipInbox":
+            logger.info(f"Removing Inbox label for email {msg_id}")
             client.remove_gmail_labels(msg_id, ["\\Inbox"])
             logger.info(f"Removed Inbox label for email {msg_id}")
     except Exception as e:
