@@ -8,4 +8,8 @@ run:
 	@echo "Running Gmail Categorizer in Docker..."
 	docker run --env-file .env gmail-categorizer python gmail_categorizer.py --ollama-host http://10.1.1.212:11434
 
+run-a:
+	@echo "Running Gmail Categorizer in Docker..."
+	docker run --env-file .env gmail-categorizer python gmail_categorizer.py --anthropic-api-key $(ANTHROPIC_API_KEY)
+
 .DEFAULT_GOAL := run
