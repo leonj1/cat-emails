@@ -15,6 +15,11 @@ from anthropic import Anthropic
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+ollamas = {
+    "http://10.1.1.212:11434": "llama3.1:8b",
+    "http://10.1.1.131:11434": "llama3:latest"
+}
+
 def check_api_connectivity(api_type, api_url=None, api_key=None, max_retries=3, retry_delay=5):
     logger.info(f"Checking connectivity to {api_type} API")
     for attempt in range(max_retries):
@@ -102,11 +107,12 @@ def get_sender_email(email_message):
         # Fallback: convert to string
         return str(sender)
 
-def generate_response(purpose, prompt, api_type, api_url=None, api_key=None):
+def generate_response(purpose, prompt, api_type, model, api_url=None, api_key=None):
     logger.info(f"Initiating {purpose}...")
+    logger.info(f"Ollama server: {api_url}...")
     if api_type == "Ollama":
         response = requests.post(f"{api_url}/api/generate", json={
-            "model": "llama3.1:8b",
+            "model": model,
             "prompt": prompt,
             "stream": False
         })
@@ -137,7 +143,7 @@ def generate_response(purpose, prompt, api_type, api_url=None, api_key=None):
         #return response.completion.strip()
         return message.content[0].text
 
-def categorize_email_new(subject, body, sender, api_type, api_url=None, api_key=None):
+def categorize_email_new(subject, body, sender, api_type, model, api_url=None, api_key=None):
     purpose = "Categorize email NEW"
     prompt = f"""
 You are an expert email classifier. Your task is to categorize emails based on their subject and contents. Provide a brief category label of one or two words for each email. Focus only on the following categories:
@@ -175,10 +181,10 @@ Subject: [{subject}]
 Content: [{body}]
 """
 
-    return generate_response(purpose, prompt, api_type, api_url, api_key)
+    return generate_response(purpose, prompt, api_type, model, api_url, api_key)
 
 
-def categorize_email(subject, body, sender, api_type, api_url=None, api_key=None):
+def categorize_email(subject, body, sender, api_type, model, api_url=None, api_key=None):
     if sender.endswith('@accounts.google.com'):
         logger.info("Email from accounts.google.com, categorizing as Personal")
         return "Personal"
@@ -205,11 +211,11 @@ Body: {body}
 
 Category: [Single word]"""
 
-    return generate_response("categorize email", prompt, api_type, api_url, api_key)
+    return generate_response("categorize email", prompt, api_type, model, api_url, api_key)
 
-def is_email_summary_advertisement(subject, summary, api_type, api_url=None, api_key=None):
+def is_email_summary_advertisement(subject, summary, api_type, model, api_url=None, api_key=None):
     logger.info("Summarizing Email Category...")
-    prompt = f"""You are a laconic assistant that only speaks in single words. Could the following email summary be considered Advertisement? Respond with Yes or No and no trailing period.
+    prompt = f"""You are a laconic assistant that only speaks in single words. How would you categorize the following summary? Example, if it reads like an advertisement then respond with 'Advertisement'. Respond with no trailing period.
 
 Subject: {subject}
 
@@ -217,7 +223,7 @@ Summary: {summary}
 
 Category: [Single word]"""
 
-    return generate_response("summarize email", prompt, api_type, api_url, api_key)
+    return generate_response("summarize email", prompt, api_type, model, api_url, api_key)
 
 def set_email_label(client, msg_id, label):
     logger.info(f"Setting label '{label}' for email {msg_id}")
@@ -231,7 +237,7 @@ def extract_html_content(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     return soup.get_text(separator=' ', strip=True)
 
-def is_human_readable(text, api_type, api_url=None, api_key=None):
+def is_human_readable(text, api_type, model, api_url=None, api_key=None):
     logger.info(f"Checking if text is human readable: {text}")
     prompt = f"""
 You are an expert in natural language processing and computer science. Your task is to analyze the following text and determine whether it's human-readable or computer-oriented. 
@@ -254,7 +260,7 @@ Please analyze the following text and respond with either "Human-readable" or "C
 
 Text to analyze: {text}
 """
-    return generate_response("categorize text", prompt, api_type, api_url, api_key)
+    return generate_response("categorize text", prompt, api_type, model, api_url, api_key)
 
 def has_two_words_or_less(text):
     # Split the string into words
@@ -282,7 +288,8 @@ def word_in_list(word, string_list):
 def main():
     logger.info("Starting Gmail Categorizer")
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama or Anthropic API")
-    parser.add_argument("--ollama-host", help="Ollama server host (e.g., http://10.1.1.131:11343)")
+    parser.add_argument("--ollama-host", help="Ollama server host (e.g., http://10.1.1.212:11434)")
+    parser.add_argument("--ollama-host2", help="Ollama server host (e.g., http://10.1.1.131:11434)")
     parser.add_argument("--anthropic-api-key", help="Anthropic API key")
     parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails (default: 1)")
     args = parser.parse_args()
@@ -359,17 +366,20 @@ def main():
 
         try:
             hide = ["advertisement", "politics"]
-            category = categorize_email_new(subject, body, sender, api_type, api_url, api_key)
+            category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Subject: {subject}")
-            logger.info(f"Email {i} - Category: {category}")
             category_counter[category] += 1
             if has_two_words_or_less(category.lower()):
                 set_email_label(client, msg_id, category.lower())
-            #else:
-            #    is_email_summary_advertisement()
+            else:
+                proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[args.ollama_host2], args.ollama_host2, api_key)
+                if has_two_words_or_less(proposed_category.lower()):
+                    set_email_label(client, msg_id, proposed_category.lower())
+                    category = proposed_category
             if word_in_list(category.lower(), hide):
                 set_email_label(client, msg_id, "SkipInbox")
+            logger.info(f"Email {i} - Category: {category}")
             logger.info("---")
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
