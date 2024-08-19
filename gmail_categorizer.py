@@ -368,7 +368,7 @@ def main():
 
         try:
             hide = ["advertisement", "politics", "notification", "helpful", "information", "spam", "marketting", "disclaimer", "marketing"]
-            ok = ["order", "personal", "bank", "alert", "legal", "document"]
+            ok = ["order placed", "order cancelled", "order updated", "order shipped", "personal", "bank", "alert", "legal", "document"]
             category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Subject: {subject}")
