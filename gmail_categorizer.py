@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 ollamas = {
     "http://10.1.1.212:11434": {"model": "llama3.1:8b", "num_ctx": 4096},
-    "http://10.1.1.131:11434": {"model": "llama3:latest", "num_ctx": 8096}
+    "http://10.1.1.131:11434": {"model": "llama3:latest", "num_ctx": 8192}
 }
 
 def check_api_connectivity(api_type, api_url=None, api_key=None, max_retries=3, retry_delay=5):
