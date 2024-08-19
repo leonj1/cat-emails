@@ -173,6 +173,7 @@ Examples:
 - Contents or Subject that talk about promotions: "Advertisement"
 - Contents or Subject that talk about ads or advertisements or saving money: "Advertisement"
 - Contents or Subject that talk about getting something for free: "Advertisement"
+- Contents or Subject that talk about facebook: "Spam"
 
 For each email, analyze the sender's email address, subject line, and any provided content. Then respond with only the category label, nothing else.
 
