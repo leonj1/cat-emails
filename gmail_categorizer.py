@@ -172,6 +172,7 @@ Examples:
 - Contents or Subject that talk about politics or political parties: "Politics"
 - Contents or Subject that talk about promotions: "Advertisement"
 - Contents or Subject that talk about ads or advertisements or saving money: "Advertisement"
+- Contents or Subject that talk about getting something for free: "Advertisement"
 
 For each email, analyze the sender's email address, subject line, and any provided content. Then respond with only the category label, nothing else.
 
@@ -365,7 +366,7 @@ def main():
                 body = extract_html_content(html_content)
 
         try:
-            hide = ["advertisement", "politics"]
+            hide = ["advertisement", "politics", "notification", "helpful", "information", "spam", "marketting", "disclaimer", "marketing"]
             category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Subject: {subject}")
