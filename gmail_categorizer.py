@@ -233,6 +233,9 @@ def set_email_label(client, msg_id, label):
     try:
         client.add_gmail_labels(msg_id, [label])
         logger.info(f"Label '{label}' set successfully")
+        if label == "SkipInbox":
+            client.remove_gmail_labels(msg_id, ["\\Inbox"])
+            logger.info(f"Removed Inbox label for email {msg_id}")
     except Exception as e:
         logger.error(f"Error setting label: {e}")
 
