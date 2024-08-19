@@ -10,6 +10,6 @@ run:
 
 run-a:
 	@echo "Running Gmail Categorizer in Docker..."
-	docker run --env-file .env gmail-categorizer python gmail_categorizer.py --anthropic-api-key $(ANTHROPIC_API_KEY)
+	docker run --env-file .env gmail-categorizer python gmail_categorizer.py --anthropic-api-key $(ANTHROPIC_API_KEY) --hours 730
 
 .DEFAULT_GOAL := run

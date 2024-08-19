@@ -9,7 +9,7 @@ from imapclient import IMAPClient
 from email import message_from_bytes
 import imaplib
 from bs4 import BeautifulSoup
-import anthropic
+from anthropic import Anthropic
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,11 +25,24 @@ def check_api_connectivity(api_type, api_url=None, api_key=None, max_retries=3, 
                     logger.info("Successfully connected to Ollama host")
                     return True
             elif api_type == "Anthropic":
-                client = anthropic.Anthropic(api_key=api_key)
-                client.completions.create(
-                    model="claude-3-sonnet-20240229",
-                    max_tokens_to_sample=1,
-                    prompt="Test"
+                prompt="Test"
+                anthropic = Anthropic(api_key=api_key)
+                message = anthropic.messages.create(
+                     model="claude-3-5-sonnet-20240620",
+                     max_tokens=100,
+                     temperature=0,
+                     system="You are a world-class poet. Respond only with short poems.",
+                     messages=[
+                         {
+                             "role": "user",
+                             "content": [
+                                 {
+                                     "type": "text",
+                                     "text": "Why is the ocean salty?"
+                                 }
+                             ]
+                         }
+                     ]
                 )
                 logger.info("Successfully connected to Anthropic API")
                 return True
@@ -96,13 +109,26 @@ def generate_response(purpose, prompt, api_type, api_url=None, api_key=None):
             logger.error(f"Error: Unable to {purpose}. Status code: {response.status_code}")
             raise Exception(f"Failed to {purpose}")
     elif api_type == "Anthropic":
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.completions.create(
-            model="claude-3-sonnet-20240229",
-            max_tokens_to_sample=100,
-            prompt=f"\n\nHuman: {prompt}\n\nAssistant:"
+        client = Anthropic(api_key=api_key)
+        message = client.messages.create(
+             model="claude-3-5-sonnet-20240620",
+             max_tokens=100,
+             temperature=0,
+             system="You are a professional adept at identifying advertising, marketing, or soliciting emails typically have backgrounds in marketing, data analysis, cybersecurity, or content management. These individuals possess a combination of analytical skills, industry knowledge, and an understanding of communication techniques used in promotional materials, allowing them to quickly assess and categorize email content.",
+             messages=[
+                 {
+                     "role": "user",
+                     "content": [
+                         {
+                             "type": "text",
+                             "text": prompt
+                         }
+                     ]
+                 }
+             ]
         )
-        return response.completion.strip()
+        #return response.completion.strip()
+        return message.content[0].text
 
 def categorize_email_new(subject, body, sender, api_type, api_url=None, api_key=None):
     purpose = "Categorize email NEW"
