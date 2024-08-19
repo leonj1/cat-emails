@@ -16,8 +16,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 ollamas = {
-    "http://10.1.1.212:11434": "llama3.1:8b",
-    "http://10.1.1.131:11434": "llama3:latest"
+    "http://10.1.1.212:11434": {"model": "llama3.1:8b", "num_ctx": 8096},
+    "http://10.1.1.131:11434": {"model": "llama3:latest", "num_ctx": 8096}
 }
 
 def check_api_connectivity(api_type, api_url=None, api_key=None, max_retries=3, retry_delay=5):
@@ -107,14 +107,15 @@ def get_sender_email(email_message):
         # Fallback: convert to string
         return str(sender)
 
-def generate_response(purpose, prompt, api_type, model, api_url=None, api_key=None):
+def generate_response(purpose, prompt, api_type, model_info, api_url=None, api_key=None):
     logger.info(f"Initiating {purpose}...")
     logger.info(f"Ollama server: {api_url}...")
     if api_type == "Ollama":
         response = requests.post(f"{api_url}/api/generate", json={
-            "model": model,
+            "model": model_info["model"],
             "prompt": prompt,
-            "stream": False
+            "stream": False,
+            "context_length": model_info["num_ctx"]
         })
         if response.status_code == 200:
             return response.json()['response'].strip()
@@ -183,7 +184,7 @@ Subject: [{subject}]
 Content: [{body}]
 """
 
-    return generate_response(purpose, prompt, api_type, model, api_url, api_key)
+    return generate_response(purpose, prompt, api_type, ollamas[api_url], api_url, api_key)
 
 
 def categorize_email(subject, body, sender, api_type, model, api_url=None, api_key=None):
