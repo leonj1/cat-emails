@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 ollamas = {
-    "http://10.1.1.212:11434": {"model": "llama3.1:8b", "num_ctx": 8096},
+    "http://10.1.1.212:11434": {"model": "llama3.1:8b", "num_ctx": 4096},
     "http://10.1.1.131:11434": {"model": "llama3:latest", "num_ctx": 8096}
 }
 
