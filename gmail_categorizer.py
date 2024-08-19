@@ -91,9 +91,16 @@ def get_recent_emails(client, hours):
 
 def get_sender_email(email_message):
     sender = email_message['From']
-    if '<' in sender:
-        return sender.split('<')[1].split('>')[0]
-    return sender
+    if isinstance(sender, str):
+        if '<' in sender:
+            return sender.split('<')[1].split('>')[0]
+        return sender
+    elif hasattr(sender, 'addresses'):
+        # Handle email.header.Header object
+        return str(sender.addresses[0].addr_spec)
+    else:
+        # Fallback: convert to string
+        return str(sender)
 
 def generate_response(purpose, prompt, api_type, api_url=None, api_key=None):
     logger.info(f"Initiating {purpose}...")
