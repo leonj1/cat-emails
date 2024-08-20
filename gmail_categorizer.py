@@ -227,17 +227,8 @@ def word_in_list(word, string_list):
     # Convert the word to lowercase for case-insensitive comparison
     word = word.lower()
     
-    # Iterate through each string in the list
-    for string in string_list:
-        # Split the string into words and convert to lowercase
-        words = string.lower().split()
-        
-        # Check if the word is in the list of words
-        if word in words:
-            return True
-    
-    # If we've checked all strings and haven't found the word, return False
-    return False
+    # Use any() and a generator expression for a more concise implementation
+    return any(word in string.lower().split() for string in string_list)
 
 def main():
     logger.info("Starting Gmail Categorizer")
