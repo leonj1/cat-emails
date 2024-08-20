@@ -410,8 +410,8 @@ def main():
                     "\"personal\""
                 ]
             category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
-            logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Timestamp: {timestamp}")
+            logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Subject: {subject}")
             category_counter[category] += 1
             if has_two_words_or_less(category.lower()):
