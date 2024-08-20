@@ -276,17 +276,71 @@ def word_in_list(word, string_list):
     # Use any() and a generator expression for a more concise implementation
     return any(word in string.lower().split() for string in string_list)
 
+def get_email_body(email_message):
+    body = ''
+    if email_message.is_multipart():
+        for part in email_message.walk():
+            content_type = part.get_content_type()
+            if content_type == "text/plain":
+                body = part.get_payload(decode=True).decode(errors='ignore')
+                break
+            elif content_type == "text/html":
+                html_content = part.get_payload(decode=True).decode(errors='ignore')
+                body = extract_html_content(html_content)
+                break
+    else:
+        content_type = email_message.get_content_type()
+        if content_type == "text/plain":
+            body = email_message.get_payload(decode=True).decode(errors='ignore')
+        elif content_type == "text/html":
+            html_content = email_message.get_payload(decode=True).decode(errors='ignore')
+            body = extract_html_content(html_content)
+    return body
+
+def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, category_counter=None):
+    fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS'])
+    email_data = fetch_data[msg_id][b'RFC822']
+    email_message = message_from_bytes(email_data)
+    
+    subject = email_message['Subject']
+    sender = get_sender_email(email_message)
+    timestamp = fetch_data[msg_id][b'INTERNALDATE']
+    body = get_email_body(email_message)
+    
+    logger.info(f"Email - Timestamp: {timestamp}")
+    logger.info(f"Email - Sender: {sender}")
+    logger.info(f"Email - Subject: {subject}")
+    
+    category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
+    
+    if category_counter is not None:
+        category_counter[category] += 1
+    
+    if has_two_words_or_less(category.lower()):
+        set_email_label(client, msg_id, category.lower())
+    else:
+        proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
+        if has_two_words_or_less(proposed_category.lower()):
+            set_email_label(client, msg_id, proposed_category.lower())
+            category = proposed_category
+    
+    if not word_in_list(category, ok):
+        set_email_label(client, msg_id, "SkipInbox")
+    
+    logger.info(f"Email - Category: {category}")
+    logger.info("---")
+    
+    return category
+
 def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
     client = get_imap_client()
     
-    # Get total number of emails in the specified time range
     client.select_folder('INBOX')
     time_ago = datetime.now() - timedelta(hours=hours)
     date_criterion = time_ago.strftime("%d-%b-%Y")
     all_messages = client.search(['SINCE', date_criterion])
     total_emails = len(all_messages)
     
-    # Get emails without 'SkipInbox' label
     sorted_message_ids = get_recent_emails(client, hours)
     skipped_emails = total_emails - len(sorted_message_ids)
     
@@ -298,51 +352,8 @@ def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
 
     for i, msg_id in enumerate(sorted_message_ids, 1):
         logger.info(f"Processing email {i} of {len(sorted_message_ids)}")
-        fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
-        email_data = fetch_data[msg_id][b'RFC822']
-        email_message = message_from_bytes(email_data)
-        
-        subject = email_message['Subject']
-        sender = get_sender_email(email_message)
-        timestamp = fetch_data[msg_id][b'INTERNALDATE']
-        body = ''
-
-        if email_message.is_multipart():
-            for part in email_message.walk():
-                content_type = part.get_content_type()
-                if content_type == "text/plain":
-                    body = part.get_payload(decode=True).decode(errors='ignore')
-                    break
-                elif content_type == "text/html":
-                    html_content = part.get_payload(decode=True).decode(errors='ignore')
-                    body = extract_html_content(html_content)
-                    break
-        else:
-            content_type = email_message.get_content_type()
-            if content_type == "text/plain":
-                body = email_message.get_payload(decode=True).decode(errors='ignore')
-            elif content_type == "text/html":
-                html_content = email_message.get_payload(decode=True).decode(errors='ignore')
-                body = extract_html_content(html_content)
-
         try:
-            logger.info(f"Email {i} - Timestamp: {timestamp}")
-            logger.info(f"Email {i} - Sender: {sender}")
-            logger.info(f"Email {i} - Subject: {subject}")
-            category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
-            category_counter[category] += 1
-            if has_two_words_or_less(category.lower()):
-                set_email_label(client, msg_id, category.lower())
-            else:
-                proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
-                if has_two_words_or_less(proposed_category.lower()):
-                    set_email_label(client, msg_id, proposed_category.lower())
-                    category = proposed_category
-            # checking if the category is in the accepted categories list to keep. If not the set label to skip the inbox
-            if not word_in_list(category, ok):
-                set_email_label(client, msg_id, "SkipInbox")
-            logger.info(f"Email {i} - Category: {category}")
-            logger.info("---")
+            process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, category_counter)
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
             logger.info("Terminating program due to categorization failure")
@@ -358,7 +369,6 @@ def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
 def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
     client = get_imap_client()
     
-    # Get emails with 'SkipInbox' label
     client.select_folder('INBOX')
     time_ago = datetime.now() - timedelta(hours=hours)
     date_criterion = time_ago.strftime("%d-%b-%Y")
@@ -368,52 +378,17 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
 
     for i, msg_id in enumerate(messages, 1):
         logger.info(f"Processing email {i} of {len(messages)}")
-        fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS'])
-        email_data = fetch_data[msg_id][b'RFC822']
-        email_message = message_from_bytes(email_data)
-        
-        subject = email_message['Subject']
-        sender = get_sender_email(email_message)
-        timestamp = fetch_data[msg_id][b'INTERNALDATE']
+        fetch_data = client.fetch([msg_id], ['FLAGS'])
         flags = fetch_data[msg_id][b'FLAGS']
         
-        # Check if the email has 3 or more labels
         if len(flags) >= 3:
             logger.info(f"Email {i} has {len(flags)} labels. Removing all except 'SkipInbox'")
-            # Remove all labels except 'SkipInbox'
             labels_to_remove = [flag.decode() for flag in flags if flag.decode() != '\\SkipInbox']
             client.remove_gmail_labels(msg_id, labels_to_remove)
             
-            # Recategorize the email
-            body = ''
-            if email_message.is_multipart():
-                for part in email_message.walk():
-                    content_type = part.get_content_type()
-                    if content_type == "text/plain":
-                        body = part.get_payload(decode=True).decode(errors='ignore')
-                        break
-                    elif content_type == "text/html":
-                        html_content = part.get_payload(decode=True).decode(errors='ignore')
-                        body = extract_html_content(html_content)
-                        break
-            else:
-                content_type = email_message.get_content_type()
-                if content_type == "text/plain":
-                    body = email_message.get_payload(decode=True).decode(errors='ignore')
-                elif content_type == "text/html":
-                    html_content = email_message.get_payload(decode=True).decode(errors='ignore')
-                    body = extract_html_content(html_content)
-            
             try:
                 logger.info(f"Recategorizing email {i}")
-                category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
-                if has_two_words_or_less(category.lower()):
-                    set_email_label(client, msg_id, category.lower())
-                else:
-                    proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
-                    if has_two_words_or_less(proposed_category.lower()):
-                        set_email_label(client, msg_id, proposed_category.lower())
-                logger.info(f"Email {i} recategorized as: {category}")
+                process_email(client, msg_id, api_type, api_url, api_key, ollama_host2)
             except Exception as e:
                 logger.error(f"Error recategorizing email: {e}")
         
