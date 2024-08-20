@@ -175,7 +175,7 @@ Examples:
 - Contents or Subject that talk about promotions: "Advertisement"
 - Contents or Subject that talk about ads or advertisements or saving money: "Advertisement"
 - Contents or Subject that talk about getting something for free: "Advertisement"
-- Contents or Subject that talk about facebook: "Spam"
+- Contents or Subject that talk about facebook: "Junk"
 
 For each email, analyze the sender's email address, subject line, and any provided content. Then respond with only the category label, nothing else.
 
@@ -236,7 +236,9 @@ def set_email_label(client, msg_id, label):
         client.add_gmail_labels(msg_id, [label])
         logger.info(f"Label '{label}' set successfully")
         if label == "SkipInbox":
-            logger.info(f"Removing Inbox label for email {msg_id}")
+            #logger.info(f"Removing Inbox label for email {msg_id}")
+            #client.remove_gmail_labels(msg_id, ["Inbox"])
+            logger.info(f"Removing \\Inbox label for email {msg_id}")
             client.remove_gmail_labels(msg_id, ["\\Inbox"])
             logger.info(f"Inbox label removed for email {msg_id}")
     except Exception as e:
