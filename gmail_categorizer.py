@@ -355,6 +355,73 @@ def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
     for category, count in category_counter.most_common():
         logger.info(f"{category}: {count}")
 
+def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
+    client = get_imap_client()
+    
+    # Get emails with 'SkipInbox' label
+    client.select_folder('INBOX')
+    time_ago = datetime.now() - timedelta(hours=hours)
+    date_criterion = time_ago.strftime("%d-%b-%Y")
+    messages = client.search(['SINCE', date_criterion, 'KEYWORD', 'SkipInbox'])
+    
+    logger.info(f"Found {len(messages)} emails with 'SkipInbox' label in the last {hours} hour(s)")
+
+    for i, msg_id in enumerate(messages, 1):
+        logger.info(f"Processing email {i} of {len(messages)}")
+        fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS'])
+        email_data = fetch_data[msg_id][b'RFC822']
+        email_message = message_from_bytes(email_data)
+        
+        subject = email_message['Subject']
+        sender = get_sender_email(email_message)
+        timestamp = fetch_data[msg_id][b'INTERNALDATE']
+        flags = fetch_data[msg_id][b'FLAGS']
+        
+        # Check if the email has 3 or more labels
+        if len(flags) >= 3:
+            logger.info(f"Email {i} has {len(flags)} labels. Removing all except 'SkipInbox'")
+            # Remove all labels except 'SkipInbox'
+            labels_to_remove = [flag.decode() for flag in flags if flag.decode() != '\\SkipInbox']
+            client.remove_gmail_labels(msg_id, labels_to_remove)
+            
+            # Recategorize the email
+            body = ''
+            if email_message.is_multipart():
+                for part in email_message.walk():
+                    content_type = part.get_content_type()
+                    if content_type == "text/plain":
+                        body = part.get_payload(decode=True).decode(errors='ignore')
+                        break
+                    elif content_type == "text/html":
+                        html_content = part.get_payload(decode=True).decode(errors='ignore')
+                        body = extract_html_content(html_content)
+                        break
+            else:
+                content_type = email_message.get_content_type()
+                if content_type == "text/plain":
+                    body = email_message.get_payload(decode=True).decode(errors='ignore')
+                elif content_type == "text/html":
+                    html_content = email_message.get_payload(decode=True).decode(errors='ignore')
+                    body = extract_html_content(html_content)
+            
+            try:
+                logger.info(f"Recategorizing email {i}")
+                category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
+                if has_two_words_or_less(category.lower()):
+                    set_email_label(client, msg_id, category.lower())
+                else:
+                    proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
+                    if has_two_words_or_less(proposed_category.lower()):
+                        set_email_label(client, msg_id, proposed_category.lower())
+                logger.info(f"Email {i} recategorized as: {category}")
+            except Exception as e:
+                logger.error(f"Error recategorizing email: {e}")
+        
+        logger.info("---")
+
+    logger.info("Logging out from Gmail IMAP server")
+    client.logout()
+
 def main():
     logger.info("Starting Gmail Categorizer")
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama or Anthropic API")
@@ -362,6 +429,7 @@ def main():
     parser.add_argument("--ollama-host2", help="Ollama server host (e.g., http://10.1.1.131:11434)")
     parser.add_argument("--anthropic-api-key", help="Anthropic API key")
     parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails (default: 1)")
+    parser.add_argument("--skip", action="store_true", help="Clean up and recategorize emails with SkipInbox label")
     args = parser.parse_args()
 
     if args.ollama_host and args.anthropic_api_key:
@@ -388,7 +456,10 @@ def main():
         logger.error(f"Terminating program due to {api_type} API connectivity failure")
         return
 
-    categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
+    if args.skip:
+        clean_up_skip_inbox_label(api_type, api_url, api_key, hours, args.ollama_host2)
+    else:
+        categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
 
     logger.info("Gmail Categorizer finished")
 
