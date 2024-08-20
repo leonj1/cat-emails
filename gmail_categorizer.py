@@ -237,7 +237,7 @@ def set_email_label(client, msg_id, label):
         logger.info(f"Label '{label}' set successfully")
         if label == "SkipInbox":
             logger.info(f"Archiving email {msg_id}")
-            client.add_gmail_labels(msg_id, ["\\Archive"])
+            client.add_gmail_labels(msg_id, ["Archive"])
             logger.info(f"Archived email {msg_id}")
     except Exception as e:
         logger.error(f"Error setting label or archiving: {e}")
@@ -375,7 +375,35 @@ def main():
 
         try:
             hide = ["advertisement", "politics", "notification", "helpful", "information", "spam", "marketting", "disclaimer", "marketing"]
-            ok = ["order placed", "order cancelled", "order updated", "order shipped", "personal", "bank", "alert", "legal", "document", "memorandum", "correspondance"]
+            ok = [
+                    "order", 
+                    "order cancelled", 
+                    "order confirm", 
+                    "order confirmed", 
+                    "order confirmation", 
+                    "order placed", 
+                    "order promised", 
+                    "order reminder", 
+                    "order scheduled", 
+                    "order update", 
+                    "order shipped", 
+                    "personal", 
+                    "statement", 
+                    "bank", 
+                    "alert", 
+                    "legal", 
+                    "legalese", 
+                    "document", 
+                    "memorandum", 
+                    "appointment confirmation", 
+                    "appointment confirmed", 
+                    "appointment reminder", 
+                    "appointment scheduled", 
+                    "correspondance",
+                    "\"alert\"", 
+                    "\"bank\"", 
+                    "\"personal\""
+                ]
             category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Subject: {subject}")
