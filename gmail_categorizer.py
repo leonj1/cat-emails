@@ -188,36 +188,6 @@ Content: [{body}]
     return generate_response(purpose, prompt, api_type, ollamas[api_url], api_url, api_key)
 
 
-def categorize_email(subject, body, sender, api_type, model, api_url=None, api_key=None):
-    if sender.endswith('@accounts.google.com'):
-        logger.info("Email from accounts.google.com, categorizing as Personal")
-        return "Personal"
-    if sender.endswith('shipment-tracking@amazon.com'):
-        logger.info("Email from Amazon shipment, categorizing as Shipment")
-        return "Shipment"
-    if sender.endswith('alerts@deadmansnitch.com'):
-        logger.info("Alert Email from Deadmansnitch, categorizing as Alert")
-        return "Alert"
-    logger.info("Categorizing email...")
-    prompt = f"""You are a laconic assistant that only speaks in single words. You will be given the content of an email. Your task is to categorize this email into one of the following categories:
-
-- Order Receipt
-- Advertisement
-- Personal Response
-- Other
-
-Please analyze the content of the email and determine which category it best fits into. Consider the purpose, tone, and typical characteristics of each category.
-Respond with only the category name, using one or two words at most. Do not provide any explanation or additional commentary.
-Instead of using the category name "Spam" use "Junk" instead.
-
-Subject: {subject}
-
-Body: {body}
-
-Category: [Single word]"""
-
-    return generate_response("categorize email", prompt, api_type, model, api_url, api_key)
-
 def is_email_summary_advertisement(subject, summary, api_type, model, api_url=None, api_key=None):
     logger.info("Summarizing Email Category...")
     prompt = f"""You are a laconic assistant that only speaks in single words. How would you categorize the following summary? Example, if it reads like an advertisement then respond with 'Advertisement'. Respond with no trailing period.
@@ -245,31 +215,6 @@ def set_email_label(client, msg_id, label):
 def extract_html_content(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     return soup.get_text(separator=' ', strip=True)
-
-def is_human_readable(text, api_type, model, api_url=None, api_key=None):
-    logger.info(f"Checking if text is human readable: {text}")
-    prompt = f"""
-You are an expert in natural language processing and computer science. Your task is to analyze the following text and determine whether it's human-readable or computer-oriented. 
-
-Human-readable text typically has these characteristics:
-1. Follows grammatical structures of natural language
-2. Uses common words and phrases
-3. Has a logical flow of ideas
-4. Contains punctuation and proper capitalization
-5. May include some technical terms, but in a context understandable to humans
-
-Computer-oriented text typically has these characteristics:
-1. Contains programming code, markup, or machine-readable data formats
-2. Uses specialized syntax or symbols not common in natural language
-3. May have long strings of numbers or seemingly random characters
-4. Often lacks natural language sentence structure
-5. May include file paths, URLs, or other computer-specific references
-
-Please analyze the following text and respond with either "Human-readable" or "Computer-oriented", followed by a brief explanation of your reasoning.
-
-Text to analyze: {text}
-"""
-    return generate_response("categorize text", prompt, api_type, model, api_url, api_key)
 
 def has_two_words_or_less(text):
     # Split the string into words
