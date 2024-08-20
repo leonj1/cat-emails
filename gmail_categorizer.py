@@ -276,39 +276,7 @@ def word_in_list(word, string_list):
     # Use any() and a generator expression for a more concise implementation
     return any(word in string.lower().split() for string in string_list)
 
-def main():
-    logger.info("Starting Gmail Categorizer")
-    parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama or Anthropic API")
-    parser.add_argument("--ollama-host", help="Ollama server host (e.g., http://10.1.1.212:11434)")
-    parser.add_argument("--ollama-host2", help="Ollama server host (e.g., http://10.1.1.131:11434)")
-    parser.add_argument("--anthropic-api-key", help="Anthropic API key")
-    parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails (default: 1)")
-    args = parser.parse_args()
-
-    if args.ollama_host and args.anthropic_api_key:
-        logger.error("Please provide either --ollama-host or --anthropic-api-key, not both")
-        return
-
-    if args.ollama_host:
-        api_type = "Ollama"
-        api_url = args.ollama_host
-        api_key = None
-    elif args.anthropic_api_key:
-        api_type = "Anthropic"
-        api_url = None
-        api_key = args.anthropic_api_key
-    else:
-        logger.error("Please provide either --ollama-host or --anthropic-api-key")
-        return
-
-    hours = args.hours
-    logger.info(f"Using {api_type} API")
-    logger.info(f"Fetching emails from the last {hours} hour(s)")
-
-    if not check_api_connectivity(api_type, api_url, api_key):
-        logger.error(f"Terminating program due to {api_type} API connectivity failure")
-        return
-
+def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
     client = get_imap_client()
     
     # Get total number of emails in the specified time range
@@ -366,7 +334,7 @@ def main():
             if has_two_words_or_less(category.lower()):
                 set_email_label(client, msg_id, category.lower())
             else:
-                proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[args.ollama_host2], args.ollama_host2, api_key)
+                proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
                 if has_two_words_or_less(proposed_category.lower()):
                     set_email_label(client, msg_id, proposed_category.lower())
                     category = proposed_category
@@ -386,6 +354,41 @@ def main():
     logger.info("Category Summary:")
     for category, count in category_counter.most_common():
         logger.info(f"{category}: {count}")
+
+def main():
+    logger.info("Starting Gmail Categorizer")
+    parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama or Anthropic API")
+    parser.add_argument("--ollama-host", help="Ollama server host (e.g., http://10.1.1.212:11434)")
+    parser.add_argument("--ollama-host2", help="Ollama server host (e.g., http://10.1.1.131:11434)")
+    parser.add_argument("--anthropic-api-key", help="Anthropic API key")
+    parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails (default: 1)")
+    args = parser.parse_args()
+
+    if args.ollama_host and args.anthropic_api_key:
+        logger.error("Please provide either --ollama-host or --anthropic-api-key, not both")
+        return
+
+    if args.ollama_host:
+        api_type = "Ollama"
+        api_url = args.ollama_host
+        api_key = None
+    elif args.anthropic_api_key:
+        api_type = "Anthropic"
+        api_url = None
+        api_key = args.anthropic_api_key
+    else:
+        logger.error("Please provide either --ollama-host or --anthropic-api-key")
+        return
+
+    hours = args.hours
+    logger.info(f"Using {api_type} API")
+    logger.info(f"Fetching emails from the last {hours} hour(s)")
+
+    if not check_api_connectivity(api_type, api_url, api_key):
+        logger.error(f"Terminating program due to {api_type} API connectivity failure")
+        return
+
+    categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
 
     logger.info("Gmail Categorizer finished")
 
