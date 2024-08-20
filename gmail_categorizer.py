@@ -260,6 +260,24 @@ def set_email_label(client, msg_id, label):
     except Exception as e:
         logger.error(f"Error setting label or removing Inbox label: {e}")
 
+def remove_all_labels(client, msg_id):
+    logger.info(f"Removing all labels for email {msg_id}")
+    try:
+        # Fetch all labels for the email
+        fetch_data = client.fetch([msg_id], ['X-GM-LABELS'])
+        labels = fetch_data[msg_id][b'X-GM-LABELS']
+        
+        # Convert labels to strings and filter out system labels
+        labels_to_remove = [label.decode() for label in labels if not label.startswith(b'\\')]
+        
+        if labels_to_remove:
+            client.remove_gmail_labels(msg_id, labels_to_remove)
+            logger.info(f"Removed labels: {', '.join(labels_to_remove)}")
+        else:
+            logger.info("No custom labels to remove")
+    except Exception as e:
+        logger.error(f"Error removing labels: {e}")
+
 def extract_html_content(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     return soup.get_text(separator=' ', strip=True)
