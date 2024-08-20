@@ -236,11 +236,11 @@ def set_email_label(client, msg_id, label):
         client.add_gmail_labels(msg_id, [label])
         logger.info(f"Label '{label}' set successfully")
         if label == "SkipInbox":
-            logger.info(f"Archiving email {msg_id}")
-            client.add_gmail_labels(msg_id, ["Archive"])
-            logger.info(f"Archived email {msg_id}")
+            logger.info(f"Removing Inbox label for email {msg_id}")
+            client.remove_gmail_labels(msg_id, ["\\Inbox"])
+            logger.info(f"Inbox label removed for email {msg_id}")
     except Exception as e:
-        logger.error(f"Error setting label or archiving: {e}")
+        logger.error(f"Error setting label or removing Inbox label: {e}")
 
 def extract_html_content(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
