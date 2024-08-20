@@ -422,7 +422,6 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
             
             # Get the labels
             labels = data.get(b'X-GM-LABELS', [])
-            
             list_of_labels = ", ".join(label.decode() for label in labels)
             logger.info(f"Email {i} has {len(labels)} labels: {list_of_labels}")
             
@@ -430,6 +429,12 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
                 logger.info(f"Email {i} has 'SkipInbox' label. Recategorizing...")
                 try:
                     process_email(client, msg_id, api_type, api_url, api_key, ollama_host2)
+                    # Fetching the new labels
+                    fetch_data = client.fetch([msg_id], ['RFC822', 'X-GM-LABELS'])
+                    for msg_id, data in fetch_data.items():
+                         labels = data.get(b'X-GM-LABELS', [])
+                         list_of_labels = ", ".join(label.decode() for label in labels)
+                         logger.info(f"Email {i} has {len(labels)} labels: {list_of_labels}")
                 except Exception as e:
                     logger.error(f"Error recategorizing email: {e}")
             else:
