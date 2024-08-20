@@ -92,7 +92,20 @@ def get_recent_emails(client, hours):
     logger.info(f"Searching for emails since {date_criterion}...")
     messages = client.search(['SINCE', date_criterion, 'NOT', 'KEYWORD', 'SkipInbox'])
     logger.info(f"Found {len(messages)} recent emails without 'SkipInbox' label")
-    return messages
+    
+    # Fetch email data including timestamps
+    email_data = []
+    for msg_id in messages:
+        fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
+        timestamp = fetch_data[msg_id][b'INTERNALDATE']
+        email_data.append((msg_id, timestamp))
+    
+    # Sort emails by timestamp in descending order
+    sorted_emails = sorted(email_data, key=lambda x: x[1], reverse=True)
+    sorted_msg_ids = [email[0] for email in sorted_emails]
+    
+    logger.info("Emails sorted by timestamp in descending order")
+    return sorted_msg_ids
 
 def get_sender_email(email_message):
     sender = email_message['From']
@@ -273,23 +286,24 @@ def main():
     total_emails = len(all_messages)
     
     # Get emails without 'SkipInbox' label
-    message_ids = get_recent_emails(client, hours)
-    skipped_emails = total_emails - len(message_ids)
+    sorted_message_ids = get_recent_emails(client, hours)
+    skipped_emails = total_emails - len(sorted_message_ids)
     
     logger.info(f"Total emails in the last {hours} hour(s): {total_emails}")
     logger.info(f"Emails skipped due to 'SkipInbox' label: {skipped_emails}")
-    logger.info(f"Emails to process: {len(message_ids)}")
+    logger.info(f"Emails to process: {len(sorted_message_ids)}")
 
     category_counter = Counter()
 
-    for i, msg_id in enumerate(message_ids, 1):
-        logger.info(f"Processing email {i} of {len(message_ids)}")
-        email_data = client.fetch([msg_id], ['RFC822'])[msg_id][b'RFC822']
+    for i, msg_id in enumerate(sorted_message_ids, 1):
+        logger.info(f"Processing email {i} of {len(sorted_message_ids)}")
+        fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
+        email_data = fetch_data[msg_id][b'RFC822']
         email_message = message_from_bytes(email_data)
         
         subject = email_message['Subject']
         sender = get_sender_email(email_message)
-        timestamp = email_message['Date']
+        timestamp = fetch_data[msg_id][b'INTERNALDATE']
         body = ''
 
         if email_message.is_multipart():
