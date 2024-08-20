@@ -333,17 +333,17 @@ def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, cate
     if category_counter is not None:
         category_counter[category] += 1
     
-    if has_two_words_or_less(category.lower()):
-        set_email_label(client, msg_id, category.lower())
-    else:
+    if not has_two_words_or_less(category):
         proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
-        if has_two_words_or_less(proposed_category.lower()):
-            set_email_label(client, msg_id, proposed_category.lower())
+        if has_two_words_or_less(proposed_category):
             category = proposed_category
+            set_email_label(client, msg_id, proposed_category)
     
     if not word_in_list(category, ok):
         remove_all_labels(client, msg_id, labels)
         set_email_label(client, msg_id, "SkipInbox")
+
+    set_email_label(client, msg_id, category)
     
     logger.info(f"Email - Category: {category}")
     logger.info("---")
