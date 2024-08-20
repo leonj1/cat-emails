@@ -3,6 +3,8 @@ import requests
 import argparse
 import logging
 import time
+import email
+from email.header import decode_header
 from collections import Counter
 from datetime import datetime, timedelta
 from imapclient import IMAPClient
@@ -372,7 +374,7 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
     client.select_folder('INBOX')
     time_ago = datetime.now() - timedelta(hours=hours)
     date_criterion = time_ago.strftime("%d-%b-%Y")
-    messages = client.search(['SINCE', date_criterion, 'KEYWORD', 'SkipInbox'])
+    messages = client.search(['SINCE', date_criterion, 'X-GM-LABELS', 'SkipInbox'])
     
     logger.info(f"Found {len(messages)} emails with 'SkipInbox' label in the last {hours} hour(s)")
 
@@ -381,7 +383,7 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
         for folder in client.list_folders():
             folder_name = folder[2]
             client.select_folder(folder_name)
-            messages = client.search(['SINCE', date_criterion, 'KEYWORD', 'SkipInbox'])
+            messages = client.search(['SINCE', date_criterion, 'X-GM-LABELS', 'SkipInbox'])
             if messages:
                 logger.info(f"Found {len(messages)} emails with 'SkipInbox' label in folder: {folder_name}")
                 break
@@ -392,21 +394,32 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
 
     for i, msg_id in enumerate(messages, 1):
         logger.info(f"Processing email {i} of {len(messages)}")
-        fetch_data = client.fetch([msg_id], ['FLAGS'])
-        flags = fetch_data[msg_id][b'FLAGS']
-        
-        logger.info(f"Email {i} has {len(flags)} labels: {[flag.decode() for flag in flags]}")
-        
-        if b'\\SkipInbox' in flags:
-            logger.info(f"Email {i} has 'SkipInbox' label. Recategorizing...")
-            try:
-                process_email(client, msg_id, api_type, api_url, api_key, ollama_host2)
-            except Exception as e:
-                logger.error(f"Error recategorizing email: {e}")
-        else:
-            logger.info(f"Email {i} does not have 'SkipInbox' label. Skipping...")
-        
-        logger.info("---")
+        fetch_data = client.fetch([msg_id], ['RFC822', 'X-GM-LABELS'])
+
+        for msg_id, data in fetch_data.items():
+            email_message = email.message_from_bytes(data[b'RFC822'])
+            
+            # Decode the email subject
+            subject, encoding = decode_header(email_message["Subject"])[0]
+            if isinstance(subject, bytes):
+                subject = subject.decode(encoding or "utf-8")
+            
+            # Get the labels
+            labels = data.get(b'X-GM-LABELS', [])
+            
+            list_of_labels = ", ".join(label.decode() for label in labels)
+            logger.info(f"Email {i} has {len(labels)} labels: {list_of_labels}")
+            
+            if b'SkipInbox' in labels:
+                logger.info(f"Email {i} has 'SkipInbox' label. Recategorizing...")
+                try:
+                    process_email(client, msg_id, api_type, api_url, api_key, ollama_host2)
+                except Exception as e:
+                    logger.error(f"Error recategorizing email: {e}")
+            else:
+                logger.info(f"Email {i} does not have 'SkipInbox' label. Skipping...")
+            
+            logger.info("-" * 50)
 
     logger.info("Logging out from Gmail IMAP server")
     client.logout()
