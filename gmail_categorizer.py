@@ -376,21 +376,35 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
     
     logger.info(f"Found {len(messages)} emails with 'SkipInbox' label in the last {hours} hour(s)")
 
+    if not messages:
+        logger.info("No emails found with 'SkipInbox' label. Checking all folders...")
+        for folder in client.list_folders():
+            folder_name = folder[2]
+            client.select_folder(folder_name)
+            messages = client.search(['SINCE', date_criterion, 'KEYWORD', 'SkipInbox'])
+            if messages:
+                logger.info(f"Found {len(messages)} emails with 'SkipInbox' label in folder: {folder_name}")
+                break
+        else:
+            logger.info("No emails found with 'SkipInbox' label in any folder.")
+            client.logout()
+            return
+
     for i, msg_id in enumerate(messages, 1):
         logger.info(f"Processing email {i} of {len(messages)}")
         fetch_data = client.fetch([msg_id], ['FLAGS'])
         flags = fetch_data[msg_id][b'FLAGS']
         
-        if len(flags) >= 3:
-            logger.info(f"Email {i} has {len(flags)} labels. Removing all except 'SkipInbox'")
-            labels_to_remove = [flag.decode() for flag in flags if flag.decode() != '\\SkipInbox']
-            client.remove_gmail_labels(msg_id, labels_to_remove)
-            
+        logger.info(f"Email {i} has {len(flags)} labels: {[flag.decode() for flag in flags]}")
+        
+        if b'\\SkipInbox' in flags:
+            logger.info(f"Email {i} has 'SkipInbox' label. Recategorizing...")
             try:
-                logger.info(f"Recategorizing email {i}")
                 process_email(client, msg_id, api_type, api_url, api_key, ollama_host2)
             except Exception as e:
                 logger.error(f"Error recategorizing email: {e}")
+        else:
+            logger.info(f"Email {i} does not have 'SkipInbox' label. Skipping...")
         
         logger.info("---")
 
