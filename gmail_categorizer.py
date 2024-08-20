@@ -247,6 +247,8 @@ Category: [Single word]"""
 def set_email_label(client, msg_id, label):
     if label.lower() == "spam":
         label = "Junk"
+    # Remove surrounding quotes if present
+    label = label.strip("\"'")
     logger.info(f"Setting label '{label}' for email {msg_id}")
     try:
         client.add_gmail_labels(msg_id, [label])
