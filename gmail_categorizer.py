@@ -20,6 +20,37 @@ ollamas = {
     "http://10.1.1.131:11434": {"model": "llama3:latest", "num_ctx": 8192}
 }
 
+hide = ["advertisement", "politics", "notification", "helpful", "information", "spam", "marketting", "disclaimer", "marketing"]
+ok = [
+        "order", 
+        "order cancelled", 
+        "order confirm", 
+        "order confirmed", 
+        "order confirmation", 
+        "order placed", 
+        "order promised", 
+        "order reminder", 
+        "order scheduled", 
+        "order update", 
+        "order shipped", 
+        "personal", 
+        "statement", 
+        "bank", 
+        "alert", 
+        "legal", 
+        "legalese", 
+        "document", 
+        "memorandum", 
+        "appointment confirmation", 
+        "appointment confirmed", 
+        "appointment reminder", 
+        "appointment scheduled", 
+        "correspondance",
+        "\"alert\"", 
+        "\"bank\"", 
+        "\"personal\""
+    ]
+
 def check_api_connectivity(api_type, api_url=None, api_key=None, max_retries=3, retry_delay=5):
     logger.info(f"Checking connectivity to {api_type} API")
     for attempt in range(max_retries):
@@ -325,40 +356,10 @@ def main():
                 body = extract_html_content(html_content)
 
         try:
-            hide = ["advertisement", "politics", "notification", "helpful", "information", "spam", "marketting", "disclaimer", "marketing"]
-            ok = [
-                    "order", 
-                    "order cancelled", 
-                    "order confirm", 
-                    "order confirmed", 
-                    "order confirmation", 
-                    "order placed", 
-                    "order promised", 
-                    "order reminder", 
-                    "order scheduled", 
-                    "order update", 
-                    "order shipped", 
-                    "personal", 
-                    "statement", 
-                    "bank", 
-                    "alert", 
-                    "legal", 
-                    "legalese", 
-                    "document", 
-                    "memorandum", 
-                    "appointment confirmation", 
-                    "appointment confirmed", 
-                    "appointment reminder", 
-                    "appointment scheduled", 
-                    "correspondance",
-                    "\"alert\"", 
-                    "\"bank\"", 
-                    "\"personal\""
-                ]
-            category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
             logger.info(f"Email {i} - Timestamp: {timestamp}")
             logger.info(f"Email {i} - Sender: {sender}")
             logger.info(f"Email {i} - Subject: {subject}")
+            category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
             category_counter[category] += 1
             if has_two_words_or_less(category.lower()):
                 set_email_label(client, msg_id, category.lower())
