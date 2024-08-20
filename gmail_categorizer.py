@@ -251,6 +251,8 @@ def set_email_label(client, msg_id, label):
         label = "Junk"
     # Remove surrounding quotes if present
     label = label.strip("\"'")
+    # Capitalize each word in the label
+    label = capitalize_words(label)
     logger.info(f"Setting label '{label}' for email {msg_id}")
     try:
         client.add_gmail_labels(msg_id, [label])
@@ -291,6 +293,9 @@ def word_in_list(word, string_list):
     
     # Use any() and a generator expression for a more concise implementation
     return any(word in string.lower().split() for string in string_list)
+
+def capitalize_words(text):
+    return ' '.join(word.capitalize() for word in text.split())
 
 def get_email_body(email_message):
     body = ''
