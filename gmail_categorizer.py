@@ -231,6 +231,8 @@ Category: [Single word]"""
     return generate_response("summarize email", prompt, api_type, model, api_url, api_key)
 
 def set_email_label(client, msg_id, label):
+    if label.lower() == "spam":
+        label = "Junk"
     logger.info(f"Setting label '{label}' for email {msg_id}")
     try:
         client.add_gmail_labels(msg_id, [label])
