@@ -260,15 +260,11 @@ def set_email_label(client, msg_id, label):
     except Exception as e:
         logger.error(f"Error setting label or removing Inbox label: {e}")
 
-def remove_all_labels(client, msg_id):
+def remove_all_labels(client, msg_id, labels):
     logger.info(f"Removing all labels for email {msg_id}")
     try:
-        # Fetch all labels for the email
-        fetch_data = client.fetch([msg_id], ['X-GM-LABELS'])
-        labels = fetch_data[msg_id][b'X-GM-LABELS']
-        
         # Convert labels to strings and filter out system labels
-        labels_to_remove = [label.decode() for label in labels if not label.startswith(b'\\')]
+        labels_to_remove = [label.decode() if isinstance(label, bytes) else label for label in labels if not (isinstance(label, bytes) and label.startswith(b'\\')) and not (isinstance(label, str) and label.startswith('\\'))]
         
         if labels_to_remove:
             client.remove_gmail_labels(msg_id, labels_to_remove)
@@ -318,9 +314,10 @@ def get_email_body(email_message):
     return body
 
 def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, category_counter=None):
-    fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS'])
+    fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS', 'X-GM-LABELS'])
     email_data = fetch_data[msg_id][b'RFC822']
     email_message = message_from_bytes(email_data)
+    labels = fetch_data[msg_id][b'X-GM-LABELS']
     
     subject = email_message['Subject']
     sender = get_sender_email(email_message)
@@ -345,6 +342,7 @@ def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, cate
             category = proposed_category
     
     if not word_in_list(category, ok):
+        remove_all_labels(client, msg_id, labels)
         set_email_label(client, msg_id, "SkipInbox")
     
     logger.info(f"Email - Category: {category}")
