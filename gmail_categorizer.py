@@ -262,6 +262,23 @@ def set_email_label(client, msg_id, label):
     except Exception as e:
         logger.error(f"Error setting label or removing Inbox label: {e}")
 
+def archive_email(client, msg_id):
+    logger.info(f"Archiving email {msg_id}")
+    try:
+        client.remove_gmail_labels(msg_id, ["\\Inbox"])
+        logger.info(f"Email {msg_id} archived successfully")
+    except Exception as e:
+        logger.error(f"Error archiving email {msg_id}: {e}")
+
+def delete_and_expunge_email(client, msg_id):
+    logger.info(f"Deleting and expunging email {msg_id}")
+    try:
+        client.delete_messages([msg_id])
+        client.expunge()
+        logger.info(f"Email {msg_id} deleted and expunged successfully")
+    except Exception as e:
+        logger.error(f"Error deleting and expunging email {msg_id}: {e}")
+
 def remove_all_labels(client, msg_id, labels):
     logger.info(f"Removing all labels for email {msg_id}")
     try:
@@ -344,11 +361,17 @@ def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, cate
             category = proposed_category
             set_email_label(client, msg_id, proposed_category)
     
-    if not word_in_list(category, ok):
+    category_lower = category.lower()
+    if category_lower in ["advertisement", "advertisements", "politics"]:
+        delete_and_expunge_email(client, msg_id)
+    elif not word_in_list(category, ok):
         remove_all_labels(client, msg_id, labels)
         set_email_label(client, msg_id, "SkipInbox")
-
-    set_email_label(client, msg_id, category)
+        archive_email(client, msg_id)
+    elif category_lower == "junk":
+        archive_email(client, msg_id)
+    else:
+        set_email_label(client, msg_id, category)
     
     logger.info(f"Email - Category: {category}")
     logger.info("---")
