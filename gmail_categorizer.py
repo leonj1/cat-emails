@@ -453,7 +453,14 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
             list_of_labels = ", ".join(label.decode() for label in labels)
             logger.info(f"Email {i} has {len(labels)} labels: {list_of_labels}")
             
-            if b'SkipInbox' in labels:
+            lower_labels = [label.decode().lower() for label in labels]
+            if any(label in lower_labels for label in ["advertisement", "advertisements", "politics"]):
+                logger.info(f"Email {i} has 'advertisement', 'advertisements', or 'politics' label. Deleting and expunging...")
+                try:
+                    delete_and_expunge_email(client, msg_id)
+                except Exception as e:
+                    logger.error(f"Error deleting and expunging email: {e}")
+            elif b'SkipInbox' in labels:
                 logger.info(f"Email {i} has 'SkipInbox' label. Recategorizing...")
                 try:
                     process_email(client, msg_id, api_type, api_url, api_key, ollama_host2)
@@ -466,7 +473,7 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
                 except Exception as e:
                     logger.error(f"Error recategorizing email: {e}")
             else:
-                logger.info(f"Email {i} does not have 'SkipInbox' label. Skipping...")
+                logger.info(f"Email {i} does not have 'SkipInbox' label or targeted labels. Skipping...")
             
             logger.info("-" * 50)
 
