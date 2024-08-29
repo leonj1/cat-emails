@@ -128,7 +128,9 @@ def get_recent_emails(client, hours):
     
     # Fetch email data including timestamps
     email_data = []
-    for msg_id in messages:
+    total_messages = len(messages)
+    for index, msg_id in enumerate(messages, 1):
+        logger.info(f"Processing {index} of {total_messages} emails, ID: {msg_id}")
         fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
         timestamp = fetch_data[msg_id][b'INTERNALDATE']
         email_data.append((msg_id, timestamp))
@@ -191,7 +193,7 @@ def generate_response(purpose, prompt, api_type, model_info, api_url=None, api_k
         return message.content[0].text
 
 def categorize_email_new(subject, body, sender, api_type, model, api_url=None, api_key=None):
-    purpose = "Categorize email NEW"
+    purpose = "Categorize email"
     prompt = f"""
 You are an expert email classifier. Your task is to categorize emails based on their subject and contents. Provide a brief category label of one or two words for each email. Focus only on the following categories:
 
@@ -438,20 +440,25 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
 
     for i, msg_id in enumerate(messages, 1):
         logger.info(f"Processing email {i} of {len(messages)}")
-        fetch_data = client.fetch([msg_id], ['RFC822', 'X-GM-LABELS'])
+        try:
+            fetch_data = client.fetch([msg_id], ['RFC822', 'X-GM-LABELS'])
 
-        for msg_id, data in fetch_data.items():
-            email_message = email.message_from_bytes(data[b'RFC822'])
-            
-            # Decode the email subject
-            subject, encoding = decode_header(email_message["Subject"])[0]
-            if isinstance(subject, bytes):
-                subject = subject.decode(encoding or "utf-8")
-            
-            # Get the labels
-            labels = data.get(b'X-GM-LABELS', [])
-            list_of_labels = ", ".join(label.decode() for label in labels)
-            logger.info(f"Email {i} has {len(labels)} labels: {list_of_labels}")
+            for msg_id, data in fetch_data.items():
+                try:
+                    email_message = email.message_from_bytes(data[b'RFC822'])
+                    
+                    # Decode the email subject
+                    subject, encoding = decode_header(email_message["Subject"])[0]
+                    if isinstance(subject, bytes):
+                        subject = subject.decode(encoding or "utf-8")
+                    
+                    # Get the labels
+                    labels = data.get(b'X-GM-LABELS', [])
+                    list_of_labels = ", ".join(label.decode() for label in labels)
+                    logger.info(f"Email {i} has {len(labels)} labels: {list_of_labels}")
+                except KeyError as e:
+                    logger.error(f"KeyError processing email {i}: {e}")
+                    continue  # Skip to the next email
             
             lower_labels = [label.decode().lower() for label in labels]
             if any(label in lower_labels for label in ["advertisement", "advertisements", "politics"]):
@@ -476,6 +483,8 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
                 logger.info(f"Email {i} does not have 'SkipInbox' label or targeted labels. Skipping...")
             
             logger.info("-" * 50)
+        except Exception as e:
+            logger.error(f"Error processing email {i}: {e}")
 
     logger.info("Logging out from Gmail IMAP server")
     client.logout()
