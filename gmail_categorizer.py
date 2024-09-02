@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 ollamas = {
     "http://10.1.1.212:11434": {"model": "llama3.1:8b", "num_ctx": 4096},
-    "http://10.1.1.131:11434": {"model": "llama3:latest", "num_ctx": 8192}
+    "http://10.1.1.144:11434": {"model": "llama3:latest", "num_ctx": 8192}
 }
 
 hide = ["advertisement", "politics", "notification", "helpful", "information", "spam", "marketting", "disclaimer", "marketing"]
@@ -493,7 +493,7 @@ def main():
     logger.info("Starting Gmail Categorizer")
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama or Anthropic API")
     parser.add_argument("--ollama-host", help="Ollama server host (e.g., http://10.1.1.212:11434)")
-    parser.add_argument("--ollama-host2", help="Ollama server host (e.g., http://10.1.1.131:11434)")
+    parser.add_argument("--ollama-host2", help="Ollama server host (e.g., http://10.1.1.144:11434)")
     parser.add_argument("--anthropic-api-key", help="Anthropic API key")
     parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails (default: 1)")
     parser.add_argument("--skip", action="store_true", help="Clean up and recategorize emails with SkipInbox label")
