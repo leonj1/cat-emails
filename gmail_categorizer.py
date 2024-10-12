@@ -1,9 +1,12 @@
+import ell
+import openai
 import os
 import requests
 import argparse
 import logging
 import time
 import email
+import re
 from email.header import decode_header
 from collections import Counter
 from datetime import datetime, timedelta
@@ -12,6 +15,23 @@ from email import message_from_bytes
 import imaplib
 from bs4 import BeautifulSoup
 from anthropic import Anthropic
+
+
+ell.init(verbose=True, store='./logdir')
+
+client = openai.Client(
+    base_url="http://10.1.1.144:11434/v1", api_key="ollama"  # required but not used
+)
+
+@ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
+def categorize_email_ell(contents: str):
+    """
+    You do not want people trying to sell you things.
+    You do not want to spend money.
+    You categorize emails into one of the following categories: 
+    'Wants-Money', 'Marketing', 'Personal', 'Financial-Notification', 'Appointment-Reminder', 'Service-Updates', 'Work-related'.
+    """
+    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,6 +44,11 @@ ollamas = {
 
 hide = ["advertisement", "politics", "notification", "helpful", "information", "spam", "marketting", "disclaimer", "marketing"]
 ok = [
+        'Personal', 
+        'Financial-Notification', 
+        'Appointment-Reminder', 
+        'Service-Updates', 
+        'Work-related',
         "order", 
         "order cancelled", 
         "order confirm", 
@@ -52,6 +77,15 @@ ok = [
         "\"bank\"", 
         "\"personal\""
     ]
+
+def remove_http_links(text):
+    # Regular expression pattern to match HTTP links
+    pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+    
+    # Replace all occurrences of the pattern with an empty string
+    cleaned_text = re.sub(pattern, '', text)
+    
+    return cleaned_text
 
 def check_api_connectivity(api_type, api_url=None, api_key=None, max_retries=3, retry_delay=5):
     logger.info(f"Checking connectivity to {api_type} API")
@@ -352,7 +386,10 @@ def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, cate
     logger.info(f"Email - Sender: {sender}")
     logger.info(f"Email - Subject: {subject}")
     
-    category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
+#    category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
+    contents_without_links = remove_http_links(f"{subject}. {body}")
+    category = categorize_email_ell(contents_without_links)
+    logger.info(f"Category: {category}")
     
     if category_counter is not None:
         category_counter[category] += 1
@@ -488,6 +525,7 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
 
     logger.info("Logging out from Gmail IMAP server")
     client.logout()
+
 
 def main():
     logger.info("Starting Gmail Categorizer")

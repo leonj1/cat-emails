@@ -2,4 +2,4 @@
 .env
 nohup.out
 ollama.txt
-
+logdir
