@@ -157,8 +157,8 @@ def get_recent_emails(client, hours):
     time_ago = datetime.now() - timedelta(hours=hours)
     date_criterion = time_ago.strftime("%d-%b-%Y")
     logger.info(f"Searching for emails since {date_criterion}...")
-    messages = client.search(['SINCE', date_criterion, 'NOT', 'KEYWORD', 'SkipInbox'])
-    logger.info(f"Found {len(messages)} recent emails without 'SkipInbox' label")
+    messages = client.search(['SINCE', date_criterion, 'NOT', 'KEYWORD', 'bogus-asdf'])
+    logger.info(f"Found {len(messages)} recent emails")
     
     # Fetch email data including timestamps
     email_data = []
@@ -389,30 +389,31 @@ def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, cate
 #    category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
     contents_without_links = remove_http_links(f"{subject}. {body}")
     category = categorize_email_ell(contents_without_links)
+    # remove double and single quotes from category
+    category = category.replace('"', '').replace("'", "")
     logger.info(f"Category: {category}")
     
     if category_counter is not None:
         category_counter[category] += 1
     
-    if not has_two_words_or_less(category):
-        proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
-        if has_two_words_or_less(proposed_category):
-            category = proposed_category
-            set_email_label(client, msg_id, proposed_category)
+    # if not has_two_words_or_less(category):
+    #     proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
+    #     if has_two_words_or_less(proposed_category):
+    #         category = proposed_category
+    #         set_email_label(client, msg_id, proposed_category)
     
     category_lower = category.lower()
-    if category_lower in ["advertisement", "advertisements", "politics"]:
+    if category_lower not in ok:
         delete_and_expunge_email(client, msg_id)
-    elif not word_in_list(category, ok):
-        remove_all_labels(client, msg_id, labels)
-        set_email_label(client, msg_id, "SkipInbox")
-        archive_email(client, msg_id)
-    elif category_lower == "junk":
-        archive_email(client, msg_id)
+    # elif not word_in_list(category, ok):
+    #     remove_all_labels(client, msg_id, labels)
+    #     set_email_label(client, msg_id, "SkipInbox")
+    #     archive_email(client, msg_id)
+    # elif category_lower == "junk":
+    #     archive_email(client, msg_id)
     else:
         set_email_label(client, msg_id, category)
     
-    logger.info(f"Email - Category: {category}")
     logger.info("---")
     
     return category
@@ -561,11 +562,12 @@ def main():
         logger.error(f"Terminating program due to {api_type} API connectivity failure")
         return
 
-    if args.skip:
-        clean_up_skip_inbox_label(api_type, api_url, api_key, hours, args.ollama_host2)
-    else:
-        categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
+    # if args.skip:
+    #     clean_up_skip_inbox_label(api_type, api_url, api_key, hours, args.ollama_host2)
+    # else:
+    #     categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
 
+    categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
     logger.info("Gmail Categorizer finished")
 
 if __name__ == '__main__':
