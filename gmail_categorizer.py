@@ -541,12 +541,18 @@ def get_email_body(email_message):
     return body
 
 def process_email(client, msg_id, category_counter=None):
-    logger.info(f"{msg_id}: Starting processing email")
-    fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS', 'X-GM-LABELS'])
-    email_data = fetch_data[msg_id][b'RFC822']
-    logger.info(f"{msg_id}: Obtaining message from bytes")
-    email_message = message_from_bytes(email_data)
-    existing_email_labels = fetch_data[msg_id][b'X-GM-LABELS']
+    try:
+        logger.info(f"{msg_id}: Starting processing email")
+        # Select the INBOX folder before fetching email data
+        client.select_folder('INBOX')
+        fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS', 'X-GM-LABELS'])
+        email_data = fetch_data[msg_id][b'RFC822']
+        logger.info(f"{msg_id}: Obtaining message from bytes")
+        email_message = message_from_bytes(email_data)
+        existing_email_labels = fetch_data[msg_id][b'X-GM-LABELS']
+    except Exception as e:
+        logger.error(f"Error fetching email data: {e}")
+        return "ERROR", None
     
     subject = email_message['Subject']
     logger.info(f"{msg_id}: Getting sender email")
@@ -615,11 +621,16 @@ process_email.__module__ = __name__
 def categorize_emails(hours):
     client = get_imap_client()
     
-    client.select_folder('INBOX')
-    time_ago = datetime.now() - timedelta(hours=hours)
-    date_criterion = time_ago.strftime("%d-%b-%Y")
-    all_messages = client.search(['SINCE', date_criterion])
-    total_emails = len(all_messages)
+    try:
+        client.select_folder('INBOX')
+        time_ago = datetime.now() - timedelta(hours=hours)
+        date_criterion = time_ago.strftime("%d-%b-%Y")
+        all_messages = client.search(['SINCE', date_criterion])
+        total_emails = len(all_messages)
+    except Exception as e:
+        logger.error(f"Error selecting INBOX or searching for messages: {e}")
+        client.logout()
+        return
     
     sorted_message_ids = get_recent_emails(client, hours)
     # skipped_emails = total_emails - len(sorted_message_ids)
