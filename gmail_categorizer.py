@@ -303,6 +303,8 @@ def get_imap_client():
     logger.info("Successfully connected to Gmail IMAP server")
     return client
 
+get_imap_client.__module__ = __name__
+
 def get_recent_emails(client, hours):
     logger.info("Selecting INBOX folder...")
     client.select_folder('INBOX')
@@ -539,14 +541,18 @@ def get_email_body(email_message):
     return body
 
 def process_email(client, msg_id, category_counter=None):
+    logger.info(f"{msg_id}: Starting processing email")
     fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS', 'X-GM-LABELS'])
     email_data = fetch_data[msg_id][b'RFC822']
+    logger.info(f"{msg_id}: Obtaining message from bytes")
     email_message = message_from_bytes(email_data)
     existing_email_labels = fetch_data[msg_id][b'X-GM-LABELS']
     
     subject = email_message['Subject']
+    logger.info(f"{msg_id}: Getting sender email")
     sender = get_sender_email(email_message)
     timestamp = fetch_data[msg_id][b'INTERNALDATE']
+    logger.info(f"{msg_id}: Getting email body")
     body = get_email_body(email_message)
     contents_without_links = remove_http_links(f"{subject}. {body}")
     contents_without_images = remove_images_from_email(contents_without_links)
@@ -556,7 +562,6 @@ def process_email(client, msg_id, category_counter=None):
     logger.info(f"Email - Timestamp: {timestamp}")
     logger.info(f"Email - Sender: {sender}")
     logger.info(f"Email - Subject: {subject}")
-
 
     ignore_existing_labels = True
     
@@ -568,16 +573,18 @@ def process_email(client, msg_id, category_counter=None):
             else:
                 logger.info(f"Email {msg_id} has labels {existing_email_labels}. Skipping...")
                 logger.info("---")
-                return existing_email_labels
+                return "KEPT", existing_email_labels
     
     category = categorize_email_ell_for_me(contents_cleaned)
     category = category.replace('"', '').replace("'", "")
     category_lower = category.lower()
     logger.info("Finished checking if the email is meant for me")
+    action_taken = "None"
     
     if category_lower != "other" and category_lower in ok:
         set_email_label(client, msg_id, category)
         mark_email_as_unread(client, msg_id)
+        action_taken = "KEPT"
     else:
         category = categorize_email_ell_marketing(contents_cleaned)
         category = category.replace('"', '').replace("'", "")
@@ -586,12 +593,14 @@ def process_email(client, msg_id, category_counter=None):
         if category_lower != "other" and len(category_lower) <= 40:
             set_email_label(client, msg_id, category)
             delete_and_expunge_email(client, msg_id)
+            action_taken = "PURGED"
         else:
             category = categorize_email_ell_generic(contents_cleaned)
             category = category.replace('"', '').replace("'", "")
             logger.info("Finished checking if the email is generic")
             set_email_label(client, msg_id, category)
             delete_and_expunge_email(client, msg_id)
+            action_taken = "PURGED"
     
     if category_counter is not None:
         category_counter[category] += 1
@@ -599,7 +608,9 @@ def process_email(client, msg_id, category_counter=None):
     logger.info(f"Category: {category}")
     logger.info("---")
     
-    return category
+    return action_taken, category
+
+process_email.__module__ = __name__
 
 def categorize_emails(hours):
     client = get_imap_client()
@@ -635,82 +646,6 @@ def categorize_emails(hours):
     logger.info("Category Summary:")
     for category, count in category_counter.most_common():
         logger.info(f"{category}: {count}")
-
-def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
-    client = get_imap_client()
-    
-    client.select_folder('INBOX')
-    time_ago = datetime.now() - timedelta(hours=hours)
-    date_criterion = time_ago.strftime("%d-%b-%Y")
-    messages = client.search(['SINCE', date_criterion, 'X-GM-LABELS', 'SkipInbox'])
-    
-    logger.info(f"Found {len(messages)} emails with 'SkipInbox' label in the last {hours} hour(s)")
-
-    if not messages:
-        logger.info("No emails found with 'SkipInbox' label. Checking all folders...")
-        for folder in client.list_folders():
-            folder_name = folder[2]
-            client.select_folder(folder_name)
-            messages = client.search(['SINCE', date_criterion, 'X-GM-LABELS', 'SkipInbox'])
-            if messages:
-                logger.info(f"Found {len(messages)} emails with 'SkipInbox' label in folder: {folder_name}")
-                break
-        else:
-            logger.info("No emails found with 'SkipInbox' label in any folder.")
-            client.logout()
-            return
-
-    for i, msg_id in enumerate(messages, 1):
-        logger.info(f"Processing email {i} of {len(messages)}")
-        try:
-            fetch_data = client.fetch([msg_id], ['RFC822', 'X-GM-LABELS'])
-
-            for msg_id, data in fetch_data.items():
-                try:
-                    email_message = email.message_from_bytes(data[b'RFC822'])
-                    
-                    # Decode the email subject
-                    subject, encoding = decode_header(email_message["Subject"])[0]
-                    if isinstance(subject, bytes):
-                        subject = subject.decode(encoding or "utf-8")
-                    
-                    # Get the labels
-                    labels = data.get(b'X-GM-LABELS', [])
-                    list_of_labels = ", ".join(label.decode() for label in labels)
-                    logger.info(f"Email {i} has {len(labels)} labels: {list_of_labels}")
-                except KeyError as e:
-                    logger.error(f"KeyError processing email {i}: {e}")
-                    continue  # Skip to the next email
-            
-            lower_labels = [label.decode().lower() for label in labels]
-            if any(label in lower_labels for label in ["advertisement", "advertisements", "politics"]):
-                logger.info(f"Email {i} has 'advertisement', 'advertisements', or 'politics' label. Deleting and expunging...")
-                try:
-                    delete_and_expunge_email(client, msg_id)
-                except Exception as e:
-                    logger.error(f"Error deleting and expunging email: {e}")
-            elif b'SkipInbox' in labels:
-                logger.info(f"Email {i} has 'SkipInbox' label. Recategorizing...")
-                try:
-                    process_email(client, msg_id)
-                    # Fetching the new labels
-                    fetch_data = client.fetch([msg_id], ['RFC822', 'X-GM-LABELS'])
-                    for msg_id, data in fetch_data.items():
-                         labels = data.get(b'X-GM-LABELS', [])
-                         list_of_labels = ", ".join(label.decode() for label in labels)
-                         logger.info(f"Email {i} has {len(labels)} labels: {list_of_labels}")
-                except Exception as e:
-                    logger.error(f"Error recategorizing email: {e}")
-            else:
-                logger.info(f"Email {i} does not have 'SkipInbox' label or targeted labels. Skipping...")
-            
-            logger.info("-" * 50)
-        except Exception as e:
-            logger.error(f"Error processing email {i}: {e}")
-
-    logger.info("Logging out from Gmail IMAP server")
-    client.logout()
-
 
 def main():
     logger.info("Starting Gmail Categorizer")
