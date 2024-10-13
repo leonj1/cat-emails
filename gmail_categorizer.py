@@ -601,7 +601,7 @@ def process_email(client, msg_id, category_counter=None):
     
     return category
 
-def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
+def categorize_emails(hours):
     client = get_imap_client()
     
     client.select_folder('INBOX')
@@ -746,7 +746,7 @@ def main():
         logger.error(f"Terminating program due to {api_type} API connectivity failure")
         return
 
-    categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
+    categorize_emails(hours)
     logger.info("Gmail Categorizer finished")
 
 if __name__ == '__main__':
