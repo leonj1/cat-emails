@@ -542,7 +542,7 @@ def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, cate
     fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS', 'X-GM-LABELS'])
     email_data = fetch_data[msg_id][b'RFC822']
     email_message = message_from_bytes(email_data)
-    labels = fetch_data[msg_id][b'X-GM-LABELS']
+    existing_email_labels = fetch_data[msg_id][b'X-GM-LABELS']
     
     subject = email_message['Subject']
     sender = get_sender_email(email_message)
@@ -556,15 +556,19 @@ def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, cate
     logger.info(f"Email - Timestamp: {timestamp}")
     logger.info(f"Email - Sender: {sender}")
     logger.info(f"Email - Subject: {subject}")
+
+
+    ignore_existing_labels = True
     
-    existing_meail_labels = existing_labels(client, msg_id)
-    if existing_meail_labels is not None and len(existing_meail_labels) > 0:
-        if len(existing_meail_labels) == 1 and existing_meail_labels[0] == b'\\Important':
-            pass
-        else:
-            logger.info(f"Email {msg_id} has labels {existing_meail_labels}. Skipping...")
-            logger.info("---")
-            return existing_meail_labels
+    if not ignore_existing_labels:
+        # existing_meail_labels = existing_labels(client, msg_id)
+        if existing_email_labels is not None and len(existing_email_labels) > 0:
+            if len(existing_email_labels) == 1 and existing_email_labels[0] == b'\\Important':
+                pass
+            else:
+                logger.info(f"Email {msg_id} has labels {existing_email_labels}. Skipping...")
+                logger.info("---")
+                return existing_email_labels
     
     category = categorize_email_ell_for_me(contents_cleaned)
     category = category.replace('"', '').replace("'", "")
