@@ -746,11 +746,6 @@ def main():
         logger.error(f"Terminating program due to {api_type} API connectivity failure")
         return
 
-    # if args.skip:
-    #     clean_up_skip_inbox_label(api_type, api_url, api_key, hours, args.ollama_host2)
-    # else:
-    #     categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
-
     categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
     logger.info("Gmail Categorizer finished")
 
