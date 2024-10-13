@@ -23,32 +23,158 @@ client = openai.Client(
     base_url="http://10.1.1.144:11434/v1", api_key="ollama"  # required but not used
 )
 
-@ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
+@ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
 def categorize_email_ell_for_me(contents: str):
     """
-    You do not want people trying to sell you things.
-    You do not want to spend money.
-    You categorize emails into one of the following categories: 
-    'Personal', 'Financial-Notification', 'Appointment-Reminder', 'Service-Updates', 'Work-related', 'Other'.
+You are an AI assistant tasked with categorizing incoming emails. Your goal is to efficiently sort emails into predefined categories without being swayed by marketing tactics or sales pitches. You have a strong aversion to unsolicited commercial content and are programmed to prioritize the user's financial well-being by avoiding unnecessary expenditures.
+
+When categorizing emails, you must strictly adhere to the following six categories:
+
+'Personal': Emails from friends, family, or acquaintances that are not related to work or financial matters. This includes personal correspondence, invitations to social events, and general updates from individuals known to the user.
+'Financial-Notification': Any email related to the user's financial accounts or transactions. This includes bank statements, credit card alerts, investment updates, payment confirmations, and notifications about account activity or balance changes.
+'Appointment-Reminder': Emails that serve as reminders for upcoming appointments, meetings, or events. This category includes doctor's appointments, dental visits, scheduled calls, and any other time-specific commitments.
+'Service-Updates': Notifications about changes, updates, or important information from services the user is already subscribed to or uses. This can include updates from software providers, changes to terms of service, account security notifications, and status updates for ongoing services.
+'Work-related': Any email pertaining to the user's professional life. This includes correspondence with colleagues, superiors, or clients, project updates, meeting invitations, and any other communication related to the user's job or career.
+'Other': This category is for emails that don't clearly fit into the above categories. It may include newsletters the user has willingly subscribed to, community announcements, or any other email that doesn't fall neatly into the other five categories.
+Important guidelines:
+
+Approach each email with skepticism towards any content that appears to be trying to sell products or services.
+Be particularly wary of emails that encourage spending money, even if they claim to offer deals or discounts.
+If an email contains elements of multiple categories, prioritize the most significant or actionable aspect when choosing a category.
+Pay close attention to the sender, subject line, and key content to make accurate categorizations.
+Remember that the goal is to organize emails efficiently, not to engage with or respond to their content.
+By following these guidelines and strictly adhering to the given categories, you will help the user maintain an organized inbox while avoiding unwanted commercial influences.
     """
     return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
 @ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
 def categorize_email_ell_marketing(contents: str):
     """
-    You do not want people trying to sell you things.
-    You do not want to spend money.
-    You categorize emails into one of the following categories: 
-    'Wants-Money', 'Marketing', 'Other'.
-    """
+You are an AI assistant designed to categorize incoming emails with a focus on protecting the user from unwanted commercial content and unnecessary spending. Your primary goal is to quickly identify and sort emails that may be attempting to solicit money or promote products/services. You should approach each email with a healthy dose of skepticism, always on the lookout for subtle or overt attempts to encourage spending.
+When categorizing emails, you must strictly adhere to the following four categories:
+
+'Wants-Money': This category is for any email that directly or indirectly asks the recipient to spend money. This includes:
+
+Invoices or bills
+Requests for donations or charitable contributions
+Notifications about due payments or subscriptions
+Emails about fundraising campaigns
+Messages asking for financial support of any kind
+Subtle requests disguised as opportunities that require monetary investment
+
+
+'Advertising': This category is for emails primarily focused on promoting specific products or services. Look for:
+
+Direct product advertisements
+Sale announcements
+New product launches
+Service offerings
+Emails showcasing product features or benefits
+Messages with prominent calls-to-action to purchase or "learn more" about products
+
+
+'Marketing': This category is for emails that may not directly advertise products but are part of broader marketing strategies. This includes:
+
+Brand awareness campaigns
+Newsletters with soft-sell approaches
+Content marketing emails (blogs, articles, videos) that indirectly promote products or services
+Customer relationship emails that don't directly sell but keep the brand in the recipient's mind
+Surveys or feedback requests that are part of marketing research
+Emails about loyalty programs or rewards
+
+
+'Other': This category is for all emails that don't fit into the above three categories. This may include:
+
+Personal correspondence
+Work-related emails
+Transactional emails (e.g., order confirmations, shipping notifications)
+Account security alerts
+Appointment reminders
+Service updates or notifications not aimed at selling
+
+
+
+Important guidelines:
+
+Be vigilant in identifying even subtle attempts to encourage spending or promote products/services.
+Pay close attention to the sender, subject line, and key content to make accurate categorizations.
+If an email contains elements of multiple categories, prioritize 'Wants-Money' first, then 'Advertising', then 'Marketing'.
+Remember that the goal is to shield the user from unwanted commercial influences and protect them from unnecessary spending.
+Approach each email with the assumption that it may be trying to sell something, and only categorize as 'Other' if you're confident it's not commercial in nature.
+
+By following these guidelines and strictly adhering to the given categories, you will help the user maintain an inbox free from unwanted commercial content and protect them from potential financial solicitations.
+"""
     return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
 @ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
 def categorize_email_ell_generic(contents: str):
     """
-    You categorize emails in 2 words or less. 
-    """
+Email Intent Analyzer:
+You are an AI designed to swiftly discern and label the core intention behind each email. Your task is to deduce the primary purpose of the email's author, with a particular focus on identifying attempts to seek money, advertise products/services, or gain political influence.
+Your responses must always be two words or fewer. Be concise yet precise.
+Key objectives:
+
+Quickly assess the email's content, sender, and context.
+Determine the author's main goal or intention.
+Categorize using clear, succinct labels.
+
+Primary categories to consider (not exhaustive):
+
+"Seeks Money" (or variations like "Requests Donation", "Demands Payment")
+"Promotes Product" or "Advertises Service"
+"Political Appeal" or "Seeks Support"
+"Shares Information"
+"Requests Action"
+"Personal Message"
+
+Guidelines:
+
+Prioritize identifying commercial or political motivations.
+Look for subtle cues that might reveal hidden intentions.
+If multiple purposes are present, identify the most prominent one.
+Use active verbs when possible to convey intent (e.g., "Solicits Funds" rather than "Fundraising Email").
+Remain objective and avoid emotional language.
+
+Examples:
+
+For an email asking for donations: "Seeks Donation"
+For a marketing newsletter: "Promotes Products"
+For a political campaign email: "Political Persuasion"
+For a personal message from a friend: "Personal Correspondence"
+
+Remember: Your labels must be two words or fewer, clear, and accurately reflect the email author's primary intention.
+"""
     return f"Categorize this email. Maximum length of response is 2 words: {contents}"
+
+
+def remove_images_from_email(email_body):
+    """
+    Remove images from email contents.
+    
+    Args:
+    email_body (str): The email body content (can be HTML or plain text).
+    
+    Returns:
+    str: Email body with images removed.
+    """
+    # Check if the email body is HTML
+    if re.search(r'<[^>]+>', email_body):
+        # Parse HTML content
+        soup = BeautifulSoup(email_body, 'html.parser')
+        
+        # Remove all img tags
+        for img in soup.find_all('img'):
+            img.decompose()
+        
+        # Remove all elements with background images
+        for element in soup.find_all(style=re.compile('background-image')):
+            del element['style']
+        
+        # Convert back to string
+        return str(soup)
+    else:
+        # For plain text, remove any text that looks like an image file or URL
+        return re.sub(r'\b(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|bmp))\b', '', email_body, flags=re.IGNORECASE)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -98,6 +224,15 @@ ok = [
 def remove_http_links(text):
     # Regular expression pattern to match HTTP links
     pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+    
+    # Replace all occurrences of the pattern with an empty string
+    cleaned_text = re.sub(pattern, '', text)
+    
+    return cleaned_text
+
+def remove_encoded_content(text):
+    # Regular expression pattern to match the encoded content format
+    pattern = r'\(\s*~~/[A-Za-z0-9/+]+~\s*\)'
     
     # Replace all occurrences of the pattern with an empty string
     cleaned_text = re.sub(pattern, '', text)
@@ -329,6 +464,24 @@ def delete_and_expunge_email(client, msg_id):
     except Exception as e:
         logger.error(f"Error deleting and expunging email {msg_id}: {e}")
 
+def mark_email_as_unread(client, msg_id):
+    logger.info(f"Marking email {msg_id} as unread")
+    try:
+        client.remove_flags([msg_id], [b'\\Seen'])
+        logger.info(f"Email {msg_id} marked as unread successfully")
+    except Exception as e:
+        logger.error(f"Error marking email {msg_id} as unread: {e}")
+
+def existing_labels(client, msg_id) -> list[str]:
+    logger.info(f"Checking if email {msg_id} has any label.")
+    try:
+        fetch_data = client.fetch([msg_id], ['X-GM-LABELS'])
+        labels = fetch_data[msg_id][b'X-GM-LABELS']
+        return labels
+    except Exception as e:
+        logger.error(f"Error checking label for email {msg_id}: {e}")
+        return None
+
 def remove_all_labels(client, msg_id, labels):
     logger.info(f"Removing all labels for email {msg_id}")
     try:
@@ -395,35 +548,46 @@ def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, cate
     sender = get_sender_email(email_message)
     timestamp = fetch_data[msg_id][b'INTERNALDATE']
     body = get_email_body(email_message)
+    contents_without_links = remove_http_links(f"{subject}. {body}")
+    contents_without_images = remove_images_from_email(contents_without_links)
+    contents_without_encoded = remove_encoded_content(contents_without_images)
+    contents_cleaned = contents_without_encoded
     
     logger.info(f"Email - Timestamp: {timestamp}")
     logger.info(f"Email - Sender: {sender}")
     logger.info(f"Email - Subject: {subject}")
     
-#    category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
-    contents_without_links = remove_http_links(f"{subject}. {body}")
-    category = categorize_email_ell_for_me(contents_without_links)
+    existing_meail_labels = existing_labels(client, msg_id)
+    if existing_meail_labels is not None and len(existing_meail_labels) > 0:
+        if len(existing_meail_labels) == 1 and existing_meail_labels[0] == b'\\Important':
+            pass
+        else:
+            logger.info(f"Email {msg_id} has labels {existing_meail_labels}. Skipping...")
+            logger.info("---")
+            return existing_meail_labels
+    
+    category = categorize_email_ell_for_me(contents_cleaned)
     category = category.replace('"', '').replace("'", "")
     category_lower = category.lower()
-    # if category_lower not in ok:
-    #     delete_and_expunge_email(client, msg_id)
-    # else:
-    #     set_email_label(client, msg_id, category)
+    logger.info("Finished checking if the email is meant for me")
     
-    if category_lower != "other":
+    if category_lower != "other" and category_lower in ok:
         set_email_label(client, msg_id, category)
+        mark_email_as_unread(client, msg_id)
     else:
-        category = categorize_email_ell_marketing(contents_without_links)
+        category = categorize_email_ell_marketing(contents_cleaned)
         category = category.replace('"', '').replace("'", "")
         category_lower = category.lower()
-        if category_lower != "other":
+        logger.info("Finished checking if the email is an advertisement")
+        if category_lower != "other" and len(category_lower) <= 40:
             set_email_label(client, msg_id, category)
-            delete_and_expunge_email(client, msg_id, category)
+            delete_and_expunge_email(client, msg_id)
         else:
-            category = categorize_email_ell_generic(contents_without_links)
+            category = categorize_email_ell_generic(contents_cleaned)
             category = category.replace('"', '').replace("'", "")
+            logger.info("Finished checking if the email is generic")
             set_email_label(client, msg_id, category)
-            delete_and_expunge_email(client, msg_id, category)
+            delete_and_expunge_email(client, msg_id)
     
     if category_counter is not None:
         category_counter[category] += 1
@@ -443,11 +607,12 @@ def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
     total_emails = len(all_messages)
     
     sorted_message_ids = get_recent_emails(client, hours)
-    skipped_emails = total_emails - len(sorted_message_ids)
+    # skipped_emails = total_emails - len(sorted_message_ids)
     
     logger.info(f"Total emails in the last {hours} hour(s): {total_emails}")
-    logger.info(f"Emails skipped due to 'SkipInbox' label: {skipped_emails}")
+    # logger.info(f"Emails skipped due to 'SkipInbox' label: {skipped_emails}")
     logger.info(f"Emails to process: {len(sorted_message_ids)}")
+    logger.info("---")
 
     category_counter = Counter()
 
