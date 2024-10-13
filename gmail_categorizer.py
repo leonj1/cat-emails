@@ -33,6 +33,7 @@ def categorize_email_ell_for_me(contents: str):
     """
     return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
+@ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
 def categorize_email_ell_marketing(contents: str):
     """
     You do not want people trying to sell you things.
@@ -42,6 +43,7 @@ def categorize_email_ell_marketing(contents: str):
     """
     return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
+@ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
 def categorize_email_ell_generic(contents: str):
     """
     You categorize emails in 2 words or less. 
