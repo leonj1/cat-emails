@@ -538,7 +538,7 @@ def get_email_body(email_message):
             body = extract_html_content(html_content)
     return body
 
-def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, category_counter=None):
+def process_email(client, msg_id, category_counter=None):
     fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS', 'X-GM-LABELS'])
     email_data = fetch_data[msg_id][b'RFC822']
     email_message = message_from_bytes(email_data)
@@ -623,7 +623,7 @@ def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
     for i, msg_id in enumerate(sorted_message_ids, 1):
         logger.info(f"Processing email {i} of {len(sorted_message_ids)}")
         try:
-            process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, category_counter)
+            process_email(client, msg_id, category_counter)
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
             logger.info("Terminating program due to categorization failure")
@@ -692,7 +692,7 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
             elif b'SkipInbox' in labels:
                 logger.info(f"Email {i} has 'SkipInbox' label. Recategorizing...")
                 try:
-                    process_email(client, msg_id, api_type, api_url, api_key, ollama_host2)
+                    process_email(client, msg_id)
                     # Fetching the new labels
                     fetch_data = client.fetch([msg_id], ['RFC822', 'X-GM-LABELS'])
                     for msg_id, data in fetch_data.items():
