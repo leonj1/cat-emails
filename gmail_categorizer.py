@@ -24,14 +24,29 @@ client = openai.Client(
 )
 
 @ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
-def categorize_email_ell(contents: str):
+def categorize_email_ell_for_me(contents: str):
     """
     You do not want people trying to sell you things.
     You do not want to spend money.
     You categorize emails into one of the following categories: 
-    'Wants-Money', 'Marketing', 'Personal', 'Financial-Notification', 'Appointment-Reminder', 'Service-Updates', 'Work-related'.
+    'Personal', 'Financial-Notification', 'Appointment-Reminder', 'Service-Updates', 'Work-related', 'Other'.
     """
     return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
+
+def categorize_email_ell_marketing(contents: str):
+    """
+    You do not want people trying to sell you things.
+    You do not want to spend money.
+    You categorize emails into one of the following categories: 
+    'Wants-Money', 'Marketing', 'Other'.
+    """
+    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
+
+def categorize_email_ell_generic(contents: str):
+    """
+    You categorize emails in 2 words or less. 
+    """
+    return f"Categorize this email. Maximum length of response is 2 words: {contents}"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -292,9 +307,6 @@ def set_email_label(client, msg_id, label):
     logger.info(f"Setting label '{label}' for email {msg_id}")
     try:
         client.add_gmail_labels(msg_id, [label])
-        if label == "SkipInbox":
-            client.remove_gmail_labels(msg_id, ["\\Inbox"])
-            logger.info(f"Inbox label removed for email {msg_id}")
     except Exception as e:
         logger.error(f"Error setting label or removing Inbox label: {e}")
 
@@ -388,32 +400,33 @@ def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, cate
     
 #    category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
     contents_without_links = remove_http_links(f"{subject}. {body}")
-    category = categorize_email_ell(contents_without_links)
-    # remove double and single quotes from category
+    category = categorize_email_ell_for_me(contents_without_links)
     category = category.replace('"', '').replace("'", "")
-    logger.info(f"Category: {category}")
+    category_lower = category.lower()
+    # if category_lower not in ok:
+    #     delete_and_expunge_email(client, msg_id)
+    # else:
+    #     set_email_label(client, msg_id, category)
+    
+    if category_lower != "other":
+        set_email_label(client, msg_id, category)
+    else:
+        category = categorize_email_ell_marketing(contents_without_links)
+        category = category.replace('"', '').replace("'", "")
+        category_lower = category.lower()
+        if category_lower != "other":
+            set_email_label(client, msg_id, category)
+            delete_and_expunge_email(client, msg_id, category)
+        else:
+            category = categorize_email_ell_generic(contents_without_links)
+            category = category.replace('"', '').replace("'", "")
+            set_email_label(client, msg_id, category)
+            delete_and_expunge_email(client, msg_id, category)
     
     if category_counter is not None:
         category_counter[category] += 1
-    
-    # if not has_two_words_or_less(category):
-    #     proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
-    #     if has_two_words_or_less(proposed_category):
-    #         category = proposed_category
-    #         set_email_label(client, msg_id, proposed_category)
-    
-    category_lower = category.lower()
-    if category_lower not in ok:
-        delete_and_expunge_email(client, msg_id)
-    # elif not word_in_list(category, ok):
-    #     remove_all_labels(client, msg_id, labels)
-    #     set_email_label(client, msg_id, "SkipInbox")
-    #     archive_email(client, msg_id)
-    # elif category_lower == "junk":
-    #     archive_email(client, msg_id)
-    else:
-        set_email_label(client, msg_id, category)
-    
+
+    logger.info(f"Category: {category}")
     logger.info("---")
     
     return category
