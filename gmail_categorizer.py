@@ -317,9 +317,12 @@ def get_recent_emails(client, hours):
     total_messages = len(messages)
     for index, msg_id in enumerate(messages, 1):
         logger.info(f"Processing {index} of {total_messages} emails, ID: {msg_id}")
-        fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
-        timestamp = fetch_data[msg_id][b'INTERNALDATE']
-        email_data.append((msg_id, timestamp))
+        try:
+            fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
+            timestamp = fetch_data[msg_id][b'INTERNALDATE']
+            email_data.append((msg_id, timestamp))
+        except Exception as e:
+            logger.info(f"Problem fetching recent email [{msg_id}]: {e}")
     
     # Sort emails by timestamp in descending order
     sorted_emails = sorted(email_data, key=lambda x: x[1], reverse=True)
@@ -624,13 +627,13 @@ def categorize_emails(hours):
         logger.info(f"Processing email {i} of {len(sorted_message_ids)}")
         try:
             process_email(client, msg_id, category_counter)
+            logger.info("Logging out from Gmail IMAP server")
+            client.logout()
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
             logger.info("Terminating program due to categorization failure")
             break
 
-    logger.info("Logging out from Gmail IMAP server")
-    client.logout()
 
     logger.info("Category Summary:")
     for category, count in category_counter.most_common():
