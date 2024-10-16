@@ -1,9 +1,12 @@
+import ell
+import openai
 import os
 import requests
 import argparse
 import logging
 import time
 import email
+import re
 from email.header import decode_header
 from collections import Counter
 from datetime import datetime, timedelta
@@ -12,6 +15,167 @@ from email import message_from_bytes
 import imaplib
 from bs4 import BeautifulSoup
 from anthropic import Anthropic
+from kafka_email_sender import send_email_to_kafka
+
+
+ell.init(verbose=True, store='./logdir')
+
+client = openai.Client(
+    base_url="http://10.1.1.144:11434/v1", api_key="ollama"  # required but not used
+)
+
+@ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
+def categorize_email_ell_for_me(contents: str):
+    """
+You are an AI assistant tasked with categorizing incoming emails. Your goal is to efficiently sort emails into predefined categories without being swayed by marketing tactics or sales pitches. You have a strong aversion to unsolicited commercial content and are programmed to prioritize the user's financial well-being by avoiding unnecessary expenditures.
+
+When categorizing emails, you must strictly adhere to the following six categories:
+
+'Personal': Emails from friends, family, or acquaintances that are not related to work or financial matters. This includes personal correspondence, invitations to social events, and general updates from individuals known to the user.
+'Financial-Notification': Any email related to the user's financial accounts or transactions. This includes bank statements, credit card alerts, investment updates, payment confirmations, and notifications about account activity or balance changes.
+'Appointment-Reminder': Emails that serve as reminders for upcoming appointments, meetings, or events. This category includes doctor's appointments, dental visits, scheduled calls, and any other time-specific commitments.
+'Service-Updates': Notifications about changes, updates, or important information from services the user is already subscribed to or uses. This can include updates from software providers, changes to terms of service, account security notifications, and status updates for ongoing services.
+'Work-related': Any email pertaining to the user's professional life. This includes correspondence with colleagues, superiors, or clients, project updates, meeting invitations, and any other communication related to the user's job or career.
+'Other': This category is for emails that don't clearly fit into the above categories. It may include newsletters the user has willingly subscribed to, community announcements, or any other email that doesn't fall neatly into the other five categories.
+Important guidelines:
+
+Approach each email with skepticism towards any content that appears to be trying to sell products or services.
+Be particularly wary of emails that encourage spending money, even if they claim to offer deals or discounts.
+If an email contains elements of multiple categories, prioritize the most significant or actionable aspect when choosing a category.
+Pay close attention to the sender, subject line, and key content to make accurate categorizations.
+Remember that the goal is to organize emails efficiently, not to engage with or respond to their content.
+By following these guidelines and strictly adhering to the given categories, you will help the user maintain an organized inbox while avoiding unwanted commercial influences.
+    """
+    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
+
+@ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
+def categorize_email_ell_marketing(contents: str):
+    """
+You are an AI assistant designed to categorize incoming emails with a focus on protecting the user from unwanted commercial content and unnecessary spending. Your primary goal is to quickly identify and sort emails that may be attempting to solicit money or promote products/services. You should approach each email with a healthy dose of skepticism, always on the lookout for subtle or overt attempts to encourage spending.
+When categorizing emails, you must strictly adhere to the following four categories:
+
+'Wants-Money': This category is for any email that directly or indirectly asks the recipient to spend money. This includes:
+
+Invoices or bills
+Requests for donations or charitable contributions
+Notifications about due payments or subscriptions
+Emails about fundraising campaigns
+Messages asking for financial support of any kind
+Subtle requests disguised as opportunities that require monetary investment
+
+
+'Advertising': This category is for emails primarily focused on promoting specific products or services. Look for:
+
+Direct product advertisements
+Sale announcements
+New product launches
+Service offerings
+Emails showcasing product features or benefits
+Messages with prominent calls-to-action to purchase or "learn more" about products
+
+
+'Marketing': This category is for emails that may not directly advertise products but are part of broader marketing strategies. This includes:
+
+Brand awareness campaigns
+Newsletters with soft-sell approaches
+Content marketing emails (blogs, articles, videos) that indirectly promote products or services
+Customer relationship emails that don't directly sell but keep the brand in the recipient's mind
+Surveys or feedback requests that are part of marketing research
+Emails about loyalty programs or rewards
+
+
+'Other': This category is for all emails that don't fit into the above three categories. This may include:
+
+Personal correspondence
+Work-related emails
+Transactional emails (e.g., order confirmations, shipping notifications)
+Account security alerts
+Appointment reminders
+Service updates or notifications not aimed at selling
+
+
+
+Important guidelines:
+
+Be vigilant in identifying even subtle attempts to encourage spending or promote products/services.
+Pay close attention to the sender, subject line, and key content to make accurate categorizations.
+If an email contains elements of multiple categories, prioritize 'Wants-Money' first, then 'Advertising', then 'Marketing'.
+Remember that the goal is to shield the user from unwanted commercial influences and protect them from unnecessary spending.
+Approach each email with the assumption that it may be trying to sell something, and only categorize as 'Other' if you're confident it's not commercial in nature.
+
+By following these guidelines and strictly adhering to the given categories, you will help the user maintain an inbox free from unwanted commercial content and protect them from potential financial solicitations.
+"""
+    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
+
+@ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
+def categorize_email_ell_generic(contents: str):
+    """
+Email Intent Analyzer:
+You are an AI designed to swiftly discern and label the core intention behind each email. Your task is to deduce the primary purpose of the email's author, with a particular focus on identifying attempts to seek money, advertise products/services, or gain political influence.
+Your responses must always be two words or fewer. Be concise yet precise.
+Key objectives:
+
+Quickly assess the email's content, sender, and context.
+Determine the author's main goal or intention.
+Categorize using clear, succinct labels.
+
+Primary categories to consider (not exhaustive):
+
+"Seeks Money" (or variations like "Requests Donation", "Demands Payment")
+"Promotes Product" or "Advertises Service"
+"Political Appeal" or "Seeks Support"
+"Shares Information"
+"Requests Action"
+"Personal Message"
+
+Guidelines:
+
+Prioritize identifying commercial or political motivations.
+Look for subtle cues that might reveal hidden intentions.
+If multiple purposes are present, identify the most prominent one.
+Use active verbs when possible to convey intent (e.g., "Solicits Funds" rather than "Fundraising Email").
+Remain objective and avoid emotional language.
+
+Examples:
+
+For an email asking for donations: "Seeks Donation"
+For a marketing newsletter: "Promotes Products"
+For a political campaign email: "Political Persuasion"
+For a personal message from a friend: "Personal Correspondence"
+
+Remember: Your labels must be two words or fewer, clear, and accurately reflect the email author's primary intention.
+"""
+    return f"Categorize this email. Maximum length of response is 2 words: {contents}"
+
+
+def remove_images_from_email(email_body):
+    """
+    Remove images from email contents.
+    
+    Args:
+    email_body (str): The email body content (can be HTML or plain text).
+    
+    Returns:
+    str: Email body with images removed.
+    """
+    # Check if the email body is HTML
+    if re.search(r'<[^>]+>', email_body):
+        # Parse HTML content
+        soup = BeautifulSoup(email_body, 'html.parser')
+        
+        # Remove all img tags
+        for img in soup.find_all('img'):
+            img.decompose()
+        
+        # Remove all elements with background images
+        for element in soup.find_all(style=re.compile('background-image')):
+            del element['style']
+        
+        # Convert back to string
+        return str(soup)
+    else:
+        # For plain text, remove any text that looks like an image file or URL
+        return re.sub(r'\b(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|bmp))\b', '', email_body, flags=re.IGNORECASE)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,6 +188,11 @@ ollamas = {
 
 hide = ["advertisement", "politics", "notification", "helpful", "information", "spam", "marketting", "disclaimer", "marketing"]
 ok = [
+        'Personal', 
+        'Financial-Notification', 
+        'Appointment-Reminder', 
+        'Service-Updates', 
+        'Work-related',
         "order", 
         "order cancelled", 
         "order confirm", 
@@ -52,6 +221,24 @@ ok = [
         "\"bank\"", 
         "\"personal\""
     ]
+
+def remove_http_links(text):
+    # Regular expression pattern to match HTTP links
+    pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+    
+    # Replace all occurrences of the pattern with an empty string
+    cleaned_text = re.sub(pattern, '', text)
+    
+    return cleaned_text
+
+def remove_encoded_content(text):
+    # Regular expression pattern to match the encoded content format
+    pattern = r'\(\s*~~/[A-Za-z0-9/+]+~\s*\)'
+    
+    # Replace all occurrences of the pattern with an empty string
+    cleaned_text = re.sub(pattern, '', text)
+    
+    return cleaned_text
 
 def check_api_connectivity(api_type, api_url=None, api_key=None, max_retries=3, retry_delay=5):
     logger.info(f"Checking connectivity to {api_type} API")
@@ -123,24 +310,67 @@ def get_recent_emails(client, hours):
     time_ago = datetime.now() - timedelta(hours=hours)
     date_criterion = time_ago.strftime("%d-%b-%Y")
     logger.info(f"Searching for emails since {date_criterion}...")
-    messages = client.search(['SINCE', date_criterion, 'NOT', 'KEYWORD', 'SkipInbox'])
-    logger.info(f"Found {len(messages)} recent emails without 'SkipInbox' label")
+    messages = client.search(['SINCE', date_criterion, 'NOT', 'KEYWORD', 'bogus-asdf'])
+    logger.info(f"Found {len(messages)} recent emails")
     
     # Fetch email data including timestamps
-    email_data = []
+    # email_data = []
     total_messages = len(messages)
     for index, msg_id in enumerate(messages, 1):
         logger.info(f"Processing {index} of {total_messages} emails, ID: {msg_id}")
-        fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
-        timestamp = fetch_data[msg_id][b'INTERNALDATE']
-        email_data.append((msg_id, timestamp))
+        try:
+            send_email_to_kafka(msg_id)
+            # fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
+            # timestamp = fetch_data[msg_id][b'INTERNALDATE']
+            # email_data.append((msg_id, timestamp))
+        except Exception as e:
+            logger.info(f"Problem fetching recent email [{msg_id}]: {e}")
     
     # Sort emails by timestamp in descending order
-    sorted_emails = sorted(email_data, key=lambda x: x[1], reverse=True)
-    sorted_msg_ids = [email[0] for email in sorted_emails]
+    # sorted_emails = sorted(email_data, key=lambda x: x[1], reverse=True)
+    # sorted_msg_ids = [email[0] for email in sorted_emails]
     
     logger.info("Emails sorted by timestamp in descending order")
-    return sorted_msg_ids
+    return None
+
+from datetime import datetime
+
+# The expected format for the date? dd-MMM-yyyy
+def get_emails_by_date_range(start_date_str, end_date_str):
+    """
+    Fetch email message IDs within a specified date range.
+
+    :param start_date_str: Start date (inclusive) as a string in format "dd-MMM-yyyy"
+    :param end_date_str: End date (inclusive) as a string in format "dd-MMM-yyyy"
+    :return: List of message IDs
+    """
+    client = get_imap_client()    
+    logger.info("Selecting INBOX folder...")
+    client.select_folder('INBOX')
+
+    start_date = datetime.strptime(start_date_str, "%d-%b-%Y")
+    end_date = datetime.strptime(end_date_str, "%d-%b-%Y")
+
+    start_criterion = start_date.strftime("%d-%b-%Y")
+    end_criterion = end_date.strftime("%d-%b-%Y")
+    
+    logger.info(f"Searching for emails between {start_criterion} and {end_criterion}...")
+    messages = client.search(['SINCE', start_criterion, 'BEFORE', end_criterion, 'NOT', 'KEYWORD', 'bogus-asdf'])
+    
+    total_messages = len(messages)
+    logger.info(f"Found {total_messages} emails within the specified date range")
+    for index, msg_id in enumerate(messages, 1):
+        logger.info(f"Processing {index} of {total_messages} emails, ID: {msg_id}")
+        try:
+            send_email_to_kafka(msg_id)
+            # fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
+            # timestamp = fetch_data[msg_id][b'INTERNALDATE']
+            # email_data.append((msg_id, timestamp))
+        except Exception as e:
+            logger.info(f"Problem fetching recent email [{msg_id}]: {e}")
+
+    
+    return messages
 
 def get_sender_email(email_message):
     sender = email_message['From']
@@ -258,9 +488,6 @@ def set_email_label(client, msg_id, label):
     logger.info(f"Setting label '{label}' for email {msg_id}")
     try:
         client.add_gmail_labels(msg_id, [label])
-        if label == "SkipInbox":
-            client.remove_gmail_labels(msg_id, ["\\Inbox"])
-            logger.info(f"Inbox label removed for email {msg_id}")
     except Exception as e:
         logger.error(f"Error setting label or removing Inbox label: {e}")
 
@@ -280,6 +507,24 @@ def delete_and_expunge_email(client, msg_id):
         logger.info(f"Email {msg_id} deleted and expunged successfully")
     except Exception as e:
         logger.error(f"Error deleting and expunging email {msg_id}: {e}")
+
+def mark_email_as_unread(client, msg_id):
+    logger.info(f"Marking email {msg_id} as unread")
+    try:
+        client.remove_flags([msg_id], [b'\\Seen'])
+        logger.info(f"Email {msg_id} marked as unread successfully")
+    except Exception as e:
+        logger.error(f"Error marking email {msg_id} as unread: {e}")
+
+def existing_labels(client, msg_id) -> list[str]:
+    logger.info(f"Checking if email {msg_id} has any label.")
+    try:
+        fetch_data = client.fetch([msg_id], ['X-GM-LABELS'])
+        labels = fetch_data[msg_id][b'X-GM-LABELS']
+        return labels
+    except Exception as e:
+        logger.error(f"Error checking label for email {msg_id}: {e}")
+        return None
 
 def remove_all_labels(client, msg_id, labels):
     logger.info(f"Removing all labels for email {msg_id}")
@@ -337,50 +582,79 @@ def get_email_body(email_message):
             body = extract_html_content(html_content)
     return body
 
-def process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, category_counter=None):
+def process_email(client, msg_id, category_counter=None):
     fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822', 'FLAGS', 'X-GM-LABELS'])
     email_data = fetch_data[msg_id][b'RFC822']
     email_message = message_from_bytes(email_data)
-    labels = fetch_data[msg_id][b'X-GM-LABELS']
+    existing_email_labels = fetch_data[msg_id][b'X-GM-LABELS']
     
     subject = email_message['Subject']
     sender = get_sender_email(email_message)
     timestamp = fetch_data[msg_id][b'INTERNALDATE']
     body = get_email_body(email_message)
+    contents_without_links = remove_http_links(f"{subject}. {body}")
+    contents_without_images = remove_images_from_email(contents_without_links)
+    contents_without_encoded = remove_encoded_content(contents_without_images)
+    contents_cleaned = contents_without_encoded
     
     logger.info(f"Email - Timestamp: {timestamp}")
     logger.info(f"Email - Sender: {sender}")
     logger.info(f"Email - Subject: {subject}")
+
+
+    ignore_existing_labels = True
     
-    category = categorize_email_new(subject, body, sender, api_type, ollamas[api_url], api_url, api_key)
+    if not ignore_existing_labels:
+        # existing_meail_labels = existing_labels(client, msg_id)
+        if existing_email_labels is not None and len(existing_email_labels) > 0:
+            if len(existing_email_labels) == 1 and existing_email_labels[0] == b'\\Important':
+                pass
+            else:
+                logger.info(f"Email {msg_id} has labels {existing_email_labels}. Skipping...")
+                logger.info("---")
+                return existing_email_labels
+    
+    category = categorize_email_ell_for_me(contents_cleaned)
+    category = category.replace('"', '').replace("'", "")
+    category_lower = category.lower()
+    logger.info("Finished checking if the email is meant for me")
+    
+    if category_lower != "other" and category_lower in ok:
+        set_email_label(client, msg_id, category)
+        mark_email_as_unread(client, msg_id)
+    else:
+        category = categorize_email_ell_marketing(contents_cleaned)
+        category = category.replace('"', '').replace("'", "")
+        category_lower = category.lower()
+        logger.info("Finished checking if the email is an advertisement")
+        if category_lower != "other" and len(category_lower) <= 40:
+            set_email_label(client, msg_id, category)
+            delete_and_expunge_email(client, msg_id)
+        else:
+            category = categorize_email_ell_generic(contents_cleaned)
+            category = category.replace('"', '').replace("'", "")
+            logger.info("Finished checking if the email is generic")
+            set_email_label(client, msg_id, category)
+            delete_and_expunge_email(client, msg_id)
     
     if category_counter is not None:
         category_counter[category] += 1
-    
-    if not has_two_words_or_less(category):
-        proposed_category = is_email_summary_advertisement(subject, category, api_type, ollamas[ollama_host2], ollama_host2, api_key)
-        if has_two_words_or_less(proposed_category):
-            category = proposed_category
-            set_email_label(client, msg_id, proposed_category)
-    
-    category_lower = category.lower()
-    if category_lower in ["advertisement", "advertisements", "politics"]:
-        delete_and_expunge_email(client, msg_id)
-    elif not word_in_list(category, ok):
-        remove_all_labels(client, msg_id, labels)
-        set_email_label(client, msg_id, "SkipInbox")
-        archive_email(client, msg_id)
-    elif category_lower == "junk":
-        archive_email(client, msg_id)
-    else:
-        set_email_label(client, msg_id, category)
-    
-    logger.info(f"Email - Category: {category}")
+
+    logger.info(f"Category: {category}")
     logger.info("---")
     
     return category
 
-def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
+def send_recent_emails_to_kafka(hours):
+    client = get_imap_client()    
+    client.select_folder('INBOX')
+    time_ago = datetime.now() - timedelta(hours=hours)
+    # date_criterion = time_ago.strftime("%d-%b-%Y")
+    # all_messages = client.search(['SINCE', date_criterion])
+    # total_emails = len(all_messages)
+    get_recent_emails(client, hours)
+
+def categorize_emails(hours):
     client = get_imap_client()
     
     client.select_folder('INBOX')
@@ -390,25 +664,26 @@ def categorize_emails(api_type, api_url, api_key, hours, ollama_host2):
     total_emails = len(all_messages)
     
     sorted_message_ids = get_recent_emails(client, hours)
-    skipped_emails = total_emails - len(sorted_message_ids)
+    # skipped_emails = total_emails - len(sorted_message_ids)
     
     logger.info(f"Total emails in the last {hours} hour(s): {total_emails}")
-    logger.info(f"Emails skipped due to 'SkipInbox' label: {skipped_emails}")
+    # logger.info(f"Emails skipped due to 'SkipInbox' label: {skipped_emails}")
     logger.info(f"Emails to process: {len(sorted_message_ids)}")
+    logger.info("---")
 
     category_counter = Counter()
 
     for i, msg_id in enumerate(sorted_message_ids, 1):
         logger.info(f"Processing email {i} of {len(sorted_message_ids)}")
         try:
-            process_email(client, msg_id, api_type, api_url, api_key, ollama_host2, category_counter)
+            process_email(client, msg_id, category_counter)
+            logger.info("Logging out from Gmail IMAP server")
+            client.logout()
         except Exception as e:
             logger.error(f"Error categorizing email: {e}")
             logger.info("Terminating program due to categorization failure")
             break
 
-    logger.info("Logging out from Gmail IMAP server")
-    client.logout()
 
     logger.info("Category Summary:")
     for category, count in category_counter.most_common():
@@ -470,7 +745,7 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
             elif b'SkipInbox' in labels:
                 logger.info(f"Email {i} has 'SkipInbox' label. Recategorizing...")
                 try:
-                    process_email(client, msg_id, api_type, api_url, api_key, ollama_host2)
+                    process_email(client, msg_id)
                     # Fetching the new labels
                     fetch_data = client.fetch([msg_id], ['RFC822', 'X-GM-LABELS'])
                     for msg_id, data in fetch_data.items():
@@ -489,44 +764,40 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
     logger.info("Logging out from Gmail IMAP server")
     client.logout()
 
+
 def main():
     logger.info("Starting Gmail Categorizer")
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama or Anthropic API")
-    parser.add_argument("--ollama-host", help="Ollama server host (e.g., http://10.1.1.212:11434)")
-    parser.add_argument("--ollama-host2", help="Ollama server host (e.g., http://10.1.1.144:11434)")
-    parser.add_argument("--anthropic-api-key", help="Anthropic API key")
-    parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails (default: 1)")
-    parser.add_argument("--skip", action="store_true", help="Clean up and recategorize emails with SkipInbox label")
+    parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails")
+    parser.add_argument("--start", help="Start date")
+    parser.add_argument("--end", help="End date")
     args = parser.parse_args()
 
-    if args.ollama_host and args.anthropic_api_key:
-        logger.error("Please provide either --ollama-host or --anthropic-api-key, not both")
-        return
-
-    if args.ollama_host:
-        api_type = "Ollama"
-        api_url = args.ollama_host
-        api_key = None
-    elif args.anthropic_api_key:
-        api_type = "Anthropic"
-        api_url = None
-        api_key = args.anthropic_api_key
-    else:
-        logger.error("Please provide either --ollama-host or --anthropic-api-key")
-        return
-
     hours = args.hours
-    logger.info(f"Using {api_type} API")
-    logger.info(f"Fetching emails from the last {hours} hour(s)")
+    start = args.start
+    end = args.end
+    
+    # validate start and end are in format dd-MMM-yyyy
+    if start:
+        try:
+            datetime.strptime(start, "%d-%b-%Y")
+        except ValueError:
+            logger.error("Invalid start date format. Expected format: dd-MMM-yyyy. Example: 01-Jan-2021")
+            return
+    if end:
+        try:
+            datetime.strptime(end, "%d-%b-%Y")
+        except ValueError:
+            logger.error("Invalid end date format. Expected format: dd-MMM-yyyy. Example: 01-Jan-2021")
+            return
 
-    if not check_api_connectivity(api_type, api_url, api_key):
-        logger.error(f"Terminating program due to {api_type} API connectivity failure")
-        return
+    if hours > 0:
+        logger.info(f"Fetching emails from the last {hours} hour(s)")
+        send_recent_emails_to_kafka(hours)
 
-    if args.skip:
-        clean_up_skip_inbox_label(api_type, api_url, api_key, hours, args.ollama_host2)
-    else:
-        categorize_emails(api_type, api_url, api_key, hours, args.ollama_host2)
+    if start != "" and end != "":
+        logger.info(f"Fetching emails from {start} to {end}")
+        get_emails_by_date_range(start, end)
 
     logger.info("Gmail Categorizer finished")
 
