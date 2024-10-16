@@ -3,3 +3,4 @@ requests==2.26.0
 beautifulsoup4==4.9.3
 anthropic==0.34.0
 pydantic==2.9.2
+kafka-python

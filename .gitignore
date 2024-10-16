@@ -3,3 +3,5 @@
 nohup.out
 ollama.txt
 logdir
+__pycache__/
+

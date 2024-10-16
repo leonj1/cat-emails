@@ -15,6 +15,7 @@ from email import message_from_bytes
 import imaplib
 from bs4 import BeautifulSoup
 from anthropic import Anthropic
+from kafka_email_sender import send_email_to_kafka
 
 
 ell.init(verbose=True, store='./logdir')
@@ -313,23 +314,63 @@ def get_recent_emails(client, hours):
     logger.info(f"Found {len(messages)} recent emails")
     
     # Fetch email data including timestamps
-    email_data = []
+    # email_data = []
     total_messages = len(messages)
     for index, msg_id in enumerate(messages, 1):
         logger.info(f"Processing {index} of {total_messages} emails, ID: {msg_id}")
         try:
-            fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
-            timestamp = fetch_data[msg_id][b'INTERNALDATE']
-            email_data.append((msg_id, timestamp))
+            send_email_to_kafka(msg_id)
+            # fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
+            # timestamp = fetch_data[msg_id][b'INTERNALDATE']
+            # email_data.append((msg_id, timestamp))
         except Exception as e:
             logger.info(f"Problem fetching recent email [{msg_id}]: {e}")
     
     # Sort emails by timestamp in descending order
-    sorted_emails = sorted(email_data, key=lambda x: x[1], reverse=True)
-    sorted_msg_ids = [email[0] for email in sorted_emails]
+    # sorted_emails = sorted(email_data, key=lambda x: x[1], reverse=True)
+    # sorted_msg_ids = [email[0] for email in sorted_emails]
     
     logger.info("Emails sorted by timestamp in descending order")
-    return sorted_msg_ids
+    return None
+
+from datetime import datetime
+
+# The expected format for the date? dd-MMM-yyyy
+def get_emails_by_date_range(start_date_str, end_date_str):
+    """
+    Fetch email message IDs within a specified date range.
+
+    :param start_date_str: Start date (inclusive) as a string in format "dd-MMM-yyyy"
+    :param end_date_str: End date (inclusive) as a string in format "dd-MMM-yyyy"
+    :return: List of message IDs
+    """
+    client = get_imap_client()    
+    logger.info("Selecting INBOX folder...")
+    client.select_folder('INBOX')
+
+    start_date = datetime.strptime(start_date_str, "%d-%b-%Y")
+    end_date = datetime.strptime(end_date_str, "%d-%b-%Y")
+
+    start_criterion = start_date.strftime("%d-%b-%Y")
+    end_criterion = end_date.strftime("%d-%b-%Y")
+    
+    logger.info(f"Searching for emails between {start_criterion} and {end_criterion}...")
+    messages = client.search(['SINCE', start_criterion, 'BEFORE', end_criterion, 'NOT', 'KEYWORD', 'bogus-asdf'])
+    
+    total_messages = len(messages)
+    logger.info(f"Found {total_messages} emails within the specified date range")
+    for index, msg_id in enumerate(messages, 1):
+        logger.info(f"Processing {index} of {total_messages} emails, ID: {msg_id}")
+        try:
+            send_email_to_kafka(msg_id)
+            # fetch_data = client.fetch([msg_id], ['INTERNALDATE', 'RFC822'])
+            # timestamp = fetch_data[msg_id][b'INTERNALDATE']
+            # email_data.append((msg_id, timestamp))
+        except Exception as e:
+            logger.info(f"Problem fetching recent email [{msg_id}]: {e}")
+
+    
+    return messages
 
 def get_sender_email(email_message):
     sender = email_message['From']
@@ -604,6 +645,15 @@ def process_email(client, msg_id, category_counter=None):
     
     return category
 
+def send_recent_emails_to_kafka(hours):
+    client = get_imap_client()    
+    client.select_folder('INBOX')
+    time_ago = datetime.now() - timedelta(hours=hours)
+    # date_criterion = time_ago.strftime("%d-%b-%Y")
+    # all_messages = client.search(['SINCE', date_criterion])
+    # total_emails = len(all_messages)
+    get_recent_emails(client, hours)
+
 def categorize_emails(hours):
     client = get_imap_client()
     
@@ -718,38 +768,37 @@ def clean_up_skip_inbox_label(api_type, api_url, api_key, hours, ollama_host2):
 def main():
     logger.info("Starting Gmail Categorizer")
     parser = argparse.ArgumentParser(description="Gmail Categorizer using Ollama or Anthropic API")
-    parser.add_argument("--ollama-host", help="Ollama server host (e.g., http://10.1.1.212:11434)")
-    parser.add_argument("--ollama-host2", help="Ollama server host (e.g., http://10.1.1.144:11434)")
-    parser.add_argument("--anthropic-api-key", help="Anthropic API key")
-    parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails (default: 1)")
-    parser.add_argument("--skip", action="store_true", help="Clean up and recategorize emails with SkipInbox label")
+    parser.add_argument("--hours", type=int, default=1, help="Number of hours to look back for emails")
+    parser.add_argument("--start", help="Start date")
+    parser.add_argument("--end", help="End date")
     args = parser.parse_args()
 
-    if args.ollama_host and args.anthropic_api_key:
-        logger.error("Please provide either --ollama-host or --anthropic-api-key, not both")
-        return
-
-    if args.ollama_host:
-        api_type = "Ollama"
-        api_url = args.ollama_host
-        api_key = None
-    elif args.anthropic_api_key:
-        api_type = "Anthropic"
-        api_url = None
-        api_key = args.anthropic_api_key
-    else:
-        logger.error("Please provide either --ollama-host or --anthropic-api-key")
-        return
-
     hours = args.hours
-    logger.info(f"Using {api_type} API")
-    logger.info(f"Fetching emails from the last {hours} hour(s)")
+    start = args.start
+    end = args.end
+    
+    # validate start and end are in format dd-MMM-yyyy
+    if start:
+        try:
+            datetime.strptime(start, "%d-%b-%Y")
+        except ValueError:
+            logger.error("Invalid start date format. Expected format: dd-MMM-yyyy. Example: 01-Jan-2021")
+            return
+    if end:
+        try:
+            datetime.strptime(end, "%d-%b-%Y")
+        except ValueError:
+            logger.error("Invalid end date format. Expected format: dd-MMM-yyyy. Example: 01-Jan-2021")
+            return
 
-    if not check_api_connectivity(api_type, api_url, api_key):
-        logger.error(f"Terminating program due to {api_type} API connectivity failure")
-        return
+    if hours > 0:
+        logger.info(f"Fetching emails from the last {hours} hour(s)")
+        send_recent_emails_to_kafka(hours)
 
-    categorize_emails(hours)
+    if start != "" and end != "":
+        logger.info(f"Fetching emails from {start} to {end}")
+        get_emails_by_date_range(start, end)
+
     logger.info("Gmail Categorizer finished")
 
 if __name__ == '__main__':
