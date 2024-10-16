@@ -74,18 +74,9 @@ def send_email_to_kafka(msg_id: str, kafka_topic: str = 'gmail_messages', kafka_
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
     
-    # Get IMAP client
-    #imap_client = get_imap_client()
-    
     has_message_published = False
     
     try:
-        # Fetch the email
-        #logger.info("Fetching email from gmail")
-        #_, msg_data = imap_client.fetch(msg_id, '(RFC822)')
-        #logger.info("Getting email contents")
-        #email_body = get_email_body(msg_data[0][1])
-        
         # Prepare the message for Kafka
         kafka_message = {
             'msg_id': msg_id,
@@ -102,14 +93,7 @@ def send_email_to_kafka(msg_id: str, kafka_topic: str = 'gmail_messages', kafka_
         logger.info(f"Error sending message to Kafka: {str(e)}")
     
     finally:
-        # Close connections
-        #imap_client.logout()
         producer.close()
         
     if not has_message_published:
         raise Exception(f"Failed to publish message {msg_id} to Kafka")
-
-# if __name__ == "__main__":
-#     # Example usage
-#     msg_id = "your_message_id_here"
-#     send_email_to_kafka(msg_id)

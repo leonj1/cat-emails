@@ -338,7 +338,6 @@ def process_email(client, msg_id, category_counter=None):
     ignore_existing_labels = True
     
     if not ignore_existing_labels:
-        # existing_meail_labels = existing_labels(client, msg_id)
         if existing_email_labels is not None and len(existing_email_labels) > 0:
             if len(existing_email_labels) == 1 and existing_email_labels[0] == b'\\Important':
                 pass
@@ -350,7 +349,6 @@ def process_email(client, msg_id, category_counter=None):
     category = categorize_email_ell_for_me(contents_cleaned)
     category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
     category_lower = category.lower()
-    # logger.info("Finished checking if the email is meant for me")
     
     logger.info("************")
     logger.info(f"Email - Timestamp: {timestamp}")
@@ -365,7 +363,6 @@ def process_email(client, msg_id, category_counter=None):
         category = categorize_email_ell_marketing(contents_cleaned)
         category = category.replace('"', '').replace("'", "")
         category_lower = category.lower()
-        # logger.info("Finished checking if the email is an advertisement")
         if category_lower != "other" and len(category_lower) > 4 and len(category_lower) <= 40:
             set_email_label(client, msg_id, category)
             delete_and_expunge_email(client, msg_id)
@@ -373,8 +370,6 @@ def process_email(client, msg_id, category_counter=None):
         else:
             category = categorize_email_ell_generic(contents_cleaned)
             category = category.replace('"', '').replace("'", "")
-            # logger.info("Email - Finished checking if the email is generic")
-            # if length of category is less than 40 characters, set the label
             if len(category) > 4 and len(category) < 40:
                 set_email_label(client, msg_id, category)
                 delete_and_expunge_email(client, msg_id)
