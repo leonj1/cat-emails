@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import argparse
 from kafka import KafkaConsumer
 from imapclient import IMAPClient
 from email import message_from_bytes
@@ -13,10 +14,15 @@ from bs4 import BeautifulSoup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Email Scanner Consumer")
+parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
+args = parser.parse_args()
+
 ell.init(verbose=False, store='./logdir')
 
 client = openai.Client(
-    base_url="http://10.1.1.144:11434/v1", api_key="ollama"  # required but not used
+    base_url=f"http://{args.base_url}/v1", api_key="ollama"  # required but not used
 )
 
 @ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
