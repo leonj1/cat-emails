@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import time
 import argparse
 from kafka import KafkaConsumer
 from imapclient import IMAPClient
@@ -17,6 +18,8 @@ logger = logging.getLogger(__name__)
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Email Scanner Consumer")
 parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
+parser.add_argument("--consumer-group", default="email-scanner-group", help="Kafka consumer group name")
+parser.add_argument("--delay-on-error-seconds", default=10, help="Delay on error seconds")
 args = parser.parse_args()
 
 ell.init(verbose=False, store='./logdir')
@@ -392,16 +395,17 @@ def process_email(client, msg_id, category_counter=None):
     
     return category
 
-def listen_to_kafka_topic(topic: str = 'gmail_messages', bootstrap_servers: str = 'localhost:9092'):
+def listen_to_kafka_topic(topic: str = 'gmail_messages', bootstrap_servers: str = 'localhost:9092', consumer_group: str = 'email-scanner-group', delay_on_error_seconds: str = '10'):
     """
     Listen to a Kafka topic and print incoming messages.
     
     :param topic: The Kafka topic to listen to (default: 'gmail_messages')
-    :param bootstrap_servers: The Kafka server address (default: 'localhost:9111')
+    :param bootstrap_servers: The Kafka server address (default: 'localhost:9092')
     """
     consumer = KafkaConsumer(
         topic,
         bootstrap_servers=[bootstrap_servers],
+        group_id=consumer_group,
         auto_offset_reset='latest',
         enable_auto_commit=True,
         value_deserializer=lambda x: json.loads(x.decode('utf-8'))
@@ -423,6 +427,9 @@ def listen_to_kafka_topic(topic: str = 'gmail_messages', bootstrap_servers: str 
                 logger.error(f"Error categorizing email: {e}")
                 client = get_imap_client()    
                 client.select_folder('INBOX')
+                delay = int(delay_on_error_seconds)
+                logger.info(f"Sleeping for {delay} seconds because of above error")
+                time.sleep(delay)
 
             logger.info("-" * 50)
     
@@ -434,4 +441,5 @@ def listen_to_kafka_topic(topic: str = 'gmail_messages', bootstrap_servers: str 
         logger.info("Kafka consumer closed.")
 
 if __name__ == "__main__":
-    listen_to_kafka_topic()
+    topic = 'gmail_messages'
+    listen_to_kafka_topic(topic=topic, bootstrap_servers="localhost:9092", consumer_group=args.consumer_group, delay_on_error_seconds=args.delay_on_error_seconds)
