@@ -45,6 +45,7 @@ allowed_domains = [
     "instacart.com",
     "zbarleungcpa.com",
     "intuit.com",
+    "patreon.com",
 ]
 
 blocked_domains = [
