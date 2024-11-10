@@ -1,9 +1,119 @@
+import argparse
+import ell
+import openai
+import os
 import imaplib
 from email import message_from_bytes  # Changed import
 from datetime import datetime, timedelta, timezone
-import os
 from email.utils import parsedate_to_datetime
 from typing import List, Optional
+from bs4 import BeautifulSoup
+import re
+
+parser = argparse.ArgumentParser(description="Email Fetcher")
+parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
+args = parser.parse_args()
+
+ell.init(verbose=False, store='./logdir')
+
+client = openai.Client(
+    base_url=f"http://{args.base_url}/v1", api_key="ollama"  # required but not used
+)
+
+allowed_domains = [
+    "github.com",
+    "amazon.com",
+    "apple.com",
+    "google.com",
+    "microsoft.com",
+    "microcenter.com",
+    "americanexpress.com",
+    "citi.com",
+    "wellsfargo.com",
+    "chase.com",
+    "discover.com",
+    "capitalone.com",
+    "delta.com",
+    "united.com",
+    "southwest.com",
+    "jetblue.com",
+    "americanairlines.com",
+    "masterclass.com",
+    "instacart.com",
+]
+
+blocked_domains = [
+    "facebook.com",
+    "daveandbusters.com",
+    "rh.com",
+    "raymourflanigan.com",
+]
+
+allowed_categories = [
+    "Wants-Money",
+    "Advertising",
+    "Marketing",
+    "Promotional",
+]
+
+@ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
+def categorize_email_ell_marketing(contents: str):
+    """
+You are an AI assistant designed to categorize incoming emails with a focus on protecting the user from unwanted commercial content and unnecessary spending. Your primary goal is to quickly identify and sort emails that may be attempting to solicit money or promote products/services. You should approach each email with a healthy dose of skepticism, always on the lookout for subtle or overt attempts to encourage spending.
+When categorizing emails, you must strictly adhere to the following four categories:
+
+'Wants-Money': This category is for any email that directly or indirectly asks the recipient to spend money. This includes:
+
+Invoices or bills
+Requests for donations or charitable contributions
+Notifications about due payments or subscriptions
+Emails about fundraising campaigns
+Messages asking for financial support of any kind
+Subtle requests disguised as opportunities that require monetary investment
+
+
+'Advertising': This category is for emails primarily focused on promoting specific products or services. Look for:
+
+Direct product advertisements
+Sale announcements
+New product launches
+Service offerings
+Emails showcasing product features or benefits
+Messages with prominent calls-to-action to purchase or "learn more" about products
+
+
+'Marketing': This category is for emails that may not directly advertise products but are part of broader marketing strategies. This includes:
+
+Brand awareness campaigns
+Newsletters with soft-sell approaches
+Content marketing emails (blogs, articles, videos) that indirectly promote products or services
+Customer relationship emails that don't directly sell but keep the brand in the recipient's mind
+Surveys or feedback requests that are part of marketing research
+Emails about loyalty programs or rewards
+
+
+'Other': This category is for all emails that don't fit into the above three categories. This may include:
+
+Personal correspondence
+Work-related emails
+Transactional emails (e.g., order confirmations, shipping notifications)
+Account security alerts
+Appointment reminders
+Service updates or notifications not aimed at selling
+
+
+
+Important guidelines:
+
+Be vigilant in identifying even subtle attempts to encourage spending or promote products/services.
+Pay close attention to the sender, subject line, and key content to make accurate categorizations.
+If an email contains elements of multiple categories, prioritize 'Wants-Money' first, then 'Advertising', then 'Marketing'.
+Remember that the goal is to shield the user from unwanted commercial influences and protect them from unnecessary spending.
+Approach each email with the assumption that it may be trying to sell something, and only categorize as 'Other' if you're confident it's not commercial in nature.
+
+By following these guidelines and strictly adhering to the given categories, you will help the user maintain an inbox free from unwanted commercial content and protect them from potential financial solicitations.
+"""
+    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
 class GmailFetcher:
     def __init__(self, email_address: str, app_password: str):
@@ -78,6 +188,61 @@ class GmailFetcher:
             print(f"Error adding label: {str(e)}")
             return False
 
+    def get_email_body(self, email_message) -> str:
+        """
+        Extract the body content from an email message.
+        Handles both plain text and HTML emails.
+        
+        Args:
+            email_message: Email message object
+            
+        Returns:
+            str: The email body content
+        """
+        body = ""
+        
+        if email_message.is_multipart():
+            # Handle multipart messages
+            for part in email_message.walk():
+                content_type = part.get_content_type()
+                content_disposition = str(part.get("Content-Disposition"))
+
+                # Skip attachments
+                if "attachment" in content_disposition:
+                    continue
+
+                if content_type == "text/plain":
+                    try:
+                        body = part.get_payload(decode=True).decode()
+                        break
+                    except:
+                        continue
+                elif content_type == "text/html":
+                    try:
+                        html_content = part.get_payload(decode=True).decode()
+                        # Convert HTML to plain text
+                        soup = BeautifulSoup(html_content, 'html.parser')
+                        body = soup.get_text(separator=' ', strip=True)
+                        break
+                    except:
+                        continue
+        else:
+            # Handle non-multipart messages
+            content_type = email_message.get_content_type()
+            try:
+                if content_type == "text/plain":
+                    body = email_message.get_payload(decode=True).decode()
+                elif content_type == "text/html":
+                    html_content = email_message.get_payload(decode=True).decode()
+                    soup = BeautifulSoup(html_content, 'html.parser')
+                    body = soup.get_text(separator=' ', strip=True)
+            except:
+                body = "Could not decode email content"
+
+        # Clean up the body text
+        body = re.sub(r'\s+', ' ', body).strip()  # Remove extra whitespace
+        return body
+
     def get_recent_emails(self, hours: int = 2, mark_as_read: bool = False) -> List[message_from_bytes]:
         """
         Fetch emails from the last specified hours.
@@ -99,8 +264,6 @@ class GmailFetcher:
         emails = []
         for num in message_numbers[0].split():
             fetch_command = "(BODY.PEEK[])"
-            # RFC822 always marks the email as read            
-            # fetch_command = "(RFC822)" if mark_as_read else "(BODY.PEEK[])"
             _, msg_data = self.conn.fetch(num, fetch_command)
             
             email_message = self._create_email_message(msg_data)
@@ -122,8 +285,40 @@ def main(email_address: str, app_password: str):
         
         print(f"Found {len(recent_emails)} emails in the last 2 hours:")
         for msg in recent_emails:
-            print(f"Subject: {msg.get('Subject')}")
+            # Get the email body
+            body = fetcher.get_email_body(msg)
+            pre_categorized = False
+            deletion_candidate = True
+            
+            # iterate over the blocked domains
+            for domain in blocked_domains:
+                if domain in msg.get('From'):
+                    category = "Blocked"
+                    pre_categorized = True
+                    deletion_candidate = True
+                    break
+            
+            # iterate over the allowed domains
+            for domain in allowed_domains:
+                if domain in msg.get('From'):
+                    category = "Allowed"
+                    pre_categorized = True
+                    deletion_candidate = False
+                    break
+            
+            # categorize the email
+            if not pre_categorized:
+                category = categorize_email_ell_marketing(body)
+                category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
+                
+                if category in allowed_categories:
+                    deletion_candidate = True
+
             print(f"From: {msg.get('From')}")
+            print(f"Subject: {msg.get('Subject')}")
+            if len(category) < 20:
+                print(f"Category: {category}")
+            print(f"Deletion Candidate: {deletion_candidate}")
             print("-" * 50)
             
     finally:
