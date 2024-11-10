@@ -49,9 +49,34 @@ class GmailFetcher:
             date_threshold = date_threshold.replace(tzinfo=timezone.utc)
         if email_date.tzinfo is None:
             email_date = email_date.replace(tzinfo=timezone.utc)
-        print(f"email_date: {email_date}, tzinfo: {email_date.tzinfo}")
-        print(f"threshold: {date_threshold}, tzinfo: {date_threshold.tzinfo}")
         return email_date > date_threshold
+
+    def add_label(self, message_id: str, label: str) -> bool:
+        """
+        Add a label to a message without marking it as read.
+        
+        Args:
+            message_id: The message ID to label
+            label: The Gmail label to add (will be converted to IMAP format)
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self.conn:
+            raise Exception("Not connected to Gmail")
+
+        try:
+            # Convert Gmail label to IMAP format
+            imap_label = label.replace(' ', '_').upper()
+            if not imap_label.startswith('\\'):
+                imap_label = f'\\{imap_label}'
+
+            # Store the label while preserving other flags
+            result = self.conn.store(message_id, '+X-GM-LABELS', f'({imap_label})')
+            return result[0] == 'OK'
+        except Exception as e:
+            print(f"Error adding label: {str(e)}")
+            return False
 
     def get_recent_emails(self, hours: int = 2, mark_as_read: bool = False) -> List[message_from_bytes]:
         """
