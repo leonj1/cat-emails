@@ -9,6 +9,8 @@ from email.utils import parsedate_to_datetime
 from typing import List, Optional
 from bs4 import BeautifulSoup
 import re
+from collections import Counter
+from tabulate import tabulate
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
@@ -131,6 +133,11 @@ class GmailFetcher:
         self.password = app_password
         self.imap_server = "imap.gmail.com"
         self.conn = None
+        self.stats = {
+            'deleted': 0,
+            'kept': 0,
+            'categories': Counter()
+        }
 
     def connect(self) -> None:
         """Establish connection to Gmail IMAP server."""
@@ -363,12 +370,30 @@ class GmailFetcher:
             if result[0] == 'OK':
                 # Expunge the original message
                 self.conn.expunge()
+                self.stats['deleted'] += 1  # Increment delete counter
                 return True
             return False
             
         except Exception as e:
             print(f"Error deleting email: {str(e)}")
             return False
+
+def print_summary(hours: int, stats: dict):
+    """Print a summary of email processing results."""
+    print("\n" + "="*50)
+    print("SUMMARY")
+    print("="*50)
+    print(f"Time window: Last {hours} hours")
+    print(f"Emails processed: {stats['deleted'] + stats['kept']}")
+    print(f"Emails deleted: {stats['deleted']}")
+    print(f"Emails kept: {stats['kept']}")
+    
+    # Create category table
+    if stats['categories']:
+        print("\nCategories:")
+        table = [[category, count] for category, count in stats['categories'].most_common()]
+        print(tabulate(table, headers=['Category', 'Count'], tablefmt='grid'))
+    print("="*50 + "\n")
 
 def main(email_address: str, app_password: str, hours: int = 2):
     # Initialize and use the fetcher
@@ -419,16 +444,24 @@ def main(email_address: str, app_password: str, hours: int = 2):
             print(f"Deletion Candidate: {deletion_candidate}")
             fetcher.add_label(msg.get("Message-ID"), category)
             
-            # Delete if it's a deletion candidate
+            # Track categories
+            fetcher.stats['categories'][category] += 1
+            
+            # Track kept/deleted emails
             if deletion_candidate:
                 if fetcher.delete_email(msg.get("Message-ID")):
                     print("Email deleted successfully")
                 else:
                     print("Failed to delete email")
+                    fetcher.stats['kept'] += 1
             else:
                 print("Email left in inbox")
+                fetcher.stats['kept'] += 1
                     
             print("-" * 50)
+            
+        # Print summary at the end
+        print_summary(hours, fetcher.stats)
             
     finally:
         fetcher.disconnect()

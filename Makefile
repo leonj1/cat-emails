@@ -1,11 +1,23 @@
-.PHONY: build
+.PHONY: build run clean
 
+# Docker image name
+IMAGE_NAME = gmail-cleaner
+
+# Build the Docker image
 build:
-	@echo "Building Docker image..."
-	docker build -t gmail-categorizer .
+	docker build -t $(IMAGE_NAME) .
 
+# Run the container with environment variables
 run:
-	@echo "Running Gmail Categorizer..."
-	docker run --env-file .env gmail-categorizer python gmail_categorizer.py --ollama-host http://10.1.1.212:11434 --ollama-host2 http://10.1.1.144:11434 --hours 50000
+	docker run --rm \
+		-e GMAIL_EMAIL="$(GMAIL_EMAIL)" \
+		-e GMAIL_PASSWORD="$(GMAIL_PASSWORD)" \
+		$(IMAGE_NAME) \
+		--hours $(or $(HOURS),2)
 
-.DEFAULT_GOAL := run
+# Clean up Docker images
+clean:
+	docker rmi $(IMAGE_NAME)
+
+# Build and run in one command
+all: build run
