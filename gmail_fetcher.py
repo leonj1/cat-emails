@@ -12,6 +12,7 @@ import re
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
+parser.add_argument("--hours", type=int, default=2, help="The hours to fetch emails")
 args = parser.parse_args()
 
 ell.init(verbose=False, store='./logdir')
@@ -40,6 +41,8 @@ allowed_domains = [
     "americanairlines.com",
     "masterclass.com",
     "instacart.com",
+    "zbarleungcpa.com",
+    "intuit.com",
 ]
 
 blocked_domains = [
@@ -161,13 +164,63 @@ class GmailFetcher:
             email_date = email_date.replace(tzinfo=timezone.utc)
         return email_date > date_threshold
 
+    def capitalize_words(self, text):
+        return ' '.join(word.capitalize() for word in text.split())
+
+    def remove_http_links(self, text):
+        # Regular expression pattern to match HTTP links
+        pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+        
+        # Replace all occurrences of the pattern with an empty string
+        cleaned_text = re.sub(pattern, '', text)
+        
+        return cleaned_text
+
+    def remove_encoded_content(self, text):
+        # Regular expression pattern to match the encoded content format
+        pattern = r'\(\s*~~/[A-Za-z0-9/+]+~\s*\)'
+        
+        # Replace all occurrences of the pattern with an empty string
+        cleaned_text = re.sub(pattern, '', text)
+        
+        return cleaned_text
+
+    def remove_images_from_email(self, email_body):
+        """
+        Remove images from email contents.
+        
+        Args:
+        email_body (str): The email body content (can be HTML or plain text).
+        
+        Returns:
+        str: Email body with images removed.
+        """
+        # Check if the email body is HTML
+        if re.search(r'<[^>]+>', email_body):
+            # Parse HTML content
+            soup = BeautifulSoup(email_body, 'html.parser')
+            
+            # Remove all img tags
+            for img in soup.find_all('img'):
+                img.decompose()
+            
+            # Remove all elements with background images
+            for element in soup.find_all(style=re.compile('background-image')):
+                del element['style']
+            
+            # Convert back to string
+            return str(soup)
+        else:
+            # For plain text, remove any text that looks like an image file or URL
+            return re.sub(r'\b(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|bmp))\b', '', email_body, flags=re.IGNORECASE)
+
     def add_label(self, message_id: str, label: str) -> bool:
         """
         Add a label to a message without marking it as read.
         
         Args:
             message_id: The message ID to label
-            label: The Gmail label to add (will be converted to IMAP format)
+            label: The Gmail label to add
             
         Returns:
             bool: True if successful, False otherwise
@@ -176,13 +229,19 @@ class GmailFetcher:
             raise Exception("Not connected to Gmail")
 
         try:
-            # Convert Gmail label to IMAP format
-            imap_label = label.replace(' ', '_').upper()
-            if not imap_label.startswith('\\'):
-                imap_label = f'\\{imap_label}'
+            # Search for the message ID to get the sequence number
+            _, data = self.conn.search(None, f'(HEADER Message-ID "{message_id}")')
+            if not data[0]:
+                print(f"Message ID {message_id} not found")
+                return False
 
-            # Store the label while preserving other flags
-            result = self.conn.store(message_id, '+X-GM-LABELS', f'({imap_label})')
+            sequence_number = data[0].split()[0]
+            
+            # Create the label if it doesn't exist
+            self.conn.create(f'"{label}"')
+            
+            # Copy the message to the label
+            result = self.conn.copy(sequence_number, f'"{label}"')
             return result[0] == 'OK'
         except Exception as e:
             print(f"Error adding label: {str(e)}")
@@ -243,7 +302,7 @@ class GmailFetcher:
         body = re.sub(r'\s+', ' ', body).strip()  # Remove extra whitespace
         return body
 
-    def get_recent_emails(self, hours: int = 2, mark_as_read: bool = False) -> List[message_from_bytes]:
+    def get_recent_emails(self, hours: int = 2) -> List[message_from_bytes]:
         """
         Fetch emails from the last specified hours.
         """
@@ -275,15 +334,50 @@ class GmailFetcher:
 
         return emails
 
-def main(email_address: str, app_password: str):
+    def delete_email(self, message_id: str) -> bool:
+        """
+        Delete an email by moving it to the Trash folder.
+        
+        Args:
+            message_id: The Message-ID of the email to delete
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self.conn:
+            raise Exception("Not connected to Gmail")
+
+        try:
+            # Search for the message ID to get the sequence number
+            _, data = self.conn.search(None, f'(HEADER Message-ID "{message_id}")')
+            if not data[0]:
+                print(f"Message ID {message_id} not found")
+                return False
+
+            sequence_number = data[0].split()[0]
+            
+            # Move to Trash (Gmail's trash folder is [Gmail]/Trash)
+            self.conn.store(sequence_number, '+FLAGS', '\\Deleted')
+            result = self.conn.copy(sequence_number, '[Gmail]/Trash')
+            
+            if result[0] == 'OK':
+                # Expunge the original message
+                self.conn.expunge()
+                return True
+            return False
+            
+        except Exception as e:
+            print(f"Error deleting email: {str(e)}")
+            return False
+
+def main(email_address: str, app_password: str, hours: int = 2):
     # Initialize and use the fetcher
     fetcher = GmailFetcher(email_address, app_password)
     try:
         fetcher.connect()
-        # Pass mark_as_read=False explicitly for clarity
-        recent_emails = fetcher.get_recent_emails(mark_as_read=False)
+        recent_emails = fetcher.get_recent_emails(hours)
         
-        print(f"Found {len(recent_emails)} emails in the last 2 hours:")
+        print(f"Found {len(recent_emails)} emails in the last {hours} hours:")
         for msg in recent_emails:
             # Get the email body
             body = fetcher.get_email_body(msg)
@@ -293,7 +387,7 @@ def main(email_address: str, app_password: str):
             # iterate over the blocked domains
             for domain in blocked_domains:
                 if domain in msg.get('From'):
-                    category = "Blocked"
+                    category = "Blocked_Domain"
                     pre_categorized = True
                     deletion_candidate = True
                     break
@@ -301,14 +395,18 @@ def main(email_address: str, app_password: str):
             # iterate over the allowed domains
             for domain in allowed_domains:
                 if domain in msg.get('From'):
-                    category = "Allowed"
+                    category = "Allowed_Domain"
                     pre_categorized = True
                     deletion_candidate = False
                     break
             
             # categorize the email
             if not pre_categorized:
-                category = categorize_email_ell_marketing(body)
+                contents_without_links = fetcher.remove_http_links(f"{msg.get('Subject')}. {body}")
+                contents_without_images = fetcher.remove_images_from_email(contents_without_links)
+                contents_without_encoded = fetcher.remove_encoded_content(contents_without_images)
+                contents_cleaned = contents_without_encoded
+                category = categorize_email_ell_marketing(contents_cleaned)
                 category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
                 
                 if category in allowed_categories:
@@ -319,6 +417,17 @@ def main(email_address: str, app_password: str):
             if len(category) < 20:
                 print(f"Category: {category}")
             print(f"Deletion Candidate: {deletion_candidate}")
+            fetcher.add_label(msg.get("Message-ID"), category)
+            
+            # Delete if it's a deletion candidate
+            if deletion_candidate:
+                if fetcher.delete_email(msg.get("Message-ID")):
+                    print("Email deleted successfully")
+                else:
+                    print("Failed to delete email")
+            else:
+                print("Email left in inbox")
+                    
             print("-" * 50)
             
     finally:
@@ -332,6 +441,4 @@ if __name__ == "__main__":
     if not email_address or not app_password:
         raise ValueError("Please set GMAIL_EMAIL and GMAIL_PASSWORD environment variables")
 
-    main(email_address, app_password)
-
-    
+    main(email_address, app_password, args.hours)
