@@ -47,6 +47,9 @@ allowed_domains = [
     "intuit.com",
     "patreon.com",
     "summarize.ing",
+    "justride.com",
+    "codescene.com",
+    "theburningmonk.com",
 ]
 
 blocked_domains = [
