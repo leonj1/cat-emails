@@ -53,6 +53,9 @@ allowed_domains = [
     "accounts.google.com",
     "elevenlabs.io",
     "thriftytraveler.com",
+    "optery.com",
+    "deleteme.com",
+    "incogni.com",
 ]
 
 blocked_domains = [
