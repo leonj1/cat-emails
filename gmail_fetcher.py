@@ -51,6 +51,7 @@ allowed_domains = [
     "codescene.com",
     "theburningmonk.com",
     "accounts.google.com",
+    "elevenlabs.io",
 ]
 
 blocked_domains = [
