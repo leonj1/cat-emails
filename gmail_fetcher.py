@@ -50,6 +50,7 @@ allowed_domains = [
     "justride.com",
     "codescene.com",
     "theburningmonk.com",
+    "accounts.google.com",
 ]
 
 blocked_domains = [
