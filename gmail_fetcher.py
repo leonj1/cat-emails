@@ -52,6 +52,7 @@ allowed_domains = [
     "theburningmonk.com",
     "accounts.google.com",
     "elevenlabs.io",
+    "thriftytraveler.com",
 ]
 
 blocked_domains = [
