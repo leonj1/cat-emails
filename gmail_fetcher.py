@@ -46,6 +46,7 @@ allowed_domains = [
     "zbarleungcpa.com",
     "intuit.com",
     "patreon.com",
+    "summarize.ing",
 ]
 
 blocked_domains = [
