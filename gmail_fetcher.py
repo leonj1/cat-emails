@@ -57,6 +57,8 @@ allowed_domains = [
     "deleteme.com",
     "incogni.com",
     "gamma.app",
+    "novita.ai",
+    "deadmansnitch.com",
 ]
 
 blocked_domains = [
