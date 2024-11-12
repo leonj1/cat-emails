@@ -56,6 +56,7 @@ allowed_domains = [
     "optery.com",
     "deleteme.com",
     "incogni.com",
+    "gamma.app",
 ]
 
 blocked_domains = [
