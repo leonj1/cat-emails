@@ -59,6 +59,7 @@ allowed_domains = [
     "gamma.app",
     "novita.ai",
     "deadmansnitch.com",
+    "localstack.cloud",
 ]
 
 blocked_domains = [
