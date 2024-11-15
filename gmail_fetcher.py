@@ -60,6 +60,7 @@ allowed_domains = [
     "novita.ai",
     "deadmansnitch.com",
     "localstack.cloud",
+    "jpmorgan.com",
 ]
 
 blocked_domains = [
