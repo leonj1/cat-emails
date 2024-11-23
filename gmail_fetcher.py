@@ -426,8 +426,9 @@ def main(email_address: str, app_password: str, hours: int = 2):
             deletion_candidate = True
             
             # iterate over the blocked domains
+            from_header = str(msg.get('From', ''))
             for domain in blocked_domains:
-                if domain in msg.get('From'):
+                if domain in from_header:
                     category = "Blocked_Domain"
                     pre_categorized = True
                     deletion_candidate = True
@@ -435,7 +436,7 @@ def main(email_address: str, app_password: str, hours: int = 2):
             
             # iterate over the allowed domains
             for domain in allowed_domains:
-                if domain in msg.get('From'):
+                if domain in from_header:
                     category = "Allowed_Domain"
                     pre_categorized = True
                     deletion_candidate = False
