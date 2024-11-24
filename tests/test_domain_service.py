@@ -35,7 +35,11 @@ class TestDomainService(unittest.TestCase):
         self.assertFalse(domains[1].is_active)
         
         # Verify the request
-        mock_get.assert_called_once_with(f"{self.base_url}/api/v1/domains/allowed")
+        mock_get.assert_called_once_with(
+            f"{self.base_url}/api/v1/domains/allowed",
+            timeout=10,
+            headers={'Accept': 'application/json'}
+        )
     
     @patch('requests.get')
     def test_fetch_allowed_domains_http_error(self, mock_get):
@@ -48,11 +52,42 @@ class TestDomainService(unittest.TestCase):
             self.service.fetch_allowed_domains()
         
         self.assertIn("404", str(context.exception))
+        
+        # Verify the request parameters
+        mock_get.assert_called_once_with(
+            f"{self.base_url}/api/v1/domains/allowed",
+            timeout=10,
+            headers={'Accept': 'application/json'}
+        )
     
     @patch('requests.get')
     def test_fetch_allowed_domains_invalid_response(self, mock_get):
         """Test handling of invalid response data."""
-        # Mock response with invalid data structure
+        # Mock response with invalid data structure (not a list)
+        mock_response = {"invalid": "not a list"}
+        
+        # Configure mock
+        mock_response_obj = MagicMock()
+        mock_response_obj.json.return_value = mock_response
+        mock_get.return_value = mock_response_obj
+        
+        # Verify that the appropriate exception is raised
+        with self.assertRaises(ValueError) as context:
+            self.service.fetch_allowed_domains()
+        
+        self.assertIn("Expected array response", str(context.exception))
+        
+        # Verify the request parameters
+        mock_get.assert_called_once_with(
+            f"{self.base_url}/api/v1/domains/allowed",
+            timeout=10,
+            headers={'Accept': 'application/json'}
+        )
+    
+    @patch('requests.get')
+    def test_fetch_allowed_domains_invalid_domain_data(self, mock_get):
+        """Test handling of invalid domain data within the array."""
+        # Mock response with invalid domain data
         mock_response = [{"invalid_key": "value"}]
         
         # Configure mock
@@ -65,6 +100,13 @@ class TestDomainService(unittest.TestCase):
             self.service.fetch_allowed_domains()
         
         self.assertIn("Invalid response format", str(context.exception))
+        
+        # Verify the request parameters
+        mock_get.assert_called_once_with(
+            f"{self.base_url}/api/v1/domains/allowed",
+            timeout=10,
+            headers={'Accept': 'application/json'}
+        )
     
     def test_base_url_normalization(self):
         """Test that base URL is properly normalized."""
