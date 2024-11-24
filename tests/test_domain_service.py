@@ -14,12 +14,42 @@ class TestDomainService(unittest.TestCase):
         service = DomainService("https://control-api.joseserver.com/", api_token=self.api_token)
         self.assertEqual(service.base_url, "https://control-api.joseserver.com")
 
-    def test_missing_api_token(self):
-        """Test that service raises error when API token is not provided."""
-        with self.assertRaises(ValueError) as context:
-            service = DomainService()
+    def test_mock_mode_behavior(self):
+        """Test service behavior in mock mode (no API token).
+        
+        In mock mode (when no API token is provided), the service should:
+        1. Set mock_mode to True
+        2. Return empty lists for all fetch operations
+        3. Not make any actual API calls
+        """
+        # Create service without API token to enable mock mode
+        service = DomainService()
+        
+        # Verify mock mode is enabled
+        self.assertTrue(service.mock_mode)
+        
+        # Verify all fetch methods return empty lists without making API calls
+        self.assertEqual(service.fetch_allowed_domains(), [])
+        self.assertEqual(service.fetch_blocked_domains(), [])
+        self.assertEqual(service.fetch_blocked_categories(), [])
+
+    def test_non_mock_mode_behavior(self):
+        """Test service behavior in non-mock mode (with API token).
+        
+        When an API token is provided, the service should:
+        1. Set mock_mode to False
+        2. Make actual API calls
+        3. Raise errors for invalid responses
+        """
+        # Create service with API token
+        service = DomainService(api_token=self.api_token)
+        
+        # Verify mock mode is disabled
+        self.assertFalse(service.mock_mode)
+        
+        # Verify service attempts API calls (will raise RequestException due to no mock)
+        with self.assertRaises(requests.RequestException):
             service.fetch_allowed_domains()
-        self.assertIn("API token is required", str(context.exception))
 
     @patch('requests.get')
     def test_fetch_allowed_domains_success(self, mock_get):
@@ -123,13 +153,6 @@ class TestDomainService(unittest.TestCase):
                 'X-API-Token': self.api_token
             }
         )
-
-    def test_mock_mode(self):
-        """Test that mock mode returns empty lists."""
-        service = DomainService()  # No API token = mock mode
-        self.assertTrue(service.mock_mode)
-        with self.assertRaises(ValueError):
-            service.fetch_allowed_domains()
 
 if __name__ == '__main__':
     unittest.main()

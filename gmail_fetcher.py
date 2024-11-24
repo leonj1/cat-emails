@@ -122,7 +122,7 @@ class GmailFetcher:
             
             # Fetch and cache blocked categories
             categories = self.domain_service.fetch_blocked_categories()
-            self._blocked_categories = {c.name for c in categories}
+            self._blocked_categories = {c.category for c in categories}
             
         except Exception as e:
             print(f"Warning: Failed to load domain data: {str(e)}")

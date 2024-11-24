@@ -4,6 +4,14 @@ ifneq (,$(wildcard .env))
     export
 endif
 
+# Validate required environment variables
+validate-env:
+	@if [ -z "$(GMAIL_EMAIL)" ] || [ -z "$(GMAIL_PASSWORD)" ] || [ -z "$(CONTROL_API_TOKEN)" ]; then \
+		echo "Error: Required environment variables are missing. Please set them in .env file:"; \
+		echo "GMAIL_EMAIL, GMAIL_PASSWORD, and CONTROL_API_TOKEN"; \
+		exit 1; \
+	fi
+
 .PHONY: build run clean test
 
 # Docker image name
@@ -14,12 +22,8 @@ TEST_IMAGE_NAME = gmail-cleaner-test
 build:
 	docker build -t $(IMAGE_NAME) .
 
-# Build the test Docker image
-build-test:
-	docker build -t $(TEST_IMAGE_NAME) -f Dockerfile.test .
-
 # Run the container with environment variables
-run:
+run: validate-env
 	@if [ -z "$(GMAIL_EMAIL)" ] || [ -z "$(GMAIL_PASSWORD)" ] || [ -z "$(CONTROL_API_TOKEN)" ]; then \
 		echo "Error: Required environment variables are missing. Please set them in .env file:"; \
 		echo "GMAIL_EMAIL, GMAIL_PASSWORD, and CONTROL_API_TOKEN"; \

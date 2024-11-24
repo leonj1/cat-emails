@@ -34,12 +34,12 @@ class DomainService:
         return self._fetch("/categories/blocked", BlockedCategory)
 
     def _fetch(self, endpoint: str, model_class: Type[BaseModel]) -> List[BaseModel]:
-        if not self.api_token:
-            raise ValueError("API token is required but not provided")
-            
         if self.mock_mode:
             # Return empty lists in mock mode
             return []
+            
+        if not self.api_token:
+            raise ValueError("API token is required but not provided")
 
         try:
             headers = {
