@@ -16,8 +16,9 @@ class BlockedCategory(BaseModel):
     severity: str = Field(description="Severity level of the category")
 
 class DomainService:
-    def __init__(self, base_url: str = "https://control-api.joseserver.com"):
+    def __init__(self, base_url: str = "https://control-api.joseserver.com", api_token: str | None = None):
         self.base_url = base_url.rstrip('/')
+        self.api_token = api_token
         
     def fetch_allowed_domains(self) -> List[AllowedDomain]:
         return self._fetch_domains("/api/v1/domains/allowed", AllowedDomain)
@@ -32,11 +33,19 @@ class DomainService:
         if not endpoint.startswith('/'):
             raise ValueError("API endpoint must start with '/'")
 
+        if not self.api_token:
+            raise ValueError("API token is required but not provided")
+
         try:
+            headers = {
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {self.api_token}'
+            }
+            
             response = requests.get(
                 f"{self.base_url}{endpoint}",
                 timeout=10,
-                headers={'Accept': 'application/json'}
+                headers=headers
             )
             response.raise_for_status()
 
@@ -53,7 +62,13 @@ class DomainService:
 
 # Example usage:
 if __name__ == "__main__":
-    service = DomainService()
+    import os
+    api_token = os.getenv("CONTROL_API_TOKEN")
+    if not api_token:
+        print("Error: CONTROL_API_TOKEN environment variable is not set")
+        exit(1)
+        
+    service = DomainService(api_token=api_token)
     try:
         allowed_domains = service.fetch_allowed_domains()
         print("\nAllowed Domains:")

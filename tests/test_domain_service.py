@@ -6,12 +6,20 @@ from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedC
 
 class TestDomainService(unittest.TestCase):
     def setUp(self):
-        self.service = DomainService()
+        self.api_token = "test-token-123"
+        self.service = DomainService(api_token=self.api_token)
 
     def test_base_url_normalization(self):
         """Test that base URL is properly normalized."""
-        service = DomainService("https://control-api.joseserver.com/")
+        service = DomainService("https://control-api.joseserver.com/", api_token=self.api_token)
         self.assertEqual(service.base_url, "https://control-api.joseserver.com")
+
+    def test_missing_api_token(self):
+        """Test that service raises error when API token is not provided."""
+        service = DomainService()
+        with self.assertRaises(ValueError) as context:
+            service.fetch_allowed_domains()
+        self.assertIn("API token is required", str(context.exception))
 
     @patch('requests.get')
     def test_fetch_allowed_domains_success(self, mock_get):
@@ -31,7 +39,10 @@ class TestDomainService(unittest.TestCase):
         mock_get.assert_called_with(
             "https://control-api.joseserver.com/api/v1/domains/allowed",
             timeout=10,
-            headers={'Accept': 'application/json'}
+            headers={
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {self.api_token}'
+            }
         )
 
     @patch('requests.get')
@@ -79,7 +90,10 @@ class TestDomainService(unittest.TestCase):
         mock_get.assert_called_with(
             "https://control-api.joseserver.com/api/v1/domains/blocked",
             timeout=10,
-            headers={'Accept': 'application/json'}
+            headers={
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {self.api_token}'
+            }
         )
 
     @patch('requests.get')
@@ -136,7 +150,10 @@ class TestDomainService(unittest.TestCase):
         mock_get.assert_called_with(
             "https://control-api.joseserver.com/api/v1/categories/blocked",
             timeout=10,
-            headers={'Accept': 'application/json'}
+            headers={
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {self.api_token}'
+            }
         )
 
     @patch('requests.get')
