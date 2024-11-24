@@ -5,7 +5,7 @@ import os
 import imaplib
 from email import message_from_bytes
 from datetime import datetime, timedelta, timezone
-from email.utils import parsedate_to_datetime
+from email.utils import parsedate_to_datetime, parseaddr
 from typing import List, Optional, Set
 from bs4 import BeautifulSoup
 import re
@@ -75,7 +75,7 @@ Important guidelines:
 Be vigilant in identifying even subtle attempts to encourage spending or promote products/services.
 Pay close attention to the sender, subject line, and key content to make accurate categorizations.
 If an email contains elements of multiple categories, prioritize 'Wants-Money' first, then 'Advertising', then 'Marketing'.
-Remember that the goal is to shield the user from unwanted commercial influences and protect them from unnecessary spending.
+Remember that the goal is to shield the user from unwanted commercial influences and protect them from potential financial solicitations.
 Approach each email with the assumption that it may be trying to sell something, and only categorize as 'Other' if you're confident it's not commercial in nature.
 
 By following these guidelines and strictly adhering to the given categories, you will help the user maintain an inbox free from unwanted commercial content and protect them from potential financial solicitations.
@@ -131,13 +131,29 @@ class GmailFetcher:
             self._blocked_domains = set()
             self._blocked_categories = set()
 
+    def _extract_domain(self, from_header: str) -> str:
+        """Extract domain from email address in From header.
+        
+        Args:
+            from_header: Raw From header string
+            
+        Returns:
+            str: Domain part of the email address
+        """
+        _, email_address = parseaddr(from_header)
+        if '@' in email_address:
+            return email_address.split('@')[-1].lower()
+        return ''
+
     def _is_domain_allowed(self, from_header: str) -> bool:
         """Check if the email is from an allowed domain."""
-        return any(domain in from_header for domain in self._allowed_domains)
+        domain = self._extract_domain(from_header)
+        return domain in self._allowed_domains
 
     def _is_domain_blocked(self, from_header: str) -> bool:
         """Check if the email is from a blocked domain."""
-        return any(domain in from_header for domain in self._blocked_domains)
+        domain = self._extract_domain(from_header)
+        return domain in self._blocked_domains
 
     def _is_category_blocked(self, category: str) -> bool:
         """Check if the category is in the blocked categories list."""
@@ -146,13 +162,13 @@ class GmailFetcher:
     def connect(self) -> None:
         """Establish connection to Gmail IMAP server."""
         try:
-            # Encode credentials, replacing non-ASCII characters
-            email = self.email_address.encode('ascii', 'ignore').decode('ascii')
-            password = self.password.encode('ascii', 'ignore').decode('ascii')
+            # Use original credentials without encoding
+            email = self.email_address
+            password = self.password
             
             self.conn = imaplib.IMAP4_SSL(self.imap_server)
             self.conn.login(email, password)
-        except Exception as e:
+        except imaplib.IMAP4_SSL.error as e:
             raise Exception(f"Failed to connect to Gmail: {str(e)}")
 
     def disconnect(self) -> None:
