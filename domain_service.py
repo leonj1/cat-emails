@@ -29,6 +29,9 @@ class DomainService:
         return self._fetch_domains("/api/v1/categories/blocked", BlockedCategory)
 
     def _fetch_domains(self, endpoint: str, model_class: Type[BaseModel]) -> List[BaseModel]:
+        if not endpoint.startswith('/'):
+            raise ValueError("API endpoint must start with '/'")
+
         try:
             response = requests.get(
                 f"{self.base_url}{endpoint}",
