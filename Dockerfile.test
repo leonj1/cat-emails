@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies
+COPY requirements.txt .
+COPY setup.py .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -e .
+
+# Copy source code and tests
+COPY . .
+
+# Run the tests
+CMD ["python", "-m", "unittest", "discover", "-v", "tests"]
