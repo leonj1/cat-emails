@@ -19,27 +19,32 @@ class DomainService:
     def __init__(self, base_url: str = "https://control-api.joseserver.com", api_token: str | None = None):
         self.base_url = base_url.rstrip('/')
         self.api_token = api_token
+        self.mock_mode = api_token is None
         
     def fetch_allowed_domains(self) -> List[AllowedDomain]:
-        return self._fetch_domains("/api/v1/domains/allowed", AllowedDomain)
+        return self._fetch("/domains/allowed", AllowedDomain)
 
     def fetch_blocked_domains(self) -> List[BlockedDomain]:
-        return self._fetch_domains("/api/v1/domains/blocked", BlockedDomain)
+        return self._fetch("/domains/blocked", BlockedDomain)
 
     def fetch_blocked_categories(self) -> List[BlockedCategory]:
-        return self._fetch_domains("/api/v1/categories/blocked", BlockedCategory)
+        return self._fetch("/categories/blocked", BlockedCategory)
 
-    def _fetch_domains(self, endpoint: str, model_class: Type[BaseModel]) -> List[BaseModel]:
+    def _fetch(self, endpoint: str, model_class: Type[BaseModel]) -> List[BaseModel]:
         if not endpoint.startswith('/'):
             raise ValueError("API endpoint must start with '/'")
 
         if not self.api_token:
             raise ValueError("API token is required but not provided")
+            
+        if self.mock_mode:
+            # Return empty lists in mock mode
+            return []
 
         try:
             headers = {
                 'Accept': 'application/json',
-                'Authorization': f'Bearer {self.api_token}'
+                'X-API-Token': f'{self.api_token}'
             }
             
             response = requests.get(
@@ -47,13 +52,25 @@ class DomainService:
                 timeout=10,
                 headers=headers
             )
+            response_data = response.json()
+            print(f"RESPONSE: {response_data}")
             response.raise_for_status()
 
-            domains_data = response.json()
-            if not isinstance(domains_data, list):
-                raise ValueError("Expected array response from API")
-
-            return [model_class(**domain) for domain in domains_data]
+            if not isinstance(response_data, dict):
+                raise ValueError("Expected dictionary response from API")
+                
+            # Handle allowed domains which come in 'domains' field
+            if 'domains' in response_data:
+                return [model_class(domain=d, is_active=True) for d in response_data['domains']]
+            
+            # Handle blocked domains/categories which may come in 'data' field
+            if 'data' in response_data:
+                domains_data = response_data['data']
+                if not isinstance(domains_data, list):
+                    raise ValueError("Expected array in 'data' field")
+                return [model_class(**domain) for domain in domains_data]
+                
+            raise ValueError("Expected 'domains' or 'data' field in response")
 
         except requests.RequestException as e:
             raise requests.RequestException(f"Failed to fetch domains: {str(e)}") from e
