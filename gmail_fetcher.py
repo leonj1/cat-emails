@@ -3,14 +3,15 @@ import ell
 import openai
 import os
 import imaplib
-from email import message_from_bytes  # Changed import
+from email import message_from_bytes
 from datetime import datetime, timedelta, timezone
-from email.utils import parsedate_to_datetime
-from typing import List, Optional
+from email.utils import parsedate_to_datetime, parseaddr
+from typing import List, Optional, Set
 from bs4 import BeautifulSoup
 import re
 from collections import Counter
 from tabulate import tabulate
+from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
@@ -22,60 +23,6 @@ ell.init(verbose=False, store='./logdir')
 client = openai.Client(
     base_url=f"http://{args.base_url}/v1", api_key="ollama"  # required but not used
 )
-
-allowed_domains = [
-    "github.com",
-    "amazon.com",
-    "apple.com",
-    "google.com",
-    "microsoft.com",
-    "microcenter.com",
-    "americanexpress.com",
-    "citi.com",
-    "wellsfargo.com",
-    "chase.com",
-    "discover.com",
-    "capitalone.com",
-    "delta.com",
-    "united.com",
-    "southwest.com",
-    "jetblue.com",
-    "americanairlines.com",
-    "masterclass.com",
-    "instacart.com",
-    "zbarleungcpa.com",
-    "intuit.com",
-    "patreon.com",
-    "summarize.ing",
-    "justride.com",
-    "codescene.com",
-    "theburningmonk.com",
-    "accounts.google.com",
-    "elevenlabs.io",
-    "thriftytraveler.com",
-    "optery.com",
-    "deleteme.com",
-    "incogni.com",
-    "gamma.app",
-    "novita.ai",
-    "deadmansnitch.com",
-    "localstack.cloud",
-    "jpmorgan.com",
-]
-
-blocked_domains = [
-    "facebook.com",
-    "daveandbusters.com",
-    "rh.com",
-    "raymourflanigan.com",
-]
-
-allowed_categories = [
-    "Wants-Money",
-    "Advertising",
-    "Marketing",
-    "Promotional",
-]
 
 @ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
 def categorize_email_ell_marketing(contents: str):
@@ -123,13 +70,12 @@ Appointment reminders
 Service updates or notifications not aimed at selling
 
 
-
 Important guidelines:
 
 Be vigilant in identifying even subtle attempts to encourage spending or promote products/services.
 Pay close attention to the sender, subject line, and key content to make accurate categorizations.
 If an email contains elements of multiple categories, prioritize 'Wants-Money' first, then 'Advertising', then 'Marketing'.
-Remember that the goal is to shield the user from unwanted commercial influences and protect them from unnecessary spending.
+Remember that the goal is to shield the user from unwanted commercial influences and protect them from potential financial solicitations.
 Approach each email with the assumption that it may be trying to sell something, and only categorize as 'Other' if you're confident it's not commercial in nature.
 
 By following these guidelines and strictly adhering to the given categories, you will help the user maintain an inbox free from unwanted commercial content and protect them from potential financial solicitations.
@@ -137,13 +83,14 @@ By following these guidelines and strictly adhering to the given categories, you
     return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
 class GmailFetcher:
-    def __init__(self, email_address: str, app_password: str):
+    def __init__(self, email_address: str, app_password: str, api_token: str = None):
         """
         Initialize Gmail connection using IMAP.
         
         Args:
             email_address: Gmail address
             app_password: Gmail App Password (NOT your regular Gmail password)
+            api_token: API token for the control API
         """
         self.email_address = email_address
         self.password = app_password
@@ -154,13 +101,74 @@ class GmailFetcher:
             'kept': 0,
             'categories': Counter()
         }
+        
+        # Initialize domain service and load domain data
+        self.domain_service = DomainService(api_token=api_token)
+        self._allowed_domains: Set[str] = set()
+        self._blocked_domains: Set[str] = set()
+        self._blocked_categories: Set[str] = set()
+        self._load_domain_data()
+
+    def _load_domain_data(self) -> None:
+        """Load all domain and category data during initialization."""
+        try:
+            # Fetch and cache allowed domains
+            allowed = self.domain_service.fetch_allowed_domains()
+            self._allowed_domains = {d.domain for d in allowed}
+            
+            # Fetch and cache blocked domains
+            blocked = self.domain_service.fetch_blocked_domains()
+            self._blocked_domains = {d.domain for d in blocked}
+            
+            # Fetch and cache blocked categories
+            categories = self.domain_service.fetch_blocked_categories()
+            self._blocked_categories = {c.category for c in categories}
+            
+        except Exception as e:
+            print(f"Warning: Failed to load domain data: {str(e)}")
+            # Initialize empty sets if loading fails
+            self._allowed_domains = set()
+            self._blocked_domains = set()
+            self._blocked_categories = set()
+
+    def _extract_domain(self, from_header: str) -> str:
+        """Extract domain from email address in From header.
+        
+        Args:
+            from_header: Raw From header string
+            
+        Returns:
+            str: Domain part of the email address
+        """
+        _, email_address = parseaddr(from_header)
+        if '@' in email_address:
+            return email_address.split('@')[-1].lower()
+        return ''
+
+    def _is_domain_allowed(self, from_header: str) -> bool:
+        """Check if the email is from an allowed domain."""
+        domain = self._extract_domain(from_header)
+        return domain in self._allowed_domains
+
+    def _is_domain_blocked(self, from_header: str) -> bool:
+        """Check if the email is from a blocked domain."""
+        domain = self._extract_domain(from_header)
+        return domain in self._blocked_domains
+
+    def _is_category_blocked(self, category: str) -> bool:
+        """Check if the category is in the blocked categories list."""
+        return category in self._blocked_categories
 
     def connect(self) -> None:
         """Establish connection to Gmail IMAP server."""
         try:
+            # Use original credentials without encoding
+            email = self.email_address
+            password = self.password
+            
             self.conn = imaplib.IMAP4_SSL(self.imap_server)
-            self.conn.login(self.email_address, self.password)
-        except Exception as e:
+            self.conn.login(email, password)
+        except imaplib.IMAP4_SSL.error as e:
             raise Exception(f"Failed to connect to Gmail: {str(e)}")
 
     def disconnect(self) -> None:
@@ -411,9 +419,21 @@ def print_summary(hours: int, stats: dict):
         print(tabulate(table, headers=['Category', 'Count'], tablefmt='grid'))
     print("="*50 + "\n")
 
-def main(email_address: str, app_password: str, hours: int = 2):
+def test_api_connection(api_token: str) -> None:
+    """Test connection to control API before proceeding"""
+    service = DomainService(api_token=api_token)
+    try:
+        # Try to fetch domains to verify API connection
+        service.fetch_allowed_domains()
+    except Exception as e:
+        raise Exception(f"Failed to connect to control API: {str(e)}")
+
+def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
+    # Test API connection first
+    test_api_connection(api_token)
+
     # Initialize and use the fetcher
-    fetcher = GmailFetcher(email_address, app_password)
+    fetcher = GmailFetcher(email_address, app_password, api_token)
     try:
         fetcher.connect()
         recent_emails = fetcher.get_recent_emails(hours)
@@ -425,24 +445,18 @@ def main(email_address: str, app_password: str, hours: int = 2):
             pre_categorized = False
             deletion_candidate = True
             
-            # iterate over the blocked domains
+            # Check domain lists
             from_header = str(msg.get('From', ''))
-            for domain in blocked_domains:
-                if domain in from_header:
-                    category = "Blocked_Domain"
-                    pre_categorized = True
-                    deletion_candidate = True
-                    break
+            if fetcher._is_domain_blocked(from_header):
+                category = "Blocked_Domain"
+                pre_categorized = True
+                deletion_candidate = True
+            elif fetcher._is_domain_allowed(from_header):
+                category = "Allowed_Domain"
+                pre_categorized = True
+                deletion_candidate = False
             
-            # iterate over the allowed domains
-            for domain in allowed_domains:
-                if domain in from_header:
-                    category = "Allowed_Domain"
-                    pre_categorized = True
-                    deletion_candidate = False
-                    break
-            
-            # categorize the email
+            # Categorize the email if not pre-categorized
             if not pre_categorized:
                 contents_without_links = fetcher.remove_http_links(f"{msg.get('Subject')}. {body}")
                 contents_without_images = fetcher.remove_images_from_email(contents_without_links)
@@ -451,7 +465,8 @@ def main(email_address: str, app_password: str, hours: int = 2):
                 category = categorize_email_ell_marketing(contents_cleaned)
                 category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
                 
-                if category in allowed_categories:
+                # Check if category is blocked
+                if fetcher._is_category_blocked(category):
                     deletion_candidate = True
 
             print(f"From: {msg.get('From')}")
@@ -487,8 +502,12 @@ if __name__ == "__main__":
     # Get credentials from environment variables
     email_address = os.getenv("GMAIL_EMAIL")
     app_password = os.getenv("GMAIL_PASSWORD")
+    api_token = os.getenv("CONTROL_API_TOKEN")
 
     if not email_address or not app_password:
         raise ValueError("Please set GMAIL_EMAIL and GMAIL_PASSWORD environment variables")
 
-    main(email_address, app_password, args.hours)
+    if not api_token:
+        raise ValueError("Please set CONTROL_API_TOKEN environment variable")
+    
+    main(email_address, app_password, api_token, args.hours)

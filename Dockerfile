@@ -11,7 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install -U "ell-ai[all]"
 
-COPY gmail_fetcher.py .
+COPY gmail_fetcher.py domain_service.py ./
 
 ENV GMAIL_EMAIL=""
 ENV GMAIL_PASSWORD=""
