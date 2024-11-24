@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: cat-emails
+Version: 0.1
+Requires-Dist: requests>=2.26.0
+Requires-Dist: requests-mock>=1.11.0
+Requires-Dist: pydantic>=2.9.2
