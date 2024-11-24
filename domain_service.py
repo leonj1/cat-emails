@@ -26,33 +26,9 @@ class DomainService:
         return self._fetch_domains("/api/v1/domains/blocked", BlockedDomain)
 
     def fetch_blocked_categories(self) -> List[BlockedCategory]:
-        """
-        Fetch the list of blocked categories from the control API.
-
-        Returns:
-            List[BlockedCategory]: A list of blocked categories
-
-        Raises:
-            requests.RequestException: If there's an error communicating with the API
-            ValueError: If the API response is not in the expected format
-        """
         return self._fetch_domains("/api/v1/categories/blocked", BlockedCategory)
 
     def _fetch_domains(self, endpoint: str, model_class: Type[BaseModel]) -> List[BaseModel]:
-        """
-        Generic method to fetch domains from the API.
-
-        Args:
-            endpoint: API endpoint path
-            model_class: Pydantic model class to parse the response
-
-        Returns:
-            List of domain objects
-
-        Raises:
-            requests.RequestException: If there's an error communicating with the API
-            ValueError: If the API response is not in the expected format
-        """
         try:
             response = requests.get(
                 f"{self.base_url}{endpoint}",
