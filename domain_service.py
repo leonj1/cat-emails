@@ -22,16 +22,23 @@ class DomainService:
             ValueError: If the API response is not in the expected format
         """
         try:
-            response = requests.get(f"{self.base_url}/api/v1/domains/allowed")
+            response = requests.get(
+                f"{self.base_url}/api/v1/domains/allowed",
+                timeout=10,  # Add reasonable timeout
+                headers={'Accept': 'application/json'}
+            )
             response.raise_for_status()
             
             domains_data = response.json()
+            if not isinstance(domains_data, list):
+                raise ValueError("Expected array response from API")
+                
             return [AllowedDomain(**domain) for domain in domains_data]
             
         except requests.RequestException as e:
-            raise requests.RequestException(f"Failed to fetch allowed domains: {str(e)}")
+            raise requests.RequestException(f"Failed to fetch allowed domains: {str(e)}") from e
         except (KeyError, ValueError) as e:
-            raise ValueError(f"Invalid response format from API: {str(e)}")
+            raise ValueError(f"Invalid response format from API: {str(e)}") from e
 
 # Example usage:
 if __name__ == "__main__":
