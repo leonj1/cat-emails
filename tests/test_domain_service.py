@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import requests
-from domain_service import DomainService, AllowedDomain
+from domain_service import DomainService, AllowedDomain, BlockedDomain
 
 class TestDomainService(unittest.TestCase):
     def setUp(self):
@@ -42,6 +42,38 @@ class TestDomainService(unittest.TestCase):
         )
     
     @patch('requests.get')
+    def test_fetch_blocked_domains_success(self, mock_get):
+        """Test successful fetch of blocked domains."""
+        # Mock data that matches expected API response
+        mock_response = [
+            {"domain": "spam.com", "reason": "Known spam source"},
+            {"domain": "malware.com", "reason": "Security threat"}
+        ]
+        
+        # Configure mock
+        mock_response_obj = MagicMock()
+        mock_response_obj.json.return_value = mock_response
+        mock_get.return_value = mock_response_obj
+        
+        # Call the service
+        domains = self.service.fetch_blocked_domains()
+        
+        # Verify the response
+        self.assertEqual(len(domains), 2)
+        self.assertIsInstance(domains[0], BlockedDomain)
+        self.assertEqual(domains[0].domain, "spam.com")
+        self.assertEqual(domains[0].reason, "Known spam source")
+        self.assertEqual(domains[1].domain, "malware.com")
+        self.assertEqual(domains[1].reason, "Security threat")
+        
+        # Verify the request
+        mock_get.assert_called_once_with(
+            f"{self.base_url}/api/v1/domains/blocked",
+            timeout=10,
+            headers={'Accept': 'application/json'}
+        )
+    
+    @patch('requests.get')
     def test_fetch_allowed_domains_http_error(self, mock_get):
         """Test handling of HTTP errors."""
         # Configure mock to raise an exception
@@ -56,6 +88,25 @@ class TestDomainService(unittest.TestCase):
         # Verify the request parameters
         mock_get.assert_called_once_with(
             f"{self.base_url}/api/v1/domains/allowed",
+            timeout=10,
+            headers={'Accept': 'application/json'}
+        )
+    
+    @patch('requests.get')
+    def test_fetch_blocked_domains_http_error(self, mock_get):
+        """Test handling of HTTP errors for blocked domains."""
+        # Configure mock to raise an exception
+        mock_get.side_effect = requests.exceptions.HTTPError("404 Client Error")
+        
+        # Verify that the appropriate exception is raised
+        with self.assertRaises(requests.RequestException) as context:
+            self.service.fetch_blocked_domains()
+        
+        self.assertIn("404", str(context.exception))
+        
+        # Verify the request parameters
+        mock_get.assert_called_once_with(
+            f"{self.base_url}/api/v1/domains/blocked",
             timeout=10,
             headers={'Accept': 'application/json'}
         )
@@ -85,6 +136,30 @@ class TestDomainService(unittest.TestCase):
         )
     
     @patch('requests.get')
+    def test_fetch_blocked_domains_invalid_response(self, mock_get):
+        """Test handling of invalid response data for blocked domains."""
+        # Mock response with invalid data structure (not a list)
+        mock_response = {"invalid": "not a list"}
+        
+        # Configure mock
+        mock_response_obj = MagicMock()
+        mock_response_obj.json.return_value = mock_response
+        mock_get.return_value = mock_response_obj
+        
+        # Verify that the appropriate exception is raised
+        with self.assertRaises(ValueError) as context:
+            self.service.fetch_blocked_domains()
+        
+        self.assertIn("Expected array response", str(context.exception))
+        
+        # Verify the request parameters
+        mock_get.assert_called_once_with(
+            f"{self.base_url}/api/v1/domains/blocked",
+            timeout=10,
+            headers={'Accept': 'application/json'}
+        )
+    
+    @patch('requests.get')
     def test_fetch_allowed_domains_invalid_domain_data(self, mock_get):
         """Test handling of invalid domain data within the array."""
         # Mock response with invalid domain data
@@ -104,6 +179,30 @@ class TestDomainService(unittest.TestCase):
         # Verify the request parameters
         mock_get.assert_called_once_with(
             f"{self.base_url}/api/v1/domains/allowed",
+            timeout=10,
+            headers={'Accept': 'application/json'}
+        )
+    
+    @patch('requests.get')
+    def test_fetch_blocked_domains_invalid_domain_data(self, mock_get):
+        """Test handling of invalid domain data within the array for blocked domains."""
+        # Mock response with invalid domain data
+        mock_response = [{"invalid_key": "value"}]
+        
+        # Configure mock
+        mock_response_obj = MagicMock()
+        mock_response_obj.json.return_value = mock_response
+        mock_get.return_value = mock_response_obj
+        
+        # Verify that the appropriate exception is raised
+        with self.assertRaises(ValueError) as context:
+            self.service.fetch_blocked_domains()
+        
+        self.assertIn("Invalid response format", str(context.exception))
+        
+        # Verify the request parameters
+        mock_get.assert_called_once_with(
+            f"{self.base_url}/api/v1/domains/blocked",
             timeout=10,
             headers={'Accept': 'application/json'}
         )
