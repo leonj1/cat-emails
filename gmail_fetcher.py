@@ -451,6 +451,8 @@ def test_api_connection(api_token: str) -> None:
     except Exception as e:
         raise Exception(f"Failed to connect to control API: {str(e)}")
 
+from email_processor import process_single_email
+
 def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     # Test API connection first
     test_api_connection(api_token)
@@ -463,64 +465,32 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         
         print(f"Found {len(recent_emails)} emails in the last {hours} hours:")
         for msg in recent_emails:
-            # Get the email body
-            body = fetcher.get_email_body(msg)
-            pre_categorized = False
-            deletion_candidate = True
-            
-            # Check domain lists
-            from_header = str(msg.get('From', ''))
-            if fetcher._is_domain_blocked(from_header):
-                category = "Blocked_Domain"
-                pre_categorized = True
-                deletion_candidate = True
-            elif fetcher._is_domain_allowed(from_header):
-                category = "Allowed_Domain"
-                pre_categorized = True
-                deletion_candidate = False
-            
-            # Categorize the email if not pre-categorized
-            if not pre_categorized:
-                contents_without_links = fetcher.remove_http_links(f"{msg.get('Subject')}. {body}")
-                contents_without_images = fetcher.remove_images_from_email(contents_without_links)
-                contents_without_encoded = fetcher.remove_encoded_content(contents_without_images)
-                contents_cleaned = contents_without_encoded
-                category = categorize_email_ell_marketing(contents_cleaned)
-                category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
-                
-                # Check if category is blocked
-                if fetcher._is_category_blocked(category):
-                    deletion_candidate = True
-                else:
-                    # if length of category is more than 30 characters
-                    if len(category) > 30:
-                      category = categorize_email_ell_marketing2(contents_cleaned)
-                      category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
-                      if fetcher._is_category_blocked(category):
-                          deletion_candidate = True
-
-
             print(f"From: {msg.get('From')}")
             print(f"Subject: {msg.get('Subject')}")
-            if len(category) < 20:
-                print(f"Category: {category}")
-            print(f"Deletion Candidate: {deletion_candidate}")
-            fetcher.add_label(msg.get("Message-ID"), category)
             
-            # Track categories
-            fetcher.stats['categories'][category] += 1
+            deletion_candidate = process_single_email(fetcher, msg)
             
-            # Track kept/deleted emails
+            # Handle email deletion
             if deletion_candidate:
                 if fetcher.delete_email(msg.get("Message-ID")):
-                    print("Email deleted successfully")
+                    fetcher.stats['deleted'] += 1
                 else:
-                    print("Failed to delete email")
                     fetcher.stats['kept'] += 1
             else:
-                print("Email left in inbox")
                 fetcher.stats['kept'] += 1
-                    
+            
+            # Get the most recent category from stats
+            if fetcher.stats['categories']:
+                latest_category = list(fetcher.stats['categories'].keys())[-1]
+                if len(latest_category) < 20:
+                    print(f"Category: {latest_category}")
+            
+            # Check if the email was deleted or kept
+            if fetcher.stats['deleted'] > 0 and fetcher.stats['deleted'] == sum(fetcher.stats['categories'].values()):
+                print("Email deleted successfully")
+            else:
+                print("Email left in inbox")
+                
             print("-" * 50)
             
         # Print summary at the end
