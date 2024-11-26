@@ -24,9 +24,11 @@ client = openai.Client(
     base_url=f"http://{args.base_url}/v1", api_key="ollama"  # required but not used
 )
 
-@ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
-def categorize_email_ell_marketing(contents: str):
-    """
+client2 = openai.Client(
+        base_url=f"http://10.1.1.212:11434/v1", api_key="ollama"  # required but not used
+)
+
+system_prompt = f"""
 You are an AI assistant designed to categorize incoming emails with a focus on protecting the user from unwanted commercial content and unnecessary spending. Your primary goal is to quickly identify and sort emails that may be attempting to solicit money or promote products/services. You should approach each email with a healthy dose of skepticism, always on the lookout for subtle or overt attempts to encourage spending.
 When categorizing emails, you must strictly adhere to the following four categories:
 
@@ -80,6 +82,15 @@ Approach each email with the assumption that it may be trying to sell something,
 
 By following these guidelines and strictly adhering to the given categories, you will help the user maintain an inbox free from unwanted commercial content and protect them from potential financial solicitations.
 """
+
+@ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
+def categorize_email_ell_marketing(contents: str):
+    f"""{system_prompt}"""
+    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
+
+@ell.simple(model="gemma2:latest", temperature=0.1, client=client2)
+def categorize_email_ell_marketing2(contents: str):
+    f"""{system_prompt}"""
     return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
 class GmailFetcher:
@@ -125,8 +136,20 @@ class GmailFetcher:
             self._blocked_categories = {c.category for c in categories}
             
         except Exception as e:
-            print(f"Warning: Failed to load domain data: {str(e)}")
-            # Initialize empty sets if loading fails
+            error_msg = str(e)
+            print(f"Response: " + error_msg)
+            if hasattr(e, 'response'):
+                try:
+                    print(f"Full API Response:")
+                    print(f"Status Code: {e.response.status_code}")
+                    print(f"Headers: {dict(e.response.headers)}")
+                    print(f"Content: {e.response.text}")
+                    error_msg = f"API Error: {e.response.status_code} - {e.response.text}"
+                except Exception as parse_err:
+                    print(f"Failed to parse response: {str(parse_err)}")
+                    error_msg = f"API Error: {str(e)}"
+            print(f"Error: Failed to load domain data. Details: {error_msg}")
+            # Continue with empty sets rather than exiting
             self._allowed_domains = set()
             self._blocked_domains = set()
             self._blocked_categories = set()
@@ -468,6 +491,14 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 # Check if category is blocked
                 if fetcher._is_category_blocked(category):
                     deletion_candidate = True
+                else:
+                    # if length of category is more than 30 characters
+                    if len(category) > 30:
+                      category = categorize_email_ell_marketing2(contents_cleaned)
+                      category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
+                      if fetcher._is_category_blocked(category):
+                          deletion_candidate = True
+
 
             print(f"From: {msg.get('From')}")
             print(f"Subject: {msg.get('Subject')}")

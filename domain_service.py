@@ -55,21 +55,24 @@ class DomainService:
             response.raise_for_status()
             response_data = response.json()
             
-            # Handle allowed domains which come in 'domains' field
+            # Handle different response formats based on endpoint
             if endpoint == "/domains/allowed":
                 if not isinstance(response_data, dict) or 'domains' not in response_data:
                     raise ValueError("Expected 'domains' field in response")
                 return [model_class(domain=d, is_active=True) for d in response_data['domains']]
             
-            # Handle blocked domains/categories which come in 'data' field
-            if not isinstance(response_data, dict) or 'data' not in response_data:
-                raise ValueError("Expected 'data' field in response")
+            elif endpoint == "/domains/blocked":
+                if not isinstance(response_data, dict) or 'domains' not in response_data:
+                    raise ValueError("Expected 'domains' field in response")
+                return [model_class(domain=d, reason="Blocked by policy") for d in response_data['domains']]
             
-            data = response_data['data']
-            if not isinstance(data, list):
-                raise ValueError("Expected array in 'data' field")
-                
-            return [model_class(**item) for item in data]
+            elif endpoint == "/categories/blocked":
+                if not isinstance(response_data, dict) or 'categories' not in response_data:
+                    raise ValueError("Expected 'categories' field in response")
+                return [model_class(category=c, reason="Blocked by policy") for c in response_data['categories']]
+            
+            else:
+                raise ValueError(f"Unsupported endpoint: {endpoint}")
 
         except requests.RequestException as e:
             raise requests.RequestException(f"Failed to fetch from API: {str(e)}") from e
