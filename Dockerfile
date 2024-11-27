@@ -9,9 +9,9 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements.txt setup.py ./
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install -U "ell-ai[all]"
 
 COPY cat_emails/ ./cat_emails/
+COPY tests/mock_ell/ ./ell/
 RUN pip install -e .
 
 ENV GMAIL_EMAIL=""

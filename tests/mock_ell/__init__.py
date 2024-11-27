@@ -1,5 +1,6 @@
 """Mock ELL package for testing."""
 from unittest.mock import MagicMock
+from functools import wraps
 
 def init(*args, **kwargs):
     """Mock init function."""
@@ -15,6 +16,15 @@ def complete(*args, **kwargs):
         return "Other"
     else:
         return "Other"
+
+def simple(model=None, temperature=None):
+    """Mock simple decorator."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return "Other"
+        return wrapper
+    return decorator
 
 # Create mock objects
 mock_client = MagicMock()
