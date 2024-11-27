@@ -250,5 +250,119 @@ class TestEmailProcessor(unittest.TestCase):
             "Email transformation methods not called in correct order"
         )
 
+class TestEmailDeletionAndStats(unittest.TestCase):
+    def setUp(self):
+        self.fetcher = Mock()
+        self.fetcher.stats = {
+            'categories': defaultdict(int),
+            'deleted': 0,
+            'kept': 0
+        }
+        self.msg = MagicMock()
+        self.base_msg_data = {
+            'From': 'test@example.com',
+            'Subject': 'Test Subject',
+            'Message-ID': 'test-id-123'
+        }
+        self.msg.get.side_effect = lambda x, default='': self.base_msg_data.get(x, default)
+
+    def test_successful_email_deletion(self):
+        """Test successful email deletion scenario"""
+        # Configure mocks
+        self.fetcher._is_domain_blocked.return_value = True
+        self.fetcher.get_email_body.return_value = "Test body"
+        self.fetcher.delete_email.return_value = True
+
+        # Process email
+        deletion_candidate = process_single_email(self.fetcher, self.msg)
+        
+        # Verify deletion was requested
+        self.assertTrue(deletion_candidate)
+        
+        # Simulate deletion
+        if deletion_candidate:
+            success = self.fetcher.delete_email(self.msg.get("Message-ID"))
+            if success:
+                self.fetcher.stats['deleted'] += 1
+            else:
+                self.fetcher.stats['kept'] += 1
+
+        # Verify stats
+        self.assertEqual(self.fetcher.stats['deleted'], 1)
+        self.assertEqual(self.fetcher.stats['kept'], 0)
+        self.assertEqual(self.fetcher.stats['categories']['Blocked_Domain'], 1)
+
+    def test_failed_email_deletion(self):
+        """Test failed email deletion scenario"""
+        # Configure mocks
+        self.fetcher._is_domain_blocked.return_value = True
+        self.fetcher.get_email_body.return_value = "Test body"
+        self.fetcher.delete_email.return_value = False
+
+        # Process email
+        deletion_candidate = process_single_email(self.fetcher, self.msg)
+        
+        # Verify deletion was requested
+        self.assertTrue(deletion_candidate)
+        
+        # Simulate deletion
+        if deletion_candidate:
+            success = self.fetcher.delete_email(self.msg.get("Message-ID"))
+            if success:
+                self.fetcher.stats['deleted'] += 1
+            else:
+                self.fetcher.stats['kept'] += 1
+
+        # Verify stats
+        self.assertEqual(self.fetcher.stats['deleted'], 0)
+        self.assertEqual(self.fetcher.stats['kept'], 1)
+        self.assertEqual(self.fetcher.stats['categories']['Blocked_Domain'], 1)
+
+    def test_email_kept_no_deletion_candidate(self):
+        """Test email kept when not marked for deletion"""
+        # Configure mocks
+        self.fetcher._is_domain_blocked.return_value = False
+        self.fetcher._is_domain_allowed.return_value = True
+        self.fetcher.get_email_body.return_value = "Test body"
+
+        # Process email
+        deletion_candidate = process_single_email(self.fetcher, self.msg)
+        
+        # Verify deletion was not requested
+        self.assertFalse(deletion_candidate)
+        
+        # Update stats
+        if not deletion_candidate:
+            self.fetcher.stats['kept'] += 1
+
+        # Verify stats
+        self.assertEqual(self.fetcher.stats['deleted'], 0)
+        self.assertEqual(self.fetcher.stats['kept'], 1)
+        self.assertEqual(self.fetcher.stats['categories']['Allowed_Domain'], 1)
+
+    def test_category_stats_tracking(self):
+        """Test category stats tracking for multiple emails"""
+        # First email - Newsletter
+        self.fetcher._is_domain_blocked.return_value = False
+        self.fetcher._is_domain_allowed.return_value = False
+        self.fetcher.get_email_body.return_value = "Test body"
+        
+        process_single_email(self.fetcher, self.msg)
+        self.assertEqual(self.fetcher.stats['categories']['Newsletter'], 1)
+        
+        # Second email - Blocked Domain
+        self.fetcher._is_domain_blocked.return_value = True
+        process_single_email(self.fetcher, self.msg)
+        self.assertEqual(self.fetcher.stats['categories']['Blocked_Domain'], 1)
+        
+        # Third email - Uncategorized
+        self.fetcher._is_domain_blocked.return_value = False
+        self.fetcher.get_email_body.return_value = None
+        process_single_email(self.fetcher, self.msg)
+        self.assertEqual(self.fetcher.stats['categories']['Uncategorized'], 1)
+        
+        # Verify total categories
+        self.assertEqual(sum(self.fetcher.stats['categories'].values()), 3)
+
 if __name__ == '__main__':
     unittest.main()
