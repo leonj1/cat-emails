@@ -1,8 +1,15 @@
 import unittest
 from unittest.mock import patch, Mock
 import requests
+import sys
+from pathlib import Path
 
-from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
+# Add the project root to Python path
+project_root = str(Path(__file__).parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from cat_emails.domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 
 class TestDomainService(unittest.TestCase):
     def setUp(self):

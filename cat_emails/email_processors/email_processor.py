@@ -4,10 +4,22 @@ from email_scanner_consumer import categorize_email_ell_marketing, categorize_em
 def process_single_email(fetcher, msg) -> bool:
     """Process a single email message and handle its categorization and deletion."""
     # Get the email body
-    body = fetcher.get_email_body(msg)
+    try:
+        body = fetcher.get_email_body(msg)
+    except Exception as e:
+        # Log the error
+        body = ""  # or handle error appropriately
     pre_categorized = False
     deletion_candidate = False  # Default to not deleting
-    
+
+    if not body:  # Handle empty or None body
+        category = "Uncategorized"
+        message_id = msg.get("Message-ID")
+        if message_id is not None:
+            fetcher.add_label(message_id, category)
+        fetcher.stats['categories'][category] += 1
+        return deletion_candidate
+
     # Check domain lists
     from_header = str(msg.get('From', ''))
     if fetcher._is_domain_blocked(from_header):
@@ -43,10 +55,16 @@ def process_single_email(fetcher, msg) -> bool:
         else:
             category = "Uncategorized"
 
-    fetcher.add_label(msg.get("Message-ID"), category)
+    # Track categories and add label
+    message_id = msg.get("Message-ID")
+    try:
+        if message_id is not None:  # Only add label if we have a message ID
+            fetcher.add_label(message_id, category)
+        fetcher.stats['categories'][category] += 1
+    except Exception as e:
+        # If we have problems setting the tag lets not mark for deletion
+        deletion_candidate = False
+        # Still increment the category counter even if label fails
+        fetcher.stats['categories'][category] += 1
     
-    # Track categories
-    fetcher.stats['categories'][category] += 1
-    
-    # Return whether email should be deleted
     return deletion_candidate

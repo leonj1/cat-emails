@@ -11,8 +11,8 @@ from typing import List, Optional, Set
 from bs4 import BeautifulSoup
 from collections import Counter
 from tabulate import tabulate
-from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
-from email_processor import process_single_email
+from .domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
+from .email_processors.email_processor import process_single_email
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
