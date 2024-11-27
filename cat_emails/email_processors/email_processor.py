@@ -1,6 +1,6 @@
 from typing import Tuple
 import logging
-from email_scanner_consumer import categorize_email_ell_marketing, categorize_email_ell_marketing2
+from ..email_scanner_consumer import categorize_email_ell_marketing, categorize_email_ell_generic
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ def process_single_email(fetcher, msg) -> bool:
                 else:
                     # if length of category is more than 30 characters
                     if len(category) > 30:
-                        category2 = categorize_email_ell_marketing2(contents_cleaned)
+                        category2 = categorize_email_ell_generic(contents_cleaned)
                         if category2:
                             category = _sanitize_category(category2)
                             if fetcher._is_category_blocked(category):
@@ -71,7 +71,7 @@ def process_single_email(fetcher, msg) -> bool:
     # Track categories and add label
     message_id = msg.get("Message-ID")
     try:
-        if message_id is not None:  # Only add label if we have a message ID
+        if message_id is not None and not deletion_candidate:  # Only add label if we have a message ID and it's not being deleted
             fetcher.add_label(message_id, category)
     except Exception as e:
         logger.error(f"Error adding label to email: {e}")
@@ -79,5 +79,16 @@ def process_single_email(fetcher, msg) -> bool:
     finally:
         # Ensure the category count is incremented exactly once
         fetcher.stats['categories'][category] += 1
+    
+    # Delete the email if it's a deletion candidate
+    if deletion_candidate:
+        try:
+            if fetcher.delete_email(message_id):
+                logger.info(f"Successfully deleted email with ID {message_id}")
+            else:
+                logger.error(f"Failed to delete email with ID {message_id}")
+        except Exception as e:
+            logger.error(f"Error deleting email: {e}")
+            deletion_candidate = False
     
     return deletion_candidate
