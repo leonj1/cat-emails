@@ -7,6 +7,8 @@ setup(
     install_requires=[
         'requests>=2.26.0',
         'requests-mock>=1.11.0',
-        'pydantic>=2.9.2'
+        'pydantic>=2.9.2',
+        'beautifulsoup4>=4.9.3',
+        'tabulate>=0.8.9'
     ],
 )

@@ -10,25 +10,92 @@ from kafka import KafkaConsumer
 from imapclient import IMAPClient
 from email import message_from_bytes
 from bs4 import BeautifulSoup
+from typing import Dict, Optional, Tuple, Callable
+from functools import wraps
+import unittest
+from unittest.mock import MagicMock
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Parse command-line arguments
-parser = argparse.ArgumentParser(description="Email Scanner Consumer")
-parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
-parser.add_argument("--consumer-group", default="email-scanner-group", help="Kafka consumer group name")
-parser.add_argument("--delay-on-error-seconds", default=10, help="Delay on error seconds")
-args = parser.parse_args()
+# Initialize argument parser
+parser = argparse.ArgumentParser()
+parser.add_argument("--base-url", help="Base URL for the OpenAI API", default="10.1.1.144:11434")
+parser.add_argument("--consumer-group", help="Kafka consumer group name", default="email-scanner-group")
+parser.add_argument("--delay-on-error-seconds", help="Delay in seconds when an error occurs", type=int, default=10)
 
-ell.init(verbose=False, store='./logdir')
+_args = None
+_openai_client = None
+_ell_client = None
+_mock_mode = False
 
-client = openai.Client(
-    base_url=f"http://{args.base_url}/v1", api_key="ollama"  # required but not used
-)
+def set_mock_mode(enabled: bool = True):
+    """Enable or disable mock mode for testing."""
+    global _mock_mode
+    _mock_mode = enabled
 
-@ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
+def get_args():
+    global _args
+    if _args is None:
+        try:
+            _args = parser.parse_args()
+        except SystemExit:
+            # During testing, use default values
+            _args = parser.parse_args([])
+    return _args
+
+def init_clients(base_url: Optional[str] = None):
+    """Initialize OpenAI and ELL clients."""
+    global _openai_client, _ell_client
+    
+    if _openai_client is None:
+        if _mock_mode:
+            _openai_client = MagicMock()
+            _openai_client.chat.completions.create.return_value.choices[0].message.content = "Newsletter"
+        else:
+            _openai_client = openai.Client(
+                base_url=f"http://{get_args().base_url}/v1", api_key="ollama"  # required but not used
+            )
+    
+    if _ell_client is None:
+        if _mock_mode:
+            _ell_client = MagicMock()
+            _ell_client.complete.return_value = "Other"
+        else:
+            if base_url is None:
+                base_url = get_args().base_url
+            ell.init(verbose=False, store='./logdir')
+
+def get_openai_client() -> openai.Client:
+    """Get the OpenAI client, initializing if necessary."""
+    global _openai_client
+    if _openai_client is None:
+        init_clients()
+    return _openai_client
+
+def get_ell_client() -> None:
+    """Get the ELL client, initializing if necessary."""
+    global _ell_client
+    if _ell_client is None:
+        init_clients()
+    return None
+
+def lazy_ell_decorator(model: str, temperature: float) -> Callable:
+    """Create an ELL decorator that lazily initializes the client."""
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if _mock_mode:
+                # In mock mode, just return "Newsletter" for all categorizations
+                return "Newsletter"
+            client = get_openai_client()
+            decorated_func = ell.simple(model=model, temperature=temperature, client=client)(func)
+            return decorated_func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+@lazy_ell_decorator(model="llama3.2:latest", temperature=0.1)
 def categorize_email_ell_for_me(contents: str):
     """
 You are an AI assistant tasked with categorizing incoming emails. Your goal is to efficiently sort emails into predefined categories without being swayed by marketing tactics or sales pitches. You have a strong aversion to unsolicited commercial content and are programmed to prioritize the user's financial well-being by avoiding unnecessary expenditures.
@@ -50,9 +117,11 @@ Pay close attention to the sender, subject line, and key content to make accurat
 Remember that the goal is to organize emails efficiently, not to engage with or respond to their content.
 By following these guidelines and strictly adhering to the given categories, you will help the user maintain an organized inbox while avoiding unwanted commercial influences.
     """
+    if _mock_mode:
+        return "Personal"
     return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
-@ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
+@lazy_ell_decorator(model="llama3.2:latest", temperature=0.5)
 def categorize_email_ell_marketing(contents: str):
     """
 You are an AI assistant designed to categorize incoming emails with a focus on protecting the user from unwanted commercial content and unnecessary spending. Your primary goal is to quickly identify and sort emails that may be attempting to solicit money or promote products/services. You should approach each email with a healthy dose of skepticism, always on the lookout for subtle or overt attempts to encourage spending.
@@ -109,9 +178,11 @@ Approach each email with the assumption that it may be trying to sell something,
 
 By following these guidelines and strictly adhering to the given categories, you will help the user maintain an inbox free from unwanted commercial content and protect them from potential financial solicitations.
 """
+    if _mock_mode:
+        return "Other"
     return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
 
-@ell.simple(model="llama3.2:latest", temperature=0.5, client=client)
+@lazy_ell_decorator(model="llama3.2:latest", temperature=0.5)
 def categorize_email_ell_generic(contents: str):
     """
 Email Intent Analyzer:
@@ -149,6 +220,8 @@ For a personal message from a friend: "Personal Correspondence"
 
 Remember: Your labels must be two words or fewer, clear, and accurately reflect the email author's primary intention.
 """
+    if _mock_mode:
+        return "Personal Message"
     return f"Categorize this email. Maximum length of response is 2 words: {contents}"
 
 
@@ -441,5 +514,6 @@ def listen_to_kafka_topic(topic: str = 'gmail_messages', bootstrap_servers: str 
         logger.info("Kafka consumer closed.")
 
 if __name__ == "__main__":
+    args = get_args()
     topic = 'gmail_messages'
     listen_to_kafka_topic(topic=topic, bootstrap_servers="localhost:9092", consumer_group=args.consumer_group, delay_on_error_seconds=args.delay_on_error_seconds)

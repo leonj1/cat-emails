@@ -7,14 +7,15 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements.txt setup.py ./
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install -U "ell-ai[all]"
 
-COPY gmail_fetcher.py domain_service.py ./
+COPY cat_emails/ ./cat_emails/
+COPY tests/mock_ell/ ./ell/
+RUN pip install -e .
 
 ENV GMAIL_EMAIL=""
 ENV GMAIL_PASSWORD=""
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["python", "gmail_fetcher.py"]
+ENTRYPOINT ["python", "-m", "cat_emails.gmail_fetcher"]

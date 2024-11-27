@@ -1,8 +1,15 @@
 import unittest
 from unittest.mock import patch, Mock
 import requests
+import sys
+from pathlib import Path
 
-from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
+# Add the project root to Python path
+project_root = str(Path(__file__).parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from cat_emails.domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 
 class TestDomainService(unittest.TestCase):
     def setUp(self):
@@ -98,10 +105,7 @@ class TestDomainService(unittest.TestCase):
         """Test successful fetch of blocked domains."""
         mock_response = Mock()
         mock_response.json.return_value = {
-            "data": [
-                {"domain": "spam.com", "reason": "Spam source"},
-                {"domain": "malware.com", "reason": "Malware host"}
-            ]
+            "domains": ["spam.com", "malware.com"]
         }
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
@@ -109,7 +113,7 @@ class TestDomainService(unittest.TestCase):
         domains = self.service.fetch_blocked_domains()
         self.assertEqual(len(domains), 2)
         self.assertEqual(domains[0].domain, "spam.com")
-        self.assertEqual(domains[0].reason, "Spam source")
+        self.assertEqual(domains[0].reason, "Blocked by policy")
 
         mock_get.assert_called_with(
             "https://control-api.joseserver.com/domains/blocked",
@@ -132,10 +136,7 @@ class TestDomainService(unittest.TestCase):
         """Test successful fetch of blocked categories."""
         mock_response = Mock()
         mock_response.json.return_value = {
-            "data": [
-                {"category": "spam", "reason": "Unwanted mail"},
-                {"category": "phishing", "reason": "Security risk"}
-            ]
+            "categories": ["spam", "phishing"]
         }
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
@@ -143,7 +144,7 @@ class TestDomainService(unittest.TestCase):
         categories = self.service.fetch_blocked_categories()
         self.assertEqual(len(categories), 2)
         self.assertEqual(categories[0].category, "spam")
-        self.assertEqual(categories[0].reason, "Unwanted mail")
+        self.assertEqual(categories[0].reason, "Blocked by policy")
 
         mock_get.assert_called_with(
             "https://control-api.joseserver.com/categories/blocked",

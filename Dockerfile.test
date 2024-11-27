@@ -11,11 +11,14 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements and install dependencies
 COPY requirements.txt .
 COPY setup.py .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir $(grep -v "^ell$" requirements.txt)
 RUN pip install -e .
 
 # Copy source code and tests
 COPY . .
 
+# Add mock_ell to PYTHONPATH
+ENV PYTHONPATH="/app/tests/mock_packages"
+
 # Run the tests
-CMD ["python", "-m", "unittest", "discover", "-v", "tests"]
+CMD ["python", "-m", "pytest", "tests/", "-v"]

@@ -34,12 +34,13 @@ run: validate-env
 		-e GMAIL_PASSWORD="$(GMAIL_PASSWORD)" \
 		-e CONTROL_API_TOKEN="$(CONTROL_API_TOKEN)" \
 		$(IMAGE_NAME) \
-		--hours $(or $(HOURS),2)
+		--base-url "10.1.1.144:11434" \
+		--hours 2
 
 # Run tests
 test:
-	docker build -t $(TEST_IMAGE_NAME) -f Dockerfile.test .
-	docker run --rm $(TEST_IMAGE_NAME)
+	docker build -t gmail-cleaner-test -f Dockerfile.test .
+	docker run --rm gmail-cleaner-test python -m pytest tests/ -v
 
 # Clean up Docker images
 clean:

@@ -1,32 +1,50 @@
+from typing import Tuple
+import os
+import re
+import sys
+import imaplib
+import openai
 import argparse
 import ell
-import openai
-import os
-import imaplib
 from email import message_from_bytes
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime, parseaddr
 from typing import List, Optional, Set
 from bs4 import BeautifulSoup
-import re
 from collections import Counter
 from tabulate import tabulate
-from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
+from .domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
+from .email_processors.email_processor import process_single_email
 
-parser = argparse.ArgumentParser(description="Email Fetcher")
-parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
-parser.add_argument("--hours", type=int, default=2, help="The hours to fetch emails")
-args = parser.parse_args()
+# Global variables for clients and args
+client = None
+client2 = None
+_args = None
 
-ell.init(verbose=False, store='./logdir')
+def get_args():
+    """Get command line arguments lazily."""
+    global _args
+    if _args is None:
+        parser = argparse.ArgumentParser(description="Email Fetcher")
+        parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
+        parser.add_argument("--consumer-group", default="default", help="Consumer group name")
+        parser.add_argument("--delay-on-error-seconds", type=int, default=60, help="Delay in seconds when an error occurs")
+        parser.add_argument("--hours", type=int, default=2, help="Number of hours to look back for emails")
+        try:
+            _args = parser.parse_args()
+        except SystemExit:
+            # If running under test, use default values
+            _args = parser.parse_args([])
+    return _args
 
-client = openai.Client(
-    base_url=f"http://{args.base_url}/v1", api_key="ollama"  # required but not used
-)
-
-client2 = openai.Client(
-        base_url=f"http://10.1.1.212:11434/v1", api_key="ollama"  # required but not used
-)
+def init_clients(base_url=None):
+    """Initialize ELL and OpenAI clients."""
+    global client, client2
+    if base_url is None:
+        base_url = get_args().base_url
+    ell.init(verbose=False, store='./logdir')
+    client = openai.Client(base_url=f"http://{base_url}/v1", api_key="ollama")
+    client2 = openai.Client(base_url="http://10.1.1.212:11434/v1", api_key="ollama")
 
 system_prompt = f"""
 You are an AI assistant designed to categorize incoming emails with a focus on protecting the user from unwanted commercial content and unnecessary spending. Your primary goal is to quickly identify and sort emails that may be attempting to solicit money or promote products/services. You should approach each email with a healthy dose of skepticism, always on the lookout for subtle or overt attempts to encourage spending.
@@ -83,15 +101,35 @@ Approach each email with the assumption that it may be trying to sell something,
 By following these guidelines and strictly adhering to the given categories, you will help the user maintain an inbox free from unwanted commercial content and protect them from potential financial solicitations.
 """
 
-@ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
+@ell.simple(model="llama3.2:latest", temperature=0.1)
 def categorize_email_ell_marketing(contents: str):
-    f"""{system_prompt}"""
-    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
+    """Categorize email using llama model."""
+    global client
+    if client is None:
+        raise RuntimeError("OpenAI client not initialized. Call init_clients() first.")
+    return client.chat.completions.create(
+        model="llama3.2:latest",
+        temperature=0.1,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"}
+        ]
+    ).choices[0].message.content
 
-@ell.simple(model="gemma2:latest", temperature=0.1, client=client2)
+@ell.simple(model="gemma2:latest", temperature=0.1)
 def categorize_email_ell_marketing2(contents: str):
-    f"""{system_prompt}"""
-    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
+    """Categorize email using gemma model."""
+    global client2
+    if client2 is None:
+        raise RuntimeError("OpenAI client not initialized. Call init_clients() first.")
+    return client2.chat.completions.create(
+        model="gemma2:latest",
+        temperature=0.1,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"}
+        ]
+    ).choices[0].message.content
 
 class GmailFetcher:
     def __init__(self, email_address: str, app_password: str, api_token: str = None):
@@ -451,79 +489,46 @@ def test_api_connection(api_token: str) -> None:
     except Exception as e:
         raise Exception(f"Failed to connect to control API: {str(e)}")
 
-def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
+def main(email_address: str, app_password: str, api_token: str, hours: Optional[int] = None):
+    """
+    Main function to process emails.
+    
+    Args:
+        email_address: Gmail address
+        app_password: Gmail App Password
+        api_token: API token for control API
+        hours: Number of hours to look back for emails. If None, uses value from command line args.
+    """
     # Test API connection first
     test_api_connection(api_token)
 
     # Initialize and use the fetcher
+    init_clients()
     fetcher = GmailFetcher(email_address, app_password, api_token)
     try:
         fetcher.connect()
+        hours = hours if hours is not None else get_args().hours
         recent_emails = fetcher.get_recent_emails(hours)
         
-        print(f"Found {len(recent_emails)} emails in the last {hours} hours:")
-        for msg in recent_emails:
-            # Get the email body
-            body = fetcher.get_email_body(msg)
-            pre_categorized = False
-            deletion_candidate = True
-            
-            # Check domain lists
-            from_header = str(msg.get('From', ''))
-            if fetcher._is_domain_blocked(from_header):
-                category = "Blocked_Domain"
-                pre_categorized = True
-                deletion_candidate = True
-            elif fetcher._is_domain_allowed(from_header):
-                category = "Allowed_Domain"
-                pre_categorized = True
-                deletion_candidate = False
-            
-            # Categorize the email if not pre-categorized
-            if not pre_categorized:
-                contents_without_links = fetcher.remove_http_links(f"{msg.get('Subject')}. {body}")
-                contents_without_images = fetcher.remove_images_from_email(contents_without_links)
-                contents_without_encoded = fetcher.remove_encoded_content(contents_without_images)
-                contents_cleaned = contents_without_encoded
-                category = categorize_email_ell_marketing(contents_cleaned)
-                category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
-                
-                # Check if category is blocked
-                if fetcher._is_category_blocked(category):
-                    deletion_candidate = True
-                else:
-                    # if length of category is more than 30 characters
-                    if len(category) > 30:
-                      category = categorize_email_ell_marketing2(contents_cleaned)
-                      category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
-                      if fetcher._is_category_blocked(category):
-                          deletion_candidate = True
+        if not recent_emails:
+            print(f"No emails found in the last {hours} hours.")
+            return
 
-
-            print(f"From: {msg.get('From')}")
-            print(f"Subject: {msg.get('Subject')}")
-            if len(category) < 20:
-                print(f"Category: {category}")
-            print(f"Deletion Candidate: {deletion_candidate}")
-            fetcher.add_label(msg.get("Message-ID"), category)
+        print(f"\nProcessing {len(recent_emails)} emails from the last {hours} hours...")
+        
+        for email in recent_emails:
+            should_delete = process_single_email(fetcher, email)
             
-            # Track categories
-            fetcher.stats['categories'][category] += 1
-            
-            # Track kept/deleted emails
-            if deletion_candidate:
-                if fetcher.delete_email(msg.get("Message-ID")):
-                    print("Email deleted successfully")
-                else:
-                    print("Failed to delete email")
-                    fetcher.stats['kept'] += 1
+            if should_delete:
+                message_id = email.get("Message-ID")
+                if message_id:
+                    if fetcher.delete_email(message_id):
+                        fetcher.stats['deleted'] += 1
+                    else:
+                        fetcher.stats['kept'] += 1
             else:
-                print("Email left in inbox")
                 fetcher.stats['kept'] += 1
-                    
-            print("-" * 50)
-            
-        # Print summary at the end
+
         print_summary(hours, fetcher.stats)
             
     finally:
@@ -535,10 +540,10 @@ if __name__ == "__main__":
     app_password = os.getenv("GMAIL_PASSWORD")
     api_token = os.getenv("CONTROL_API_TOKEN")
 
-    if not email_address or not app_password:
-        raise ValueError("Please set GMAIL_EMAIL and GMAIL_PASSWORD environment variables")
+    if not all([email_address, app_password, api_token]):
+        print("Error: Required environment variables are missing.")
+        print("Please set GMAIL_EMAIL, GMAIL_PASSWORD, and CONTROL_API_TOKEN")
+        sys.exit(1)
 
-    if not api_token:
-        raise ValueError("Please set CONTROL_API_TOKEN environment variable")
-    
-    main(email_address, app_password, api_token, args.hours)
+    # Run the main function
+    main(email_address, app_password, api_token)
