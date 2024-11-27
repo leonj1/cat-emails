@@ -5,6 +5,20 @@ from email_scanner_consumer import categorize_email_ell_marketing, categorize_em
 # Configure logger
 logger = logging.getLogger(__name__)
 
+def _sanitize_category(category: str) -> str:
+    """Remove special characters from category name.
+    
+    Args:
+        category: The category string to sanitize
+        
+    Returns:
+        The sanitized category string with special characters removed
+    """
+    chars_to_remove = '"\'*=+-_'
+    for char in chars_to_remove:
+        category = category.replace(char, '')
+    return category
+
 def process_single_email(fetcher, msg) -> bool:
     """Process a single email message and handle its categorization and deletion."""
     # Get the email body
@@ -38,7 +52,7 @@ def process_single_email(fetcher, msg) -> bool:
             contents_cleaned = contents_without_encoded
             category = categorize_email_ell_marketing(contents_cleaned)
             if category:
-                category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
+                category = _sanitize_category(category)
                 
                 # Check if category is blocked
                 if fetcher._is_category_blocked(category):
@@ -48,7 +62,7 @@ def process_single_email(fetcher, msg) -> bool:
                     if len(category) > 30:
                         category2 = categorize_email_ell_marketing2(contents_cleaned)
                         if category2:
-                            category = category2.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
+                            category = _sanitize_category(category2)
                             if fetcher._is_category_blocked(category):
                                 deletion_candidate = True
             else:
