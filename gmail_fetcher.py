@@ -1,17 +1,18 @@
-import argparse
 import ell
-import openai
 import os
+import re
 import imaplib
+import openai
+import argparse
 from email import message_from_bytes
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime, parseaddr
 from typing import List, Optional, Set
 from bs4 import BeautifulSoup
-import re
 from collections import Counter
 from tabulate import tabulate
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
+from email_processor import process_single_email
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
@@ -450,8 +451,6 @@ def test_api_connection(api_token: str) -> None:
         service.fetch_allowed_domains()
     except Exception as e:
         raise Exception(f"Failed to connect to control API: {str(e)}")
-
-from email_processor import process_single_email
 
 def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     # Test API connection first

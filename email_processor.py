@@ -1,11 +1,12 @@
 from typing import Tuple
+from email_scanner_consumer import categorize_email_ell_marketing, categorize_email_ell_marketing2
 
 def process_single_email(fetcher, msg) -> bool:
     """Process a single email message and handle its categorization and deletion."""
     # Get the email body
     body = fetcher.get_email_body(msg)
     pre_categorized = False
-    deletion_candidate = True
+    deletion_candidate = False  # Default to not deleting
     
     # Check domain lists
     from_header = str(msg.get('From', ''))
@@ -25,18 +26,22 @@ def process_single_email(fetcher, msg) -> bool:
         contents_without_encoded = fetcher.remove_encoded_content(contents_without_images)
         contents_cleaned = contents_without_encoded
         category = categorize_email_ell_marketing(contents_cleaned)
-        category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
-        
-        # Check if category is blocked
-        if fetcher._is_category_blocked(category):
-            deletion_candidate = True
+        if category:
+            category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
+            
+            # Check if category is blocked
+            if fetcher._is_category_blocked(category):
+                deletion_candidate = True
+            else:
+                # if length of category is more than 30 characters
+                if len(category) > 30:
+                    category2 = categorize_email_ell_marketing2(contents_cleaned)
+                    if category2:
+                        category = category2.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
+                        if fetcher._is_category_blocked(category):
+                            deletion_candidate = True
         else:
-            # if length of category is more than 30 characters
-            if len(category) > 30:
-                category = categorize_email_ell_marketing2(contents_cleaned)
-                category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
-                if fetcher._is_category_blocked(category):
-                    deletion_candidate = True
+            category = "Uncategorized"
 
     fetcher.add_label(msg.get("Message-ID"), category)
     
