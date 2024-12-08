@@ -457,12 +457,17 @@ class GmailFetcher:
             logger.debug(f"Found email with sequence number: {sequence_number}")
             
             # Move to Trash (Gmail's trash folder is [Gmail]/Trash)
+            logger.debug(f"Setting delete flag for email {message_id}")
             self.conn.store(sequence_number, '+FLAGS', '\\Deleted')
+            
+            logger.debug(f"Attempting to copy email {message_id} to Trash folder")
             result = self.conn.copy(sequence_number, '[Gmail]/Trash')
             
             if result[0] == 'OK':
+                logger.debug(f"Successfully copied email {message_id} to Trash, now expunging")
                 # Expunge the original message
                 self.conn.expunge()
+                logger.debug(f"Expunge completed for email {message_id}")
                 self.stats['deleted'] += 1  # Increment delete counter
                 logger.info(f"Successfully deleted email {message_id}")
                 return True
