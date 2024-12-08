@@ -1,7 +1,9 @@
 import argparse
 import ell
+import logging
 import openai
 import os
+import ssl
 import imaplib
 from email import message_from_bytes
 from datetime import datetime, timedelta, timezone
@@ -17,6 +19,17 @@ parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
 parser.add_argument("--hours", type=int, default=2, help="The hours to fetch emails")
 args = parser.parse_args()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('email_processor.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 ell.init(verbose=False, store='./logdir')
 
@@ -189,15 +202,23 @@ class GmailFetcher:
             email = self.email_address
             password = self.password
             
+            logger.info(f"Attempting to connect to {self.imap_server} for {email}")
             self.conn = imaplib.IMAP4_SSL(self.imap_server)
             self.conn.login(email, password)
+            logger.info("Successfully connected to Gmail IMAP server")
         except imaplib.IMAP4_SSL.error as e:
+            logger.error(f"Failed to connect to Gmail: {str(e)}")
             raise Exception(f"Failed to connect to Gmail: {str(e)}")
 
     def disconnect(self) -> None:
         """Close the IMAP connection."""
         if self.conn:
-            self.conn.logout()
+            try:
+                self.conn.logout()
+            except (ssl.SSLError, imaplib.IMAP4.abort) as e:
+                logger.error(f"SSL/Socket error during disconnect: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error during disconnect: {str(e)}")
 
     def _create_email_message(self, msg_data) -> Optional[message_from_bytes]:
         """Convert raw message data into an email message object."""
@@ -360,32 +381,54 @@ class GmailFetcher:
         """
         Fetch emails from the last specified hours.
         """
+        logger.info(f"Starting to fetch emails from last {hours} hours")
+        
         if not self.conn:
+            logger.error("No active IMAP connection")
             raise Exception("Not connected to Gmail")
 
         # Select inbox
+        logger.debug("Selecting INBOX")
         self.conn.select("INBOX")
 
         # Calculate the date threshold with timezone information
         date_threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
         date_str = date_threshold.strftime("%d-%b-%Y")
+        logger.debug(f"Using date threshold: {date_str}")
 
         # Search for emails after the threshold
         search_criteria = f'(SINCE "{date_str}")'
+        logger.debug(f"Searching with criteria: {search_criteria}")
         _, message_numbers = self.conn.search(None, search_criteria)
+        
+        total_messages = len(message_numbers[0].split())
+        logger.info(f"Found {total_messages} messages matching date criteria")
 
         emails = []
+        processed = 0
         for num in message_numbers[0].split():
-            fetch_command = "(BODY.PEEK[])"
-            _, msg_data = self.conn.fetch(num, fetch_command)
+            processed += 1
+            logger.debug(f"Processing message {processed}/{total_messages} (ID: {num})")
             
-            email_message = self._create_email_message(msg_data)
-            if not email_message:
-                continue
+            try:
+                fetch_command = "(BODY.PEEK[])"
+                _, msg_data = self.conn.fetch(num, fetch_command)
                 
-            if self._is_email_within_threshold(email_message, date_threshold):
-                emails.append(email_message)
+                email_message = self._create_email_message(msg_data)
+                if not email_message:
+                    logger.warning(f"Could not create email message for ID {num}")
+                    continue
+                    
+                if self._is_email_within_threshold(email_message, date_threshold):
+                    logger.debug(f"Message {num} is within time threshold, adding to results")
+                    emails.append(email_message)
+                else:
+                    logger.debug(f"Message {num} is outside time threshold, skipping")
+            except Exception as e:
+                logger.error(f"Error processing message {num}: {str(e)}")
+                continue
 
+        logger.info(f"Completed fetch: {len(emails)} emails within time threshold")
         return emails
 
     def delete_email(self, message_id: str) -> bool:
@@ -399,16 +442,19 @@ class GmailFetcher:
             bool: True if successful, False otherwise
         """
         if not self.conn:
+            logger.error("Attempted to delete email without active connection")
             raise Exception("Not connected to Gmail")
 
         try:
+            logger.debug(f"Attempting to delete email with Message-ID: {message_id}")
             # Search for the message ID to get the sequence number
             _, data = self.conn.search(None, f'(HEADER Message-ID "{message_id}")')
             if not data[0]:
-                print(f"Message ID {message_id} not found")
+                logger.warning(f"Message ID {message_id} not found")
                 return False
 
             sequence_number = data[0].split()[0]
+            logger.debug(f"Found email with sequence number: {sequence_number}")
             
             # Move to Trash (Gmail's trash folder is [Gmail]/Trash)
             self.conn.store(sequence_number, '+FLAGS', '\\Deleted')
@@ -418,11 +464,14 @@ class GmailFetcher:
                 # Expunge the original message
                 self.conn.expunge()
                 self.stats['deleted'] += 1  # Increment delete counter
+                logger.info(f"Successfully deleted email {message_id}")
                 return True
+            
+            logger.warning(f"Failed to delete email {message_id}")
             return False
             
         except Exception as e:
-            print(f"Error deleting email: {str(e)}")
+            logger.error(f"Error deleting email {message_id}: {str(e)}")
             return False
 
 def print_summary(hours: int, stats: dict):
@@ -452,7 +501,11 @@ def test_api_connection(api_token: str) -> None:
         raise Exception(f"Failed to connect to control API: {str(e)}")
 
 def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
+    logger.info("Starting email processing")
+    logger.info(f"Processing emails from the last {hours} hours")
+    
     # Test API connection first
+    logger.info("Testing API connection")
     test_api_connection(api_token)
 
     # Initialize and use the fetcher
@@ -500,28 +553,48 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                           deletion_candidate = True
 
 
-            print(f"From: {msg.get('From')}")
-            print(f"Subject: {msg.get('Subject')}")
-            if len(category) < 20:
-                print(f"Category: {category}")
-            print(f"Deletion Candidate: {deletion_candidate}")
-            fetcher.add_label(msg.get("Message-ID"), category)
-            
-            # Track categories
-            fetcher.stats['categories'][category] += 1
-            
-            # Track kept/deleted emails
-            if deletion_candidate:
-                if fetcher.delete_email(msg.get("Message-ID")):
-                    print("Email deleted successfully")
+            try:
+                print(f"From: {msg.get('From')}")
+                print(f"Subject: {msg.get('Subject')}")
+                if len(category) < 20:
+                    print(f"Category: {category}")
+                print(f"Deletion Candidate: {deletion_candidate}")
+                
+                try:
+                    fetcher.add_label(msg.get("Message-ID"), category)
+                    # Track categories
+                    fetcher.stats['categories'][category] += 1
+                except ssl.SSLError as ssl_err:
+                    logger.error(f"SSL Error while adding label: {ssl_err}")
+                    print("Skipping label addition due to SSL error")
+                    continue
+                except Exception as e:
+                    logger.error(f"Error adding label: {e}")
+                    print("Skipping label addition due to error")
+                    continue
+                
+                # Track kept/deleted emails
+                if deletion_candidate:
+                    try:
+                        if fetcher.delete_email(msg.get("Message-ID")):
+                            print("Email deleted successfully")
+                        else:
+                            print("Failed to delete email")
+                            fetcher.stats['kept'] += 1
+                    except ssl.SSLError as ssl_err:
+                        logger.error(f"SSL Error while deleting email: {ssl_err}")
+                        print("Skipping email deletion due to SSL error")
+                        fetcher.stats['kept'] += 1
+                        continue
                 else:
-                    print("Failed to delete email")
+                    print("Email left in inbox")
                     fetcher.stats['kept'] += 1
-            else:
-                print("Email left in inbox")
-                fetcher.stats['kept'] += 1
-                    
-            print("-" * 50)
+                        
+                print("-" * 50)
+            except Exception as e:
+                logger.error(f"Error processing email: {e}")
+                print(f"Skipping email due to error: {e}")
+                continue
             
         # Print summary at the end
         print_summary(hours, fetcher.stats)
