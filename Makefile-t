@@ -1,6 +1,6 @@
 # Include .env file if it exists
-ifneq (,$(wildcard .env))
-    include .env
+ifneq (,$(wildcard .env-t))
+    include .env-t
     export
 endif
 

@@ -16,7 +16,7 @@ from tabulate import tabulate
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
-parser.add_argument("--base-url", default="10.1.1.144:11434", help="Base URL for the OpenAI API")
+parser.add_argument("--base-url", default="10.1.1.74:11434", help="Base URL for the OpenAI API")
 parser.add_argument("--hours", type=int, default=2, help="The hours to fetch emails")
 args = parser.parse_args()
 
