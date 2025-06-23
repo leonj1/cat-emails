@@ -18,6 +18,7 @@ validate-env:
 IMAGE_NAME = gmail-cleaner
 TEST_IMAGE_NAME = gmail-cleaner-test
 SERVICE_IMAGE_NAME = gmail-cleaner-service
+CONSOLIDATOR_IMAGE_NAME = gmail-label-consolidator
 
 # Build the Docker image
 build:
@@ -82,3 +83,22 @@ clean:
 
 # Build and run in one command
 all: build run
+
+# Build consolidator image
+consolidator-build:
+	docker build -t $(CONSOLIDATOR_IMAGE_NAME) -f Dockerfile.consolidator .
+
+# Check label consolidation
+check-consolidate: consolidator-build
+	@if [ -z "$(GMAIL_EMAIL)" ] || [ -z "$(GMAIL_PASSWORD)" ]; then \
+		echo "Error: Required environment variables are missing. Please set them in .env file:"; \
+		echo "GMAIL_EMAIL and GMAIL_PASSWORD"; \
+		exit 1; \
+	fi
+	@echo "Checking Gmail label consolidation..."
+	@echo "Maximum labels: $(or $(MAX_LABELS),25)"
+	@docker run --rm \
+		-e GMAIL_EMAIL="$(GMAIL_EMAIL)" \
+		-e GMAIL_PASSWORD="$(GMAIL_PASSWORD)" \
+		$(CONSOLIDATOR_IMAGE_NAME) \
+		--max-labels $(or $(MAX_LABELS),25)

@@ -19,7 +19,7 @@ python setup.py install
 python gmail_fetcher.py --hours 2
 
 # Run with custom Ollama host
-python gmail_fetcher.py --ollama-host http://custom-ollama-host:11343
+python gmail_fetcher.py --base-url custom-ollama-host:11434
 
 # Run tests
 python -m unittest discover tests/
@@ -35,6 +35,12 @@ make run
 
 # Run tests in Docker
 make test
+
+# Run as a service (continuous scanning)
+make service-build
+make service-run
+make service-logs
+make service-stop
 
 # Clean Docker images
 make clean
@@ -56,16 +62,18 @@ python email_scanner_consumer.py
 1. **gmail_fetcher.py** - Main entry point that connects to Gmail via IMAP and processes emails directly
 2. **domain_service.py** - Manages allowed/blocked domains and categories via external Control API
 3. **email_scanner_producer.py** / **email_scanner_consumer.py** - Kafka-based distributed processing
-4. **models/** - Pydantic models for email categorization and API responses
+4. **gmail_fetcher_service.py** - Service mode for continuous scanning at intervals
+5. **models/** - Pydantic models for email categorization and API responses
 
 ### Email Processing Flow
 
 1. Connect to Gmail using IMAP with app-specific password
 2. Fetch emails from specified time window (default: 2 hours)
 3. Check sender domain against allowed/blocked lists via Control API
-4. Categorize email content using AI models (llama3.2, gemma2)
-5. Apply Gmail labels based on category
-6. Optionally delete emails in blocked categories
+4. Extract and clean email content (HTML to text conversion)
+5. Categorize email content using AI models (llama3.2, gemma2)
+6. Apply Gmail labels based on category
+7. Optionally delete emails in blocked categories
 
 ### Categories
 
@@ -92,6 +100,7 @@ CONTROL_API_TOKEN=your-api-token  # For domain service API
 ### Optional Environment Variables
 ```bash
 HOURS=2  # Hours to look back for emails (default: 2)
+SCAN_INTERVAL=2  # Minutes between scans in service mode (default: 2)
 OLLAMA_HOST=http://localhost:11434  # Custom Ollama server
 ```
 
@@ -124,7 +133,7 @@ domain_service = DomainService(mock_mode=True)
 
 - **imapclient** - Gmail IMAP connection
 - **email** - Email parsing
-- **ell-ai** - AI model integration framework
+- **ell-ai** - AI model integration framework (note: not in requirements.txt)
 - **openai** - For Ollama API compatibility
 - **beautifulsoup4** - HTML email parsing
 - **kafka-python** - Message queue support
@@ -149,7 +158,7 @@ The system uses Ollama with multiple models for categorization:
 - Primary: `llama3.2` (fast, accurate)
 - Secondary: `gemma2` (fallback)
 
-Models are accessed via the Ollama API at the configured OLLAMA_HOST.
+Models are accessed via the Ollama API at the configured OLLAMA_HOST. The `ell` framework is used for LLM orchestration with logging stored in `./logdir`.
 
 ## Common Development Tasks
 
@@ -162,9 +171,10 @@ Models are accessed via the Ollama API at the configured OLLAMA_HOST.
 Domain rules are managed via the Control API. The local cache refreshes on each run.
 
 ### Debugging Email Processing
-- Enable verbose logging by checking the logging configuration
+- Enable verbose logging by checking the logging configuration in `gmail_fetcher.py`
 - Use mock mode to test without connecting to Gmail
 - Check Docker logs: `docker logs <container-id>`
+- Review ell logs in `./logdir` for AI model interactions
 
 ## Security Notes
 

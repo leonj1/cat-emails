@@ -1,0 +1,27 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY check_label_consolidation.py .
+COPY label_consolidation/ ./label_consolidation/
+
+# Make the script executable
+RUN chmod +x check_label_consolidation.py
+
+# Set the entrypoint
+ENTRYPOINT ["python", "check_label_consolidation.py"]
+
+# Default command (can be overridden)
+CMD ["--max-labels", "25"]
