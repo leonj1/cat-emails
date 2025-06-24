@@ -19,6 +19,7 @@ IMAGE_NAME = gmail-cleaner
 TEST_IMAGE_NAME = gmail-cleaner-test
 SERVICE_IMAGE_NAME = gmail-cleaner-service
 CONSOLIDATOR_IMAGE_NAME = gmail-label-consolidator
+EMAIL_TEST_IMAGE_NAME = gmail-email-test
 
 # Build the Docker image
 build:
@@ -102,3 +103,38 @@ check-consolidate: consolidator-build
 		-e GMAIL_PASSWORD="$(GMAIL_PASSWORD)" \
 		$(CONSOLIDATOR_IMAGE_NAME) \
 		--max-labels $(or $(MAX_LABELS),25)
+
+# Build email test image
+email-test-build:
+	docker build -t $(EMAIL_TEST_IMAGE_NAME) -f Dockerfile.email-test .
+
+# Run email integration test
+test-email-integration: email-test-build
+	@if [ -z "$(MAILTRAP_KEY)" ]; then \
+		echo "Error: MAILTRAP_KEY environment variable is required"; \
+		echo "Set it with: export MAILTRAP_KEY='your-api-token'"; \
+		exit 1; \
+	fi
+	@echo "Running email integration test in Docker..."
+	@echo "Sending test email to: leonj1@gmail.com"
+	@docker run --rm \
+		-e MAILTRAP_KEY="$(MAILTRAP_KEY)" \
+		$(EMAIL_TEST_IMAGE_NAME)
+
+# Run mailfrom.dev SMTP integration test
+test-mailfrom-integration: email-test-build
+	@if [ -z "$(SMTP_USERNAME)" ] || [ -z "$(SMTP_PASSWORD)" ]; then \
+		echo "Error: SMTP_USERNAME and SMTP_PASSWORD environment variables are required"; \
+		echo "Set them with:"; \
+		echo "  export SMTP_USERNAME='your-smtp-username'"; \
+		echo "  export SMTP_PASSWORD='your-smtp-password'"; \
+		exit 1; \
+	fi
+	@echo "Running mailfrom.dev SMTP integration test in Docker..."
+	@echo "Sending test email to: leonj1@gmail.com"
+	@docker run --rm \
+		--entrypoint python \
+		-e SMTP_USERNAME="$(SMTP_USERNAME)" \
+		-e SMTP_PASSWORD="$(SMTP_PASSWORD)" \
+		$(EMAIL_TEST_IMAGE_NAME) \
+		tests/test_mailfrom_integration.py

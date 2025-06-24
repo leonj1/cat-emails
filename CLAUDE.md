@@ -176,9 +176,84 @@ Domain rules are managed via the Control API. The local cache refreshes on each 
 - Check Docker logs: `docker logs <container-id>`
 - Review ell logs in `./logdir` for AI model interactions
 
+## Email Sending Interface
+
+The project includes a flexible email sending interface that supports multiple providers:
+
+### Architecture
+- **Interface**: `EmailProviderInterface` in `email_providers/base.py` - Abstract base class for all providers
+- **Models**: Pydantic models in `models/email_models.py` for type-safe email handling
+- **Providers**: Concrete implementations (currently Mailtrap) in `email_providers/`
+
+### Usage Example
+```python
+from models.email_models import EmailAddress, EmailMessage
+from email_providers.mailtrap import MailtrapProvider, MailtrapConfig
+
+# Configure provider
+config = MailtrapConfig(api_token="your-mailtrap-token")
+provider = MailtrapProvider(config)
+
+# Create and send email
+message = EmailMessage(
+    sender=EmailAddress(email="noreply@example.com", name="System"),
+    to=[EmailAddress(email="user@example.com")],
+    subject="Test Email",
+    text="Email content"
+)
+result = provider.send_email(message)
+```
+
+### Running Examples
+```bash
+# Set Mailtrap API token
+export MAILTRAP_API_TOKEN="your-token"
+
+# Run examples
+python examples/send_email_example.py
+```
+
+### Testing Email Interface
+```bash
+# Run email interface tests
+python -m unittest tests.test_email_interface
+```
+
+### Available Email Providers
+
+#### Mailtrap (API-based)
+- Uses Mailtrap API for sending emails
+- Requires `MAILTRAP_KEY` environment variable
+- Good for development and testing
+
+#### mailfrom.dev (SMTP-based)
+- Uses SMTP authentication for sending emails
+- Requires `SMTP_USERNAME` and `SMTP_PASSWORD` environment variables
+- More reliable for production use
+- Default configuration: `smtp.mailfrom.dev:587` with STARTTLS
+
+### Running Email Integration Tests
+```bash
+# Test Mailtrap provider
+export MAILTRAP_KEY="your-api-token"
+make test-email-integration
+
+# Test mailfrom.dev SMTP provider
+export SMTP_USERNAME="your-smtp-username"
+export SMTP_PASSWORD="your-smtp-password"
+make test-mailfrom-integration
+```
+
+### Adding New Email Providers
+1. Create a new class extending `EmailProviderInterface`
+2. Implement `send_email()` and `validate_config()` methods
+3. Create a config class extending `EmailProviderConfig`
+4. Add provider-specific dependencies to requirements.txt
+
 ## Security Notes
 
 - Never commit `.env` files with real credentials
 - Use app-specific passwords for Gmail
 - Keep CONTROL_API_TOKEN secure
+- Keep email provider API tokens secure (e.g., MAILTRAP_API_TOKEN)
 - SSL/TLS is enforced for IMAP connections
