@@ -1,0 +1,150 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug gmail_fetcher.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/gmail_fetcher.py",
+            "args": [
+                "--base-url", "10.1.1.247:11434",
+                "--hours", "2"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONUNBUFFERED": "1"
+            },
+            "stopOnEntry": false,
+            "justMyCode": false,
+            "subProcess": true,
+            "redirectOutput": true,
+            "showReturnValue": true,
+            "purpose": ["debug-in-terminal"]
+        },
+        {
+            "name": "Debug gmail_fetcher.py (Custom Args)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/gmail_fetcher.py",
+            "args": [],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONUNBUFFERED": "1"
+            },
+            "stopOnEntry": false,
+            "justMyCode": false,
+            "subProcess": true,
+            "redirectOutput": true,
+            "showReturnValue": true,
+            "purpose": ["debug-in-terminal"]
+        },
+        {
+            "name": "Debug gmail_fetcher_service.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/gmail_fetcher_service.py",
+            "args": [],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONUNBUFFERED": "1"
+            },
+            "stopOnEntry": false,
+            "justMyCode": false,
+            "subProcess": true,
+            "redirectOutput": true,
+            "showReturnValue": true,
+            "purpose": ["debug-in-terminal"]
+        },
+        {
+            "name": "Debug Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONUNBUFFERED": "1"
+            },
+            "stopOnEntry": false,
+            "justMyCode": false,
+            "subProcess": true,
+            "redirectOutput": true,
+            "showReturnValue": true,
+            "purpose": ["debug-in-terminal"]
+        },
+        {
+            "name": "Debug with Pytest",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${workspaceFolder}",
+                "-v",
+                "-s"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONUNBUFFERED": "1"
+            },
+            "stopOnEntry": false,
+            "justMyCode": false,
+            "subProcess": true,
+            "redirectOutput": true,
+            "showReturnValue": true,
+            "purpose": ["debug-test"]
+        },
+        {
+            "name": "Debug gmail_fetcher.py (Test Mode - 1 hour)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/gmail_fetcher.py",
+            "args": [
+                "--base-url", "10.1.1.247:11434",
+                "--hours", "1"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONUNBUFFERED": "1"
+            },
+            "stopOnEntry": false,
+            "justMyCode": false,
+            "subProcess": true,
+            "redirectOutput": true,
+            "showReturnValue": true,
+            "purpose": ["debug-in-terminal"]
+        },
+        {
+            "name": "Attach to Remote Process",
+            "type": "python",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "/app"
+                }
+            ],
+            "justMyCode": false
+        }
+    ]
+}

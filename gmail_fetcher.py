@@ -15,9 +15,14 @@ from collections import Counter
 from tabulate import tabulate
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 from services.email_summary_service import EmailSummaryService
+from services.ollama_client import create_resilient_client
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
-parser.add_argument("--base-url", default=os.environ.get('OLLAMA_HOST_PRIMARY', '10.1.1.247:11434'), help="Base URL for the OpenAI API")
+parser.add_argument("--primary-host", default=os.environ.get('OLLAMA_HOST_PRIMARY', '10.1.1.247:11434'), 
+                   help="Primary Ollama host URL")
+parser.add_argument("--secondary-host", default=os.environ.get('OLLAMA_HOST_SECONDARY', '10.1.1.212:11434'), 
+                   help="Secondary Ollama host URL (for failover)")
+parser.add_argument("--base-url", help="Deprecated: Use --primary-host instead")
 parser.add_argument("--hours", type=int, default=int(os.environ.get('HOURS', '2')), help="The hours to fetch emails")
 args = parser.parse_args()
 
@@ -32,15 +37,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Handle deprecated --base-url argument
+if args.base_url:
+    logger.warning("--base-url is deprecated. Use --primary-host instead.")
+    args.primary_host = args.base_url
+
 ell.init(verbose=False, store='./logdir')
 
-client = openai.Client(
-    base_url=f"http://{args.base_url}/v1", api_key="ollama"  # required but not used
+# Create resilient Ollama client with automatic failover
+resilient_client = create_resilient_client(
+    primary_host=args.primary_host,
+    secondary_host=args.secondary_host
 )
 
-client2 = openai.Client(
-        base_url=f"http://{os.environ.get('OLLAMA_HOST_SECONDARY', '10.1.1.212:11434')}/v1", api_key="ollama"  # required but not used
-)
+# Log initial host status
+host_status = resilient_client.get_hosts_status()
+logger.info(f"Ollama hosts status: {host_status}")
 
 system_prompt = f"""
 You are an AI assistant designed to categorize incoming emails with a focus on protecting the user from unwanted commercial content and unnecessary spending. Your primary goal is to quickly identify and sort emails that may be attempting to solicit money or promote products/services. You should approach each email with a healthy dose of skepticism, always on the lookout for subtle or overt attempts to encourage spending.
@@ -97,15 +109,43 @@ Approach each email with the assumption that it may be trying to sell something,
 By following these guidelines and strictly adhering to the given categories, you will help the user maintain an inbox free from unwanted commercial content and protect them from potential financial solicitations.
 """
 
-@ell.simple(model="llama3.2:latest", temperature=0.1, client=client)
-def categorize_email_ell_marketing(contents: str):
-    f"""{system_prompt}"""
-    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
+def categorize_email_with_resilient_client(contents: str, model: str = "llama3.2:latest") -> str:
+    """
+    Categorize email using the resilient Ollama client with automatic failover.
+    """
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"}
+    ]
+    
+    try:
+        response = resilient_client.chat_completion(
+            model=model,
+            messages=messages,
+            temperature=0.1
+        )
+        
+        # Extract the response text
+        if hasattr(response, 'choices') and len(response.choices) > 0:
+            return response.choices[0].message.content
+        else:
+            logger.error("Unexpected response format from Ollama")
+            return "Other"
+            
+    except Exception as e:
+        logger.error(f"Failed to categorize email: {str(e)}")
+        return "Other"
 
-@ell.simple(model="gemma2:latest", temperature=0.1, client=client2)
+# Keep the original functions for backward compatibility but have them use the resilient client
+@ell.simple(model="llama3.2:latest", temperature=0.1)
+def categorize_email_ell_marketing(contents: str):
+    """Categorize email using primary model."""
+    return categorize_email_with_resilient_client(contents, "llama3.2:latest")
+
+@ell.simple(model="gemma2:latest", temperature=0.1)
 def categorize_email_ell_marketing2(contents: str):
-    f"""{system_prompt}"""
-    return f"Categorize this email. You are limited into one of the categories. Maximum length of response is 2 words: {contents}"
+    """Categorize email using secondary model."""
+    return categorize_email_with_resilient_client(contents, "gemma2:latest")
 
 class GmailFetcher:
     def __init__(self, email_address: str, app_password: str, api_token: str = None):
@@ -554,19 +594,21 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 contents_without_images = fetcher.remove_images_from_email(contents_without_links)
                 contents_without_encoded = fetcher.remove_encoded_content(contents_without_images)
                 contents_cleaned = contents_without_encoded
-                category = categorize_email_ell_marketing(contents_cleaned)
-                category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
+                # Use the resilient client for categorization
+                category = categorize_email_with_resilient_client(contents_cleaned)
+                
+                # Clean up the category response
+                category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '').strip()
+                
+                # Validate category response
+                valid_categories = {'Wants-Money', 'Advertising', 'Marketing', 'Other'}
+                if len(category) > 30 or category not in valid_categories:
+                    logger.warning(f"Invalid category response: '{category}', defaulting to 'Other'")
+                    category = 'Other'
                 
                 # Check if category is blocked
                 if fetcher._is_category_blocked(category):
                     deletion_candidate = True
-                else:
-                    # if length of category is more than 30 characters
-                    if len(category) > 30:
-                      category = categorize_email_ell_marketing2(contents_cleaned)
-                      category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
-                      if fetcher._is_category_blocked(category):
-                          deletion_candidate = True
 
 
             try:

@@ -101,7 +101,6 @@ CONTROL_API_TOKEN=your-api-token  # For domain service API
 ```bash
 HOURS=2  # Hours to look back for emails (default: 2)
 SCAN_INTERVAL=2  # Minutes between scans in service mode (default: 2)
-OLLAMA_HOST=http://localhost:11434  # Custom Ollama server (for local development)
 OLLAMA_HOST_PRIMARY=10.1.1.247:11434  # Primary Ollama host (default: 10.1.1.247:11434)
 OLLAMA_HOST_SECONDARY=10.1.1.212:11434  # Secondary Ollama host (default: 10.1.1.212:11434)
 ```
@@ -161,6 +160,33 @@ The system uses Ollama with multiple models for categorization:
 - Secondary: `gemma2` (fallback)
 
 Models are accessed via the Ollama API at the configured OLLAMA_HOST. The `ell` framework is used for LLM orchestration with logging stored in `./logdir`.
+
+### Ollama Host Failover
+
+The system includes automatic failover between multiple Ollama hosts for high availability:
+
+1. **Primary Host**: Specified by `OLLAMA_HOST_PRIMARY` or `--primary-host`
+2. **Secondary Host**: Specified by `OLLAMA_HOST_SECONDARY` or `--secondary-host`
+
+Features:
+- Automatic health checks every 5 minutes
+- Immediate failover on connection errors
+- Exponential backoff retry logic
+- Automatic recovery when failed hosts come back online
+- Detailed logging of failover events
+
+Example usage:
+```bash
+# Using command line arguments
+python gmail_fetcher.py --primary-host 192.168.1.100:11434 --secondary-host 192.168.1.101:11434
+
+# Using environment variables
+export OLLAMA_HOST_PRIMARY=192.168.1.100:11434
+export OLLAMA_HOST_SECONDARY=192.168.1.101:11434
+python gmail_fetcher.py
+```
+
+The failover is transparent - if the primary host fails, requests automatically route to the secondary host without interrupting email processing.
 
 ## Common Development Tasks
 
