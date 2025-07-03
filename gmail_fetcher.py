@@ -17,8 +17,8 @@ from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedC
 from services.email_summary_service import EmailSummaryService
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
-parser.add_argument("--base-url", default="10.1.1.247:11434", help="Base URL for the OpenAI API")
-parser.add_argument("--hours", type=int, default=2, help="The hours to fetch emails")
+parser.add_argument("--base-url", default=os.environ.get('OLLAMA_HOST_PRIMARY', '10.1.1.247:11434'), help="Base URL for the OpenAI API")
+parser.add_argument("--hours", type=int, default=int(os.environ.get('HOURS', '2')), help="The hours to fetch emails")
 args = parser.parse_args()
 
 # Configure logging
@@ -39,7 +39,7 @@ client = openai.Client(
 )
 
 client2 = openai.Client(
-        base_url=f"http://10.1.1.212:11434/v1", api_key="ollama"  # required but not used
+        base_url=f"http://{os.environ.get('OLLAMA_HOST_SECONDARY', '10.1.1.212:11434')}/v1", api_key="ollama"  # required but not used
 )
 
 system_prompt = f"""

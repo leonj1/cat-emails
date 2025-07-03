@@ -101,7 +101,9 @@ CONTROL_API_TOKEN=your-api-token  # For domain service API
 ```bash
 HOURS=2  # Hours to look back for emails (default: 2)
 SCAN_INTERVAL=2  # Minutes between scans in service mode (default: 2)
-OLLAMA_HOST=http://localhost:11434  # Custom Ollama server
+OLLAMA_HOST=http://localhost:11434  # Custom Ollama server (for local development)
+OLLAMA_HOST_PRIMARY=10.1.1.247:11434  # Primary Ollama host (default: 10.1.1.247:11434)
+OLLAMA_HOST_SECONDARY=10.1.1.212:11434  # Secondary Ollama host (default: 10.1.1.212:11434)
 ```
 
 ### Setting Up Gmail Access
