@@ -116,7 +116,15 @@ def run_service():
             start_time = time.time()
             gmail_fetcher_main(email_address, app_password, api_token, hours)
             duration = time.time() - start_time
-            logger.info(f"Scan cycle #{cycle_count} completed successfully in {duration:.2f} seconds")
+            
+            # Convert duration to human-readable format
+            minutes = int(duration // 60)
+            seconds = int(duration % 60)
+            
+            if minutes > 0:
+                logger.info(f"Scan cycle #{cycle_count} completed successfully in {minutes} minutes and {seconds} seconds")
+            else:
+                logger.info(f"Scan cycle #{cycle_count} completed successfully in {seconds} seconds")
             
         except Exception as e:
             logger.error(f"Error in scan cycle #{cycle_count}: {str(e)}", exc_info=True)
