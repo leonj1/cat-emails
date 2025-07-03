@@ -14,9 +14,10 @@ import re
 from collections import Counter
 from tabulate import tabulate
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
+from services.email_summary_service import EmailSummaryService
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
-parser.add_argument("--base-url", default="10.1.1.74:11434", help="Base URL for the OpenAI API")
+parser.add_argument("--base-url", default="10.1.1.247:11434", help="Base URL for the OpenAI API")
 parser.add_argument("--hours", type=int, default=2, help="The hours to fetch emails")
 args = parser.parse_args()
 
@@ -128,6 +129,9 @@ class GmailFetcher:
         
         # Initialize domain service and load domain data
         self.domain_service = DomainService(api_token=api_token)
+        
+        # Initialize summary service for tracking
+        self.summary_service = EmailSummaryService()
         self._allowed_domains: Set[str] = set()
         self._blocked_domains: Set[str] = set()
         self._blocked_categories: Set[str] = set()
@@ -559,14 +563,21 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
 
 
             try:
-                print(f"From: {msg.get('From')}")
-                print(f"Subject: {msg.get('Subject')}")
+                from_header = msg.get('From', '')
+                subject = msg.get('Subject', '')
+                message_id = msg.get("Message-ID", '')
+                
+                print(f"From: {from_header}")
+                print(f"Subject: {subject}")
                 if len(category) < 20:
                     print(f"Category: {category}")
                 print(f"Deletion Candidate: {deletion_candidate}")
                 
+                # Extract sender domain for tracking
+                sender_domain = fetcher._extract_domain(from_header) if from_header else None
+                
                 try:
-                    fetcher.add_label(msg.get("Message-ID"), category)
+                    fetcher.add_label(message_id, category)
                     # Track categories
                     fetcher.stats['categories'][category] += 1
                 except ssl.SSLError as ssl_err:
@@ -579,10 +590,13 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                     continue
                 
                 # Track kept/deleted emails
+                action_taken = "kept"  # Default action
+                
                 if deletion_candidate:
                     try:
-                        if fetcher.delete_email(msg.get("Message-ID")):
+                        if fetcher.delete_email(message_id):
                             print("Email deleted successfully")
+                            action_taken = "deleted"
                         else:
                             print("Failed to delete email")
                             fetcher.stats['kept'] += 1
@@ -594,6 +608,17 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 else:
                     print("Email left in inbox")
                     fetcher.stats['kept'] += 1
+                
+                # Track email in summary service
+                fetcher.summary_service.track_email(
+                    message_id=message_id,
+                    sender=from_header,
+                    subject=subject,
+                    category=category,
+                    action=action_taken,
+                    sender_domain=sender_domain,
+                    was_pre_categorized=pre_categorized
+                )
                         
                 print("-" * 50)
             except Exception as e:

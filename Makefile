@@ -49,6 +49,7 @@ service-run: validate-env
 	@echo "Configuration:"
 	@echo "  - Scan interval: $(or $(SCAN_INTERVAL),2) minutes"
 	@echo "  - Hours to look back: $(or $(HOURS),2)"
+	@echo "  - Summaries enabled: $(or $(ENABLE_SUMMARIES),true)"
 	@docker stop $(SERVICE_IMAGE_NAME) 2>/dev/null || true
 	@docker rm $(SERVICE_IMAGE_NAME) 2>/dev/null || true
 	docker run -d \
@@ -58,6 +59,10 @@ service-run: validate-env
 		-e CONTROL_API_TOKEN="$(CONTROL_API_TOKEN)" \
 		-e HOURS=$(or $(HOURS),2) \
 		-e SCAN_INTERVAL=$(or $(SCAN_INTERVAL),2) \
+		-e ENABLE_SUMMARIES=$(or $(ENABLE_SUMMARIES),true) \
+		-e SUMMARY_RECIPIENT_EMAIL=$(or $(SUMMARY_RECIPIENT_EMAIL),$(GMAIL_EMAIL)) \
+		-e SMTP_USERNAME="$(SMTP_USERNAME)" \
+		-e SMTP_PASSWORD="$(SMTP_PASSWORD)" \
 		--restart unless-stopped \
 		$(SERVICE_IMAGE_NAME)
 	@echo "Service started. Use 'make service-logs' to view logs."

@@ -250,6 +250,40 @@ make test-mailfrom-integration
 3. Create a config class extending `EmailProviderConfig`
 4. Add provider-specific dependencies to requirements.txt
 
+## Email Summary Reports
+
+The service can automatically send summary reports twice daily at 8 AM and 8 PM, containing:
+- Total emails processed vs archived/deleted
+- Top 10 email categories
+- Top 5 email senders
+- Processing statistics
+
+### Configuration
+```bash
+# Enable/disable summaries
+ENABLE_SUMMARIES=true
+
+# Who receives the summary reports
+SUMMARY_RECIPIENT_EMAIL=your-email@gmail.com
+
+# SMTP credentials for sending summaries
+SMTP_USERNAME=your-smtp-username
+SMTP_PASSWORD=your-smtp-password
+```
+
+### Summary Features
+- Tracks all processed emails between reports
+- Beautiful HTML email format
+- Automatic data clearing after sending
+- Graceful failure handling (service continues if summary fails)
+- Archives historical data for future reference
+
+### Manual Summary Generation
+```bash
+# Generate and send a summary report manually
+python send_summary_report.py
+```
+
 ## Security Notes
 
 - Never commit `.env` files with real credentials
