@@ -11,6 +11,8 @@ requests-mock>=1.11.0
 mailtrap>=2.0.0
 numpy>=1.21.0
 scipy>=1.7.0
+sqlalchemy>=2.0.0
+alembic>=1.13.0
 
 # Optional email provider dependencies
 # Uncomment the providers you want to use:

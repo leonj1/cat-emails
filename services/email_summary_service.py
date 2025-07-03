@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from pathlib import Path
 import logging
-from collections import Counter
+from collections import Counter, defaultdict
 
 from models.email_summary import (
     ProcessedEmail, 
@@ -16,6 +16,7 @@ from models.email_summary import (
     CategoryCount,
     EmailAction
 )
+from services.database_service import DatabaseService
 
 
 logger = logging.getLogger(__name__)
@@ -24,18 +25,67 @@ logger = logging.getLogger(__name__)
 class EmailSummaryService:
     """Service for tracking processed emails and generating summaries."""
     
-    def __init__(self, data_dir: str = "./email_summaries"):
+    def __init__(self, data_dir: str = "./email_summaries", use_database: bool = True):
         """
         Initialize the summary service.
         
         Args:
             data_dir: Directory to store summary data
+            use_database: Whether to persist summaries to database
         """
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
         self.current_file = self.data_dir / "current_tracking.json"
         self.archive_dir = self.data_dir / "archives"
         self.archive_dir.mkdir(exist_ok=True)
+        
+        # Initialize database service if enabled
+        self.use_database = use_database
+        self.db_service = None
+        if use_database:
+            try:
+                self.db_service = DatabaseService(
+                    db_path=str(self.data_dir / "summaries.db")
+                )
+                logger.info("Database service initialized for email summaries")
+            except Exception as e:
+                logger.error(f"Failed to initialize database service: {str(e)}")
+                self.use_database = False
+        
+        # Track current run ID if using database
+        self.current_run_id = None
+        
+        # Track run metrics
+        self.run_metrics = {
+            'fetched': 0,
+            'processed': 0,
+            'deleted': 0,
+            'archived': 0,
+            'error': 0
+        }
+        
+        # Track summary data for database
+        self.category_stats = defaultdict(lambda: {'count': 0, 'deleted': 0, 'archived': 0})
+        self.sender_stats = defaultdict(lambda: {'count': 0, 'deleted': 0, 'archived': 0, 'name': ''})
+        self.domain_stats = defaultdict(lambda: {'count': 0, 'deleted': 0, 'archived': 0, 'is_blocked': False})
+    
+    def start_processing_run(self, scan_hours: int = 2) -> None:
+        """Start a new processing run."""
+        if self.db_service and self.use_database:
+            self.current_run_id = self.db_service.start_processing_run(scan_hours)
+            logger.info(f"Started processing run: {self.current_run_id}")
+    
+    def complete_processing_run(self, success: bool = True, error_message: Optional[str] = None) -> None:
+        """Complete the current processing run."""
+        if self.db_service and self.use_database and self.current_run_id:
+            self.db_service.complete_processing_run(
+                self.current_run_id, 
+                self.run_metrics,
+                success=success,
+                error_message=error_message
+            )
+            logger.info(f"Completed processing run: {self.current_run_id}")
+            self.current_run_id = None
         
     def track_email(self, 
                    message_id: str,
@@ -76,6 +126,38 @@ class EmailSummaryService:
             # Save updated data
             self._save_current_data(existing_data)
             logger.debug(f"Tracked email: {message_id}")
+            
+            # Update statistics for database
+            if self.use_database:
+                # Update run metrics
+                self.run_metrics['processed'] += 1
+                if action == "deleted":
+                    self.run_metrics['deleted'] += 1
+                else:
+                    self.run_metrics['archived'] += 1
+                
+                # Update category stats
+                self.category_stats[category]['count'] += 1
+                if action == "deleted":
+                    self.category_stats[category]['deleted'] += 1
+                else:
+                    self.category_stats[category]['archived'] += 1
+                
+                # Update sender stats
+                self.sender_stats[sender]['count'] += 1
+                self.sender_stats[sender]['name'] = sender.split('@')[0] if '@' in sender else sender
+                if action == "deleted":
+                    self.sender_stats[sender]['deleted'] += 1
+                else:
+                    self.sender_stats[sender]['archived'] += 1
+                
+                # Update domain stats
+                if sender_domain:
+                    self.domain_stats[sender_domain]['count'] += 1
+                    if action == "deleted":
+                        self.domain_stats[sender_domain]['deleted'] += 1
+                    else:
+                        self.domain_stats[sender_domain]['archived'] += 1
             
         except Exception as e:
             logger.error(f"Failed to track email {message_id}: {str(e)}")
@@ -156,6 +238,31 @@ class EmailSummaryService:
     def clear_tracked_data(self) -> None:
         """Clear current tracking data after sending summary."""
         try:
+            # Save to database if enabled
+            if self.db_service and self.use_database:
+                # Calculate total skipped (if needed)
+                total_skipped = self.run_metrics.get('fetched', 0) - self.run_metrics.get('processed', 0)
+                
+                # Prepare summary data
+                summary_data = {
+                    'total_processed': self.run_metrics['processed'],
+                    'total_deleted': self.run_metrics['deleted'],
+                    'total_archived': self.run_metrics['archived'],
+                    'total_skipped': total_skipped,
+                    'processing_duration': 0,  # Will be calculated by processing run
+                    'scan_hours': 2,  # Default, should be passed from main
+                    'categories': dict(self.category_stats),
+                    'senders': dict(self.sender_stats),
+                    'domains': dict(self.domain_stats)
+                }
+                
+                # Save to database
+                try:
+                    summary_id = self.db_service.save_email_summary(summary_data)
+                    logger.info(f"Saved summary to database with ID: {summary_id}")
+                except Exception as e:
+                    logger.error(f"Failed to save summary to database: {str(e)}")
+            
             # Archive current data first
             if self.current_file.exists():
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -170,6 +277,18 @@ class EmailSummaryService:
                 # Clear current file
                 self._save_current_data([])
                 logger.info("Cleared tracked data after archiving")
+            
+            # Reset statistics
+            self.run_metrics = {
+                'fetched': 0,
+                'processed': 0,
+                'deleted': 0,
+                'archived': 0,
+                'error': 0
+            }
+            self.category_stats.clear()
+            self.sender_stats.clear()
+            self.domain_stats.clear()
                 
         except Exception as e:
             logger.error(f"Failed to clear tracked data: {str(e)}")

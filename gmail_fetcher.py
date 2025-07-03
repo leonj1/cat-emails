@@ -519,9 +519,16 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
 
     # Initialize and use the fetcher
     fetcher = GmailFetcher(email_address, app_password, api_token)
+    
+    # Start processing run in database
+    fetcher.summary_service.start_processing_run(scan_hours=hours)
+    
     try:
         fetcher.connect()
         recent_emails = fetcher.get_recent_emails(hours)
+        
+        # Update fetched count
+        fetcher.summary_service.run_metrics['fetched'] = len(recent_emails)
         
         print(f"Found {len(recent_emails)} emails in the last {hours} hours:")
         for msg in recent_emails:
@@ -628,7 +635,15 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
             
         # Print summary at the end
         print_summary(hours, fetcher.stats)
+        
+        # Complete processing run in database
+        fetcher.summary_service.complete_processing_run(success=True)
             
+    except Exception as e:
+        logger.error(f"Error during email processing: {str(e)}")
+        # Complete processing run with error
+        fetcher.summary_service.complete_processing_run(success=False, error_message=str(e))
+        raise
     finally:
         fetcher.disconnect()
 
