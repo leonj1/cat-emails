@@ -14,6 +14,12 @@ scipy>=1.7.0
 sqlalchemy>=2.0.0
 alembic>=1.13.0
 
+# Email summary and visualization dependencies
+pytz>=2023.3
+jinja2>=3.1.2
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
 # Optional email provider dependencies
 # Uncomment the providers you want to use:
 # mailtrap>=2.0.0  # For Mailtrap email provider

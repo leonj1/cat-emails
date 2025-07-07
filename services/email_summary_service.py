@@ -4,7 +4,7 @@ Service for tracking and summarizing email processing activities.
 import json
 import os
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pathlib import Path
 import logging
 from collections import Counter, defaultdict
@@ -68,15 +68,32 @@ class EmailSummaryService:
         self.category_stats = defaultdict(lambda: {'count': 0, 'deleted': 0, 'archived': 0})
         self.sender_stats = defaultdict(lambda: {'count': 0, 'deleted': 0, 'archived': 0, 'name': ''})
         self.domain_stats = defaultdict(lambda: {'count': 0, 'deleted': 0, 'archived': 0, 'is_blocked': False})
+        
+        # Performance tracking
+        self.performance_metrics = {
+            'start_time': None,
+            'end_time': None,
+            'email_processing_times': [],  # List of (email_id, processing_time) tuples
+            'total_emails': 0
+        }
     
     def start_processing_run(self, scan_hours: int = 2) -> None:
         """Start a new processing run."""
+        # Reset performance metrics
+        self.performance_metrics['start_time'] = datetime.now()
+        self.performance_metrics['email_processing_times'] = []
+        self.performance_metrics['total_emails'] = 0
+        
         if self.db_service and self.use_database:
             self.current_run_id = self.db_service.start_processing_run(scan_hours)
             logger.info(f"Started processing run: {self.current_run_id}")
     
     def complete_processing_run(self, success: bool = True, error_message: Optional[str] = None) -> None:
         """Complete the current processing run."""
+        # Finalize performance metrics
+        self.performance_metrics['end_time'] = datetime.now()
+        self.performance_metrics['total_emails'] = self.run_metrics['processed']
+        
         if self.db_service and self.use_database and self.current_run_id:
             self.db_service.complete_processing_run(
                 self.current_run_id, 
@@ -94,7 +111,8 @@ class EmailSummaryService:
                    category: str,
                    action: str,
                    sender_domain: Optional[str] = None,
-                   was_pre_categorized: bool = False) -> None:
+                   was_pre_categorized: bool = False,
+                   processing_time: Optional[float] = None) -> None:
         """
         Track a processed email.
         
@@ -106,8 +124,15 @@ class EmailSummaryService:
             action: Action taken (kept/deleted)
             sender_domain: Domain of sender
             was_pre_categorized: Whether pre-categorized by domain rules
+            processing_time: Time taken to process this email in seconds
         """
         try:
+            # Track performance metrics
+            if processing_time is not None:
+                self.performance_metrics['email_processing_times'].append(
+                    (message_id, processing_time)
+                )
+            
             # Create processed email record
             email_record = ProcessedEmail(
                 message_id=message_id,
@@ -346,3 +371,39 @@ class EmailSummaryService:
         except Exception as e:
             logger.error(f"Failed to get stats: {str(e)}")
             return {"total": 0, "kept": 0, "deleted": 0}
+    
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """
+        Calculate and return performance metrics.
+        
+        Returns:
+            Dictionary with performance metrics
+        """
+        metrics = {
+            'emails_per_minute': 0,
+            'avg_processing_time': 0,
+            'total_duration_minutes': 0,
+            'peak_processing_time': 0,
+            'min_processing_time': 0
+        }
+        
+        # Calculate total duration
+        if self.performance_metrics['start_time'] and self.performance_metrics['end_time']:
+            duration = (self.performance_metrics['end_time'] - 
+                       self.performance_metrics['start_time']).total_seconds()
+            metrics['total_duration_minutes'] = duration / 60
+            
+            # Calculate emails per minute
+            if duration > 0 and self.performance_metrics['total_emails'] > 0:
+                metrics['emails_per_minute'] = (
+                    self.performance_metrics['total_emails'] / (duration / 60)
+                )
+        
+        # Calculate processing time stats
+        if self.performance_metrics['email_processing_times']:
+            processing_times = [t[1] for t in self.performance_metrics['email_processing_times']]
+            metrics['avg_processing_time'] = sum(processing_times) / len(processing_times)
+            metrics['peak_processing_time'] = max(processing_times)
+            metrics['min_processing_time'] = min(processing_times)
+        
+        return metrics

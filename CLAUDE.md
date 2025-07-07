@@ -140,6 +140,10 @@ domain_service = DomainService(mock_mode=True)
 - **kafka-python** - Message queue support
 - **pydantic** - Data validation and models
 - **requests** - HTTP client for Control API
+- **pytz** - Timezone handling for scheduled reports
+- **jinja2** - HTML email templating
+- **matplotlib** - Chart and graph generation
+- **seaborn** - Statistical data visualization
 
 ## Control API Integration
 
@@ -280,37 +284,63 @@ make test-mailfrom-integration
 
 ## Email Summary Reports
 
-The service can automatically send summary reports twice daily at 8 AM and 8 PM, containing:
+The service automatically sends summary reports at the following times (Eastern Time):
+- **Morning Report**: 8 AM ET daily
+- **Evening Report**: 8 PM ET daily  
+- **Weekly Report**: 8 PM ET on Fridays
+
+Each report contains:
 - Total emails processed vs archived/deleted
-- Top 10 email categories
-- Top 5 email senders
-- Processing statistics
+- Processing performance metrics (emails/minute, average processing time)
+- Top 10 email categories with distribution chart
+- Top 5 email senders with bar chart
+- Beautiful responsive HTML email format with charts and graphs
+- Weekly reports include week-over-week trends and comparisons
 
 ### Configuration
 ```bash
 # Enable/disable summaries
 ENABLE_SUMMARIES=true
 
-# Who receives the summary reports
+# Who receives the summary reports (defaults to GMAIL_EMAIL)
 SUMMARY_RECIPIENT_EMAIL=your-email@gmail.com
+GMAIL_EMAIL=your-email@gmail.com
 
-# SMTP credentials for sending summaries
-SMTP_USERNAME=your-smtp-username
-SMTP_PASSWORD=your-smtp-password
+# Mailtrap SMTP credentials for sending summaries
+MAILTRAP_API_TOKEN=your-mailtrap-api-token
 ```
 
 ### Summary Features
-- Tracks all processed emails between reports
-- Beautiful HTML email format
-- Automatic data clearing after sending
-- Graceful failure handling (service continues if summary fails)
-- Archives historical data for future reference
+- **Timezone-aware scheduling**: Reports are sent at consistent times in Eastern Time regardless of server timezone
+- **Performance tracking**: Monitors processing speed and efficiency
+- **Visual charts**: Category pie charts, sender bar charts, and trend line graphs
+- **Retry logic**: Automatic retry with exponential backoff (max 3 attempts)
+- **Template-based**: Customizable HTML email template in `templates/summary_email.html`
+- **Graceful failure handling**: Service continues if summary fails to send
+- **Data persistence**: Archives historical data for future analysis
 
 ### Manual Summary Generation
 ```bash
 # Generate and send a summary report manually
-python send_summary_report.py
+python send_emails.py
+
+# Test with specific recipient
+python send_emails.py recipient@example.com
 ```
+
+### Email Template Customization
+The HTML email template is located at `templates/summary_email.html` and uses Jinja2 templating. You can customize:
+- Colors and styling
+- Chart types and appearance
+- Data presentation format
+- Company branding
+
+### Chart Generation
+The system generates the following charts:
+- **Category Distribution**: Pie chart showing email category percentages
+- **Top Senders**: Horizontal bar chart of most frequent senders
+- **Daily Volume**: Line chart showing email trends over the past week (weekly reports)
+- **Performance Metrics**: Time series chart of processing efficiency
 
 ## Security Notes
 

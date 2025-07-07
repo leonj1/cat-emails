@@ -540,14 +540,18 @@ def print_summary(hours: int, stats: dict):
         print(tabulate(table, headers=['Category', 'Count'], tablefmt='grid'))
     print("="*50 + "\n")
 
-def test_api_connection(api_token: str) -> None:
+def test_api_connection(api_token: str) -> bool:
     """Test connection to control API before proceeding"""
     service = DomainService(api_token=api_token)
     try:
         # Try to fetch domains to verify API connection
         service.fetch_allowed_domains()
+        logger.info("Successfully connected to control API")
+        return True
     except Exception as e:
-        raise Exception(f"Failed to connect to control API: {str(e)}")
+        logger.warning(f"Failed to connect to control API: {str(e)}")
+        logger.warning("Continuing with mock mode - no domain filtering will be applied")
+        return False
 
 def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     logger.info("Starting email processing")
@@ -555,7 +559,11 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     
     # Test API connection first
     logger.info("Testing API connection")
-    test_api_connection(api_token)
+    api_connected = test_api_connection(api_token)
+    
+    # Use mock mode if API connection failed
+    if not api_connected:
+        api_token = None  # This will enable mock mode in DomainService
 
     # Initialize and use the fetcher
     fetcher = GmailFetcher(email_address, app_password, api_token)

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ report_type }} Email Summary - Cat Emails</title>
+    <style>
+        /* Reset and base styles */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        
+        /* Container */
+        .email-container {
+            max-width: 800px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        /* Header */
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+        
+        .email-header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        .email-header .subtitle {
+            margin: 10px 0 0 0;
+            color: #e0e0ff;
+            font-size: 16px;
+        }
+        
+        /* Content */
+        .email-content {
+            padding: 40px 30px;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        
+        .stat-box {
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+        
+        .stat-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 0;
+        }
+        
+        .stat-label {
+            margin: 5px 0 0 0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .stat-box.primary { color: #667eea; }
+        .stat-box.success { color: #48bb78; }
+        .stat-box.danger { color: #f56565; }
+        .stat-box.info { color: #4299e1; }
+        
+        /* Performance Metrics */
+        .performance-metrics {
+            background-color: #e8f4f8;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .performance-metrics h3 {
+            margin: 0 0 15px 0;
+            color: #0066cc;
+            font-size: 18px;
+        }
+        
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .metric-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* Tables */
+        .data-section {
+            margin-bottom: 40px;
+        }
+        
+        .data-section h3 {
+            margin: 0 0 20px 0;
+            color: #2d3748;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .data-table {
+            width: 100%;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+            border-collapse: collapse;
+        }
+        
+        .data-table thead {
+            background-color: #e9ecef;
+        }
+        
+        .data-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .data-table tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        /* Charts */
+        .chart-container {
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Weekly Summary Extras */
+        .trend-indicator {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 14px;
+        }
+        
+        .trend-up { color: #48bb78; }
+        .trend-down { color: #f56565; }
+        .trend-neutral { color: #a0aec0; }
+        
+        /* Footer */
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .email-footer p {
+            margin: 0 0 10px 0;
+            color: #666666;
+            font-size: 14px;
+        }
+        
+        .email-footer p:last-child {
+            margin: 0;
+            color: #999999;
+            font-size: 12px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .email-header h1 {
+                font-size: 24px;
+            }
+            
+            .stat-number {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="email-header">
+            <h1>📧 {{ report_type }} Email Summary</h1>
+            <p class="subtitle">{{ date_str }} • {{ time_period }}</p>
+        </div>
+        
+        <!-- Content -->
+        <div class="email-content">
+            <!-- Summary Stats -->
+            <div class="stats-grid">
+                <div class="stat-box primary">
+                    <h2 class="stat-number">{{ stats.total_processed }}</h2>
+                    <p class="stat-label">Total Processed</p>
+                </div>
+                <div class="stat-box success">
+                    <h2 class="stat-number">{{ stats.total_kept }}</h2>
+                    <p class="stat-label">Kept ({{ stats.kept_rate|round|int }}%)</p>
+                </div>
+                <div class="stat-box danger">
+                    <h2 class="stat-number">{{ stats.total_deleted }}</h2>
+                    <p class="stat-label">Archived ({{ stats.deletion_rate|round|int }}%)</p>
+                </div>
+                {% if performance_metrics %}
+                <div class="stat-box info">
+                    <h2 class="stat-number">{{ performance_metrics.emails_per_minute|round(1) }}</h2>
+                    <p class="stat-label">Emails/Min</p>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Performance Metrics -->
+            {% if performance_metrics %}
+            <div class="performance-metrics">
+                <h3>⚡ Processing Performance</h3>
+                <div class="metric-row">
+                    <span>Average Processing Time:</span>
+                    <strong>{{ performance_metrics.avg_processing_time|round(2) }}s</strong>
+                </div>
+                <div class="metric-row">
+                    <span>Total Processing Duration:</span>
+                    <strong>{{ performance_metrics.total_duration_minutes|round(1) }} minutes</strong>
+                </div>
+                <div class="metric-row">
+                    <span>Processing Efficiency:</span>
+                    <strong>{{ performance_metrics.emails_per_minute|round(1) }} emails/minute</strong>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Weekly Trends (for weekly reports) -->
+            {% if weekly_trends %}
+            <div class="performance-metrics">
+                <h3>📈 Weekly Trends</h3>
+                <div class="metric-row">
+                    <span>Total Emails vs Last Week:</span>
+                    <strong>{{ weekly_trends.total_change|round(1) }}%
+                        <span class="trend-indicator {% if weekly_trends.total_change > 0 %}trend-up{% elif weekly_trends.total_change < 0 %}trend-down{% else %}trend-neutral{% endif %}">
+                            {% if weekly_trends.total_change > 0 %}↑{% elif weekly_trends.total_change < 0 %}↓{% else %}→{% endif %}
+                        </span>
+                    </strong>
+                </div>
+                <div class="metric-row">
+                    <span>Deletion Rate Change:</span>
+                    <strong>{{ weekly_trends.deletion_rate_change|round(1) }}%
+                        <span class="trend-indicator {% if weekly_trends.deletion_rate_change > 0 %}trend-up{% elif weekly_trends.deletion_rate_change < 0 %}trend-down{% else %}trend-neutral{% endif %}">
+                            {% if weekly_trends.deletion_rate_change > 0 %}↑{% elif weekly_trends.deletion_rate_change < 0 %}↓{% else %}→{% endif %}
+                        </span>
+                    </strong>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Category Distribution Chart -->
+            {% if charts and charts.category_distribution %}
+            <div class="chart-container">
+                <h3>📊 Category Distribution</h3>
+                <img src="data:image/png;base64,{{ charts.category_distribution }}" alt="Category Distribution Chart">
+            </div>
+            {% endif %}
+            
+            <!-- Top Categories Table -->
+            <div class="data-section">
+                <h3>📊 Top {{ category_limit|default(10) }} Email Categories</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th style="text-align: center;">Count</th>
+                            <th style="text-align: center;">Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for category in stats.top_categories[:category_limit|default(10)] %}
+                        <tr>
+                            <td>{{ category.category }}</td>
+                            <td style="text-align: center;">{{ category.count }}</td>
+                            <td style="text-align: center;">{{ category.percentage }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Top Senders Chart -->
+            {% if charts and charts.top_senders %}
+            <div class="chart-container">
+                <h3>👥 Top Email Senders</h3>
+                <img src="data:image/png;base64,{{ charts.top_senders }}" alt="Top Senders Chart">
+            </div>
+            {% endif %}
+            
+            <!-- Top Senders Table -->
+            <div class="data-section">
+                <h3>👥 Top {{ sender_limit|default(5) }} Email Senders</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Sender/Domain</th>
+                            <th style="text-align: center;">Emails</th>
+                            <th style="text-align: center;">Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sender in top_senders[:sender_limit|default(5)] %}
+                        <tr>
+                            <td>{{ sender.sender }}</td>
+                            <td style="text-align: center;">{{ sender.count }}</td>
+                            <td style="text-align: center;">{{ sender.percentage|round(1) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Daily Volume Chart (for weekly reports) -->
+            {% if charts and charts.daily_volume %}
+            <div class="chart-container">
+                <h3>📈 Daily Email Volume</h3>
+                <img src="data:image/png;base64,{{ charts.daily_volume }}" alt="Daily Email Volume Chart">
+            </div>
+            {% endif %}
+            
+            <!-- Performance Chart -->
+            {% if charts and charts.performance %}
+            <div class="chart-container">
+                <h3>⚡ Processing Performance Over Time</h3>
+                <img src="data:image/png;base64,{{ charts.performance }}" alt="Performance Chart">
+            </div>
+            {% endif %}
+            
+            <!-- Summary Info -->
+            <div class="performance-metrics" style="margin-top: 30px;">
+                <p style="margin: 0; color: #0066cc; font-size: 16px; text-align: center;">
+                    <strong>Processing Period:</strong> {{ stats.processing_hours|round(1) }} hours<br>
+                    <strong>Report Generated:</strong> {{ generated_at }}
+                </p>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="email-footer">
+            <p>
+                <strong>Cat Emails</strong> - Automated Email Management
+            </p>
+            <p>
+                This is an automated {{ report_type|lower }} summary report. 
+                Emails are categorized and filtered automatically using AI.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

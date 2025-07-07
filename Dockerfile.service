@@ -18,9 +18,11 @@ COPY gmail_fetcher.py .
 COPY gmail_fetcher_service.py .
 COPY domain_service.py .
 COPY send_summary_report.py .
+COPY send_emails.py .
 COPY models/ ./models/
 COPY services/ ./services/
 COPY email_providers/ ./email_providers/
+COPY templates/ ./templates/
 
 # Set environment variables
 ENV GMAIL_EMAIL=""
