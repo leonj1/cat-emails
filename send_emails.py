@@ -60,7 +60,7 @@ class EmailSender:
         
     def render_email_html(self, report: DailySummaryReport, 
                          performance_metrics: Optional[Dict[str, Any]] = None,
-                         weekly_trends: Optional[Dict[str, Any]] = None,
+                         trends: Optional[Dict[str, Any]] = None,
                          charts: Optional[Dict[str, str]] = None) -> str:
         """
         Render the email HTML using the template.
@@ -68,7 +68,7 @@ class EmailSender:
         Args:
             report: The summary report data
             performance_metrics: Performance metrics data
-            weekly_trends: Weekly trend data (for weekly reports)
+            trends: Trend data (for weekly/monthly reports)
             charts: Base64 encoded chart images
             
         Returns:
@@ -91,7 +91,7 @@ class EmailSender:
             stats=report.stats,
             top_senders=top_senders,
             performance_metrics=performance_metrics,
-            weekly_trends=weekly_trends,
+            weekly_trends=trends,
             charts=charts or {},
             category_limit=10,
             sender_limit=5
@@ -158,7 +158,7 @@ class EmailSender:
         
     def send_summary_email(self, report: DailySummaryReport, recipient_email: str,
                           performance_metrics: Optional[Dict[str, Any]] = None,
-                          weekly_trends: Optional[Dict[str, Any]] = None,
+                          trends: Optional[Dict[str, Any]] = None,
                           charts: Optional[Dict[str, str]] = None) -> bool:
         """
         Send the summary report email.
@@ -167,7 +167,7 @@ class EmailSender:
             report: The summary report to send
             recipient_email: Email address to send to
             performance_metrics: Performance metrics data
-            weekly_trends: Weekly trend data (for weekly reports)
+            trends: Trend data (for weekly/monthly reports)
             charts: Base64 encoded chart images
             
         Returns:
@@ -183,7 +183,7 @@ class EmailSender:
             
             # Generate HTML content
             html_content = self.render_email_html(
-                report, performance_metrics, weekly_trends, charts
+                report, performance_metrics, trends, charts
             )
             
             # Generate plain text content
@@ -208,6 +208,79 @@ Cat Emails - Automated Email Management
         except Exception as e:
             logger.error(f"Error preparing email: {str(e)}")
             return False
+
+
+def send_summary_by_type(report_type: str) -> tuple[bool, str]:
+    """
+    Send a summary report of the specified type.
+    
+    Args:
+        report_type: Type of report to send ("Morning", "Evening", "Weekly", "Monthly", or "Daily")
+        
+    Returns:
+        Tuple of (success, message)
+    """
+    try:
+        # Get configuration
+        recipient_email = os.getenv('GMAIL_EMAIL')
+        if not recipient_email:
+            recipient_email = os.getenv('SUMMARY_RECIPIENT_EMAIL')
+        
+        if not recipient_email:
+            return False, "GMAIL_EMAIL or SUMMARY_RECIPIENT_EMAIL not configured"
+        
+        # Validate report type
+        valid_types = ["Morning", "Evening", "Weekly", "Monthly", "Daily"]
+        if report_type not in valid_types:
+            return False, f"Invalid report type. Must be one of: {', '.join(valid_types)}"
+        
+        # Initialize services
+        summary_service = EmailSummaryService()
+        email_sender = EmailSender()
+        
+        # Generate summary
+        report = summary_service.generate_summary(report_type)
+        if not report:
+            return False, "No data to summarize"
+        
+        # Generate performance metrics
+        performance_metrics = summary_service.get_performance_metrics()
+        
+        # Generate trends for weekly/monthly reports
+        trends = None
+        if report_type in ["Weekly", "Monthly"]:
+            # Calculate trends
+            # This would require historical data from the past periods
+            # For now, we'll use placeholder data
+            trends = {
+                'total_change': 12.5,  # 12.5% increase
+                'deletion_rate_change': -3.2  # 3.2% decrease in deletion rate
+            }
+        
+        # Generate charts
+        chart_generator = ChartGenerator()
+        charts = chart_generator.generate_all_charts(
+            report, 
+            performance_metrics=performance_metrics,
+            weekly_data=None  # Would need historical data for trend charts
+        )
+        
+        # Send email
+        if email_sender.send_summary_email(
+            report, recipient_email, performance_metrics, trends, charts
+        ):
+            # Clear tracked data after successful send
+            summary_service.clear_tracked_data()
+            message = f"{report_type} summary sent successfully to {recipient_email}"
+            logger.info(message)
+            return True, message
+        else:
+            return False, "Failed to send summary email"
+            
+    except Exception as e:
+        error_msg = f"Error sending {report_type} summary: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return False, error_msg
 
 
 def main():
@@ -235,47 +308,13 @@ def main():
     else:
         report_type = "Daily"
     
-    # Initialize services
-    summary_service = EmailSummaryService()
-    email_sender = EmailSender()
+    # Use the new send_summary_by_type function
+    success, message = send_summary_by_type(report_type)
     
-    # Generate summary
-    report = summary_service.generate_summary(report_type)
-    if not report:
-        logger.warning("No data to summarize")
-        return
-    
-    # Generate performance metrics
-    performance_metrics = summary_service.get_performance_metrics()
-    
-    # Generate weekly trends for weekly reports
-    weekly_trends = None
-    if report_type == "Weekly":
-        # Calculate weekly trends
-        # This would require historical data from the past two weeks
-        # For now, we'll use placeholder data
-        weekly_trends = {
-            'total_change': 12.5,  # 12.5% increase
-            'deletion_rate_change': -3.2  # 3.2% decrease in deletion rate
-        }
-    
-    # Generate charts
-    chart_generator = ChartGenerator()
-    charts = chart_generator.generate_all_charts(
-        report, 
-        performance_metrics=performance_metrics,
-        weekly_data=None  # Would need historical data for weekly charts
-    )
-    
-    # Send email
-    if email_sender.send_summary_email(
-        report, recipient_email, performance_metrics, weekly_trends, charts
-    ):
-        # Clear tracked data after successful send
-        summary_service.clear_tracked_data()
-        logger.info(f"{report_type} summary sent and data cleared")
-    else:
-        logger.error("Failed to send summary email, keeping tracked data")
+    if not success:
+        logger.error(message)
+        if "No data to summarize" not in message:
+            sys.exit(1)
 
 
 if __name__ == "__main__":

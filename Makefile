@@ -12,7 +12,7 @@ validate-env:
 		exit 1; \
 	fi
 
-.PHONY: build run clean test service-build service-run service-stop service-logs
+.PHONY: build run clean test service-build service-run service-stop service-logs api-build api-run api-stop api-logs summary-morning summary-evening summary-weekly summary-monthly api-health
 
 # Docker image name
 IMAGE_NAME = gmail-cleaner
@@ -20,6 +20,7 @@ TEST_IMAGE_NAME = gmail-cleaner-test
 SERVICE_IMAGE_NAME = gmail-cleaner-service
 CONSOLIDATOR_IMAGE_NAME = gmail-label-consolidator
 EMAIL_TEST_IMAGE_NAME = gmail-email-test
+API_IMAGE_NAME = gmail-cleaner-api
 
 # Build the Docker image
 build:
@@ -83,6 +84,102 @@ service-stop:
 service-logs:
 	docker logs -f $(SERVICE_IMAGE_NAME)
 
+# Build the API Docker image
+api-build:
+	docker build -t $(API_IMAGE_NAME) -f Dockerfile.api .
+
+# Run the API container
+api-run:
+	@echo "Starting Gmail Cleaner API..."
+	@echo "Configuration:"
+	@echo "  - API Port: $(or $(API_PORT),8000)"
+	@echo "  - API Key Required: $(if $(API_KEY),Yes,No)"
+	@docker stop $(API_IMAGE_NAME) 2>/dev/null || true
+	@docker rm $(API_IMAGE_NAME) 2>/dev/null || true
+	docker run -d \
+		--name $(API_IMAGE_NAME) \
+		-p $(or $(API_PORT),8000):8000 \
+		-e API_KEY="$(API_KEY)" \
+		-e GMAIL_EMAIL="$(GMAIL_EMAIL)" \
+		-e SUMMARY_RECIPIENT_EMAIL=$(or $(SUMMARY_RECIPIENT_EMAIL),$(GMAIL_EMAIL)) \
+		-e MAILTRAP_API_TOKEN="$(MAILTRAP_API_TOKEN)" \
+		--restart unless-stopped \
+		$(API_IMAGE_NAME)
+	@echo "API started on port $(or $(API_PORT),8000). Use 'make api-logs' to view logs."
+	@echo "API documentation available at: http://localhost:$(or $(API_PORT),8000)/docs"
+
+# Stop the API container
+api-stop:
+	@echo "Stopping Gmail Cleaner API..."
+	docker stop $(API_IMAGE_NAME)
+	docker rm $(API_IMAGE_NAME)
+	@echo "API stopped."
+
+# View API logs
+api-logs:
+	docker logs -f $(API_IMAGE_NAME)
+
+# Force send morning summary
+summary-morning:
+	@echo "Triggering morning summary..."
+	@if [ -n "$(API_KEY)" ]; then \
+		curl -X POST http://localhost:$(or $(API_PORT),8000)/api/summaries/morning \
+			-H "X-API-Key: $(API_KEY)" \
+			-H "Content-Type: application/json" \
+			-s | jq '.' || echo "Failed to trigger morning summary"; \
+	else \
+		curl -X POST http://localhost:$(or $(API_PORT),8000)/api/summaries/morning \
+			-H "Content-Type: application/json" \
+			-s | jq '.' || echo "Failed to trigger morning summary"; \
+	fi
+
+# Force send evening summary
+summary-evening:
+	@echo "Triggering evening summary..."
+	@if [ -n "$(API_KEY)" ]; then \
+		curl -X POST http://localhost:$(or $(API_PORT),8000)/api/summaries/evening \
+			-H "X-API-Key: $(API_KEY)" \
+			-H "Content-Type: application/json" \
+			-s | jq '.' || echo "Failed to trigger evening summary"; \
+	else \
+		curl -X POST http://localhost:$(or $(API_PORT),8000)/api/summaries/evening \
+			-H "Content-Type: application/json" \
+			-s | jq '.' || echo "Failed to trigger evening summary"; \
+	fi
+
+# Force send weekly summary
+summary-weekly:
+	@echo "Triggering weekly summary..."
+	@if [ -n "$(API_KEY)" ]; then \
+		curl -X POST http://localhost:$(or $(API_PORT),8000)/api/summaries/weekly \
+			-H "X-API-Key: $(API_KEY)" \
+			-H "Content-Type: application/json" \
+			-s | jq '.' || echo "Failed to trigger weekly summary"; \
+	else \
+		curl -X POST http://localhost:$(or $(API_PORT),8000)/api/summaries/weekly \
+			-H "Content-Type: application/json" \
+			-s | jq '.' || echo "Failed to trigger weekly summary"; \
+	fi
+
+# Force send monthly summary
+summary-monthly:
+	@echo "Triggering monthly summary..."
+	@if [ -n "$(API_KEY)" ]; then \
+		curl -X POST http://localhost:$(or $(API_PORT),8000)/api/summaries/monthly \
+			-H "X-API-Key: $(API_KEY)" \
+			-H "Content-Type: application/json" \
+			-s | jq '.' || echo "Failed to trigger monthly summary"; \
+	else \
+		curl -X POST http://localhost:$(or $(API_PORT),8000)/api/summaries/monthly \
+			-H "Content-Type: application/json" \
+			-s | jq '.' || echo "Failed to trigger monthly summary"; \
+	fi
+
+# Check API health
+api-health:
+	@echo "Checking API health..."
+	@curl -s http://localhost:$(or $(API_PORT),8000)/api/health | jq '.' || echo "API is not responding"
+
 # Run tests
 test:
 	docker build -t $(TEST_IMAGE_NAME) -f Dockerfile.test .
@@ -90,7 +187,7 @@ test:
 
 # Clean up Docker images
 clean:
-	docker rmi $(IMAGE_NAME) $(TEST_IMAGE_NAME) $(SERVICE_IMAGE_NAME)
+	docker rmi $(IMAGE_NAME) $(TEST_IMAGE_NAME) $(SERVICE_IMAGE_NAME) $(API_IMAGE_NAME)
 
 # Build and run in one command
 all: build run
