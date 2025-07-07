@@ -192,13 +192,27 @@ class EmailSummaryService:
         Generate a summary report from tracked emails.
         
         Args:
-            report_type: Type of report (Morning/Evening/Daily)
+            report_type: Type of report (Morning/Evening/Daily/Weekly/Monthly)
             
         Returns:
             DailySummaryReport or None if no data
         """
         try:
-            # Load tracked data
+            # For weekly/monthly reports, try to get historical data from database
+            if report_type in ["Weekly", "Monthly"] and self.db_service and self.use_database:
+                # Calculate date range based on report type
+                end_date = datetime.now()
+                if report_type == "Weekly":
+                    start_date = end_date - timedelta(days=7)
+                else:  # Monthly
+                    start_date = end_date - timedelta(days=30)
+                
+                # Try to get historical summaries from database
+                historical_data = self._get_historical_data(start_date, end_date)
+                if historical_data:
+                    return self._generate_historical_summary(historical_data, report_type)
+            
+            # Load tracked data for current period
             tracked_data = self._load_current_data()
             if not tracked_data:
                 logger.warning("No tracked emails to summarize")
@@ -371,6 +385,27 @@ class EmailSummaryService:
         except Exception as e:
             logger.error(f"Failed to get stats: {str(e)}")
             return {"total": 0, "kept": 0, "deleted": 0}
+    
+    def _get_historical_data(self, start_date: datetime, end_date: datetime) -> Optional[Dict]:
+        """Get historical summary data from database."""
+        if not self.db_service:
+            return None
+            
+        try:
+            # Query summaries from database within date range
+            # This is a placeholder - actual implementation would query the database
+            logger.info(f"Querying historical data from {start_date} to {end_date}")
+            # For now, return None to fall back to current data
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get historical data: {str(e)}")
+            return None
+    
+    def _generate_historical_summary(self, historical_data: Dict, report_type: str) -> Optional[DailySummaryReport]:
+        """Generate summary from historical data."""
+        # This would aggregate historical data into a summary
+        # For now, this is a placeholder
+        return None
     
     def get_performance_metrics(self) -> Dict[str, Any]:
         """

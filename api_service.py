@@ -6,7 +6,7 @@ import os
 import sys
 import logging
 from typing import Optional, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Header, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -89,10 +89,13 @@ async def health_check():
 
 
 @app.post("/api/test/create-sample-data")
-async def create_sample_data(x_api_key: Optional[str] = Header(None)):
+async def create_sample_data(x_api_key: Optional[str] = Header(None), report_type: Optional[str] = "Daily"):
     """
     Create sample tracking data for testing purposes.
     This endpoint creates dummy email data to test the summary functionality.
+    
+    Args:
+        report_type: Type of report to generate data for (Daily/Weekly/Monthly)
     """
     verify_api_key(x_api_key)
     
@@ -101,63 +104,80 @@ async def create_sample_data(x_api_key: Optional[str] = Header(None)):
         from models.email_summary import ProcessedEmail, EmailAction
         import json
         from pathlib import Path
+        import random
         
         # Initialize summary service
         summary_service = EmailSummaryService()
         
-        # Create sample emails
-        sample_emails = [
-            {
-                "message_id": "test1@example.com",
-                "sender": "newsletter@company.com",
-                "subject": "Weekly Newsletter",
-                "category": "Marketing",
-                "action": "kept",
-                "sender_domain": "company.com",
-                "was_pre_categorized": False,
-                "processed_at": datetime.now().isoformat()
-            },
-            {
-                "message_id": "test2@example.com",
-                "sender": "promo@shop.com",
-                "subject": "50% Off Sale!",
-                "category": "Advertising",
-                "action": "deleted",
-                "sender_domain": "shop.com",
-                "was_pre_categorized": False,
-                "processed_at": datetime.now().isoformat()
-            },
-            {
-                "message_id": "test3@example.com",
-                "sender": "friend@gmail.com",
-                "subject": "Let's catch up",
-                "category": "Personal",
-                "action": "kept",
-                "sender_domain": "gmail.com",
-                "was_pre_categorized": False,
-                "processed_at": datetime.now().isoformat()
-            },
-            {
-                "message_id": "test4@example.com",
-                "sender": "billing@service.com",
-                "subject": "Your invoice is ready",
-                "category": "Wants-Money",
-                "action": "deleted",
-                "sender_domain": "service.com",
-                "was_pre_categorized": True,
-                "processed_at": datetime.now().isoformat()
-            },
-            {
-                "message_id": "test5@example.com",
-                "sender": "noreply@bank.com",
-                "subject": "Account statement",
-                "category": "Financial-Notification",
-                "action": "kept",
-                "sender_domain": "bank.com",
-                "was_pre_categorized": False,
-                "processed_at": datetime.now().isoformat()
-            }
+        # Determine number of emails based on report type
+        if report_type == "Monthly":
+            num_emails = random.randint(800, 1200)  # Monthly: 800-1200 emails
+        elif report_type == "Weekly":
+            num_emails = random.randint(150, 250)   # Weekly: 150-250 emails
+        else:  # Daily/Morning/Evening
+            num_emails = random.randint(20, 40)     # Daily: 20-40 emails
+        
+        # Create sample emails with realistic distribution
+        categories = [
+            ("Marketing", 0.25),
+            ("Advertising", 0.20),
+            ("Personal", 0.15),
+            ("Wants-Money", 0.10),
+            ("Financial-Notification", 0.10),
+            ("Work-related", 0.10),
+            ("Service-Updates", 0.05),
+            ("Appointment-Reminder", 0.03),
+            ("Other", 0.02)
         ]
+        
+        senders = [
+            ("newsletter@company.com", "company.com"),
+            ("promo@shop.com", "shop.com"),
+            ("friend@gmail.com", "gmail.com"),
+            ("billing@service.com", "service.com"),
+            ("noreply@bank.com", "bank.com"),
+            ("updates@tech.com", "tech.com"),
+            ("info@store.com", "store.com"),
+            ("support@app.com", "app.com"),
+            ("hello@startup.com", "startup.com"),
+            ("contact@business.com", "business.com")
+        ]
+        
+        sample_emails = []
+        
+        # Generate emails based on distribution
+        for i in range(num_emails):
+            # Select category based on distribution
+            rand = random.random()
+            cumulative = 0
+            selected_category = "Other"
+            for category, probability in categories:
+                cumulative += probability
+                if rand <= cumulative:
+                    selected_category = category
+                    break
+            
+            # Select random sender
+            sender, domain = random.choice(senders)
+            
+            # Determine action based on category
+            if selected_category in ["Advertising", "Marketing", "Wants-Money"]:
+                action = "deleted" if random.random() > 0.3 else "kept"  # 70% deleted
+            else:
+                action = "kept" if random.random() > 0.2 else "deleted"  # 80% kept
+            
+            # Generate email
+            email = {
+                "message_id": f"test{i+1}_{report_type.lower()}@example.com",
+                "sender": sender,
+                "subject": f"{selected_category} email #{i+1}",
+                "category": selected_category,
+                "action": action,
+                "sender_domain": domain,
+                "was_pre_categorized": random.random() > 0.7,  # 30% pre-categorized
+                "processed_at": (datetime.now() - timedelta(minutes=random.randint(0, 60))).isoformat()
+            }
+            sample_emails.append(email)
         
         # Save to current tracking file
         tracking_file = Path(summary_service.current_file)
@@ -168,8 +188,10 @@ async def create_sample_data(x_api_key: Optional[str] = Header(None)):
         
         return {
             "status": "success",
-            "message": f"Created {len(sample_emails)} sample emails for testing",
-            "timestamp": datetime.now().isoformat()
+            "message": f"Created {len(sample_emails)} sample emails for {report_type} report testing",
+            "timestamp": datetime.now().isoformat(),
+            "email_count": len(sample_emails),
+            "report_type": report_type
         }
         
     except Exception as e:
