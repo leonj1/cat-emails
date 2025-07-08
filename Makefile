@@ -51,6 +51,8 @@ service-run: validate-env
 	@echo "  - Scan interval: $(or $(SCAN_INTERVAL),2) minutes"
 	@echo "  - Hours to look back: $(or $(HOURS),2)"
 	@echo "  - Summaries enabled: $(or $(ENABLE_SUMMARIES),true)"
+	@echo "  - Morning summary: $(or $(MORNING_HOUR),8):$(or $(MORNING_MINUTE),00) ET"
+	@echo "  - Evening summary: $(or $(EVENING_HOUR),20):$(or $(EVENING_MINUTE),00) ET"
 	@echo "  - Primary Ollama host: $(or $(OLLAMA_HOST_PRIMARY),100.100.72.86:11434)"
 	@echo "  - Secondary Ollama host: $(or $(OLLAMA_HOST_SECONDARY),100.91.167.71:11434)"
 	@docker stop $(SERVICE_IMAGE_NAME) 2>/dev/null || true
@@ -69,6 +71,10 @@ service-run: validate-env
 		-e MAILTRAP_API_TOKEN="$(MAILTRAP_API_TOKEN)" \
 		-e OLLAMA_HOST_PRIMARY=$(or $(OLLAMA_HOST_PRIMARY),100.100.72.86:11434) \
 		-e OLLAMA_HOST_SECONDARY=$(or $(OLLAMA_HOST_SECONDARY),100.91.167.71:11434) \
+		-e MORNING_HOUR=$(or $(MORNING_HOUR),8) \
+		-e MORNING_MINUTE=$(or $(MORNING_MINUTE),0) \
+		-e EVENING_HOUR=$(or $(EVENING_HOUR),20) \
+		-e EVENING_MINUTE=$(or $(EVENING_MINUTE),0) \
 		--restart unless-stopped \
 		$(SERVICE_IMAGE_NAME)
 	@echo "Service started. Use 'make service-logs' to view logs."

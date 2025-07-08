@@ -12,7 +12,7 @@ import seaborn as sns
 from datetime import datetime, timedelta
 import pandas as pd
 
-from models.email_summary import DailySummaryReport, CategoryCount
+from models.email_summary import DailySummaryReport, CategoryCount, DomainCount
 
 
 class ChartGenerator:
@@ -299,6 +299,90 @@ class ChartGenerator:
         
         return self._fig_to_base64(fig)
         
+    def generate_domain_charts(self, report: DailySummaryReport) -> Dict[str, str]:
+        """
+        Generate bar charts for top kept and archived domains.
+        
+        Args:
+            report: Summary report containing domain data
+            
+        Returns:
+            Dictionary with 'kept_domains' and 'archived_domains' charts
+        """
+        charts = {}
+        
+        # Generate kept domains chart
+        if report.stats.top_kept_domains:
+            try:
+                charts['kept_domains'] = self._generate_domain_chart(
+                    report.stats.top_kept_domains,
+                    "Top 10 Kept Domains",
+                    "#48BB78"  # Green color for kept
+                )
+            except Exception as e:
+                print(f"Error generating kept domains chart: {e}")
+        
+        # Generate archived domains chart
+        if report.stats.top_archived_domains:
+            try:
+                charts['archived_domains'] = self._generate_domain_chart(
+                    report.stats.top_archived_domains,
+                    "Top 10 Archived Domains",
+                    "#F56565"  # Red color for archived
+                )
+            except Exception as e:
+                print(f"Error generating archived domains chart: {e}")
+                
+        return charts
+    
+    def _generate_domain_chart(self, domains: List[DomainCount], title: str, color: str) -> str:
+        """
+        Generate a horizontal bar chart for domain statistics.
+        
+        Args:
+            domains: List of DomainCount objects
+            title: Chart title
+            color: Bar color
+            
+        Returns:
+            Base64 encoded PNG image
+        """
+        if not domains:
+            return ""
+            
+        # Prepare data
+        domain_names = [d.domain for d in domains]
+        counts = [d.count for d in domains]
+        
+        # Truncate long domain names
+        domain_names = [d[:35] + '...' if len(d) > 35 else d for d in domain_names]
+        
+        # Create figure
+        fig, ax = plt.subplots(figsize=(10, max(6, len(domains) * 0.5)))
+        
+        # Create horizontal bar chart
+        bars = ax.barh(domain_names, counts, color=color, alpha=0.8)
+        
+        # Add value labels
+        for bar, count, domain in zip(bars, counts, domains):
+            # Add count
+            ax.text(bar.get_width() + max(counts) * 0.01, bar.get_y() + bar.get_height()/2, 
+                   f'{count} ({domain.percentage}%)', 
+                   ha='left', va='center', fontsize=10, weight='bold')
+        
+        # Customize
+        ax.set_xlabel('Number of Emails', fontsize=12, weight='bold')
+        ax.set_title(title, fontsize=16, weight='bold', pad=20)
+        ax.grid(axis='x', alpha=0.3)
+        
+        # Invert y-axis to show highest at top
+        ax.invert_yaxis()
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return self._fig_to_base64(fig)
+        
     def generate_all_charts(self, report: DailySummaryReport, 
                           performance_metrics: Optional[Dict[str, Any]] = None,
                           weekly_data: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
@@ -326,6 +410,13 @@ class ChartGenerator:
             charts['top_senders'] = self.generate_top_senders_chart(report)
         except Exception as e:
             print(f"Error generating top senders chart: {e}")
+            
+        try:
+            # Domain charts
+            domain_charts = self.generate_domain_charts(report)
+            charts.update(domain_charts)
+        except Exception as e:
+            print(f"Error generating domain charts: {e}")
             
         # Additional charts for weekly reports
         if report.report_type == "Weekly" and weekly_data:

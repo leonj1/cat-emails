@@ -38,6 +38,12 @@ ENV SMTP_PASSWORD=""
 ENV OLLAMA_HOST_PRIMARY="10.1.1.247:11434"
 ENV OLLAMA_HOST_SECONDARY="10.1.1.212:11434"
 
+# Email schedule configuration (24-hour format, Eastern Time)
+ENV MORNING_HOUR="8"
+ENV MORNING_MINUTE="0"
+ENV EVENING_HOUR="20"
+ENV EVENING_MINUTE="0"
+
 # Make the service script executable
 RUN chmod +x gmail_fetcher_service.py
 

@@ -285,9 +285,9 @@ make test-mailfrom-integration
 ## Email Summary Reports
 
 The service automatically sends summary reports at the following times (Eastern Time):
-- **Morning Report**: 8 AM ET daily
-- **Evening Report**: 8 PM ET daily  
-- **Weekly Report**: 8 PM ET on Fridays
+- **Morning Report**: Configurable (default: 8 AM ET daily)
+- **Evening Report**: Configurable (default: 8 PM ET daily)  
+- **Weekly Report**: Same as evening time on Fridays
 
 Each report contains:
 - Total emails processed vs archived/deleted
@@ -308,6 +308,17 @@ GMAIL_EMAIL=your-email@gmail.com
 
 # Mailtrap SMTP credentials for sending summaries
 MAILTRAP_API_TOKEN=your-mailtrap-api-token
+
+# Email schedule configuration (24-hour format, Eastern Time)
+MORNING_HOUR=8     # Morning summary hour (0-23, default: 8 for 8 AM)
+MORNING_MINUTE=0   # Morning summary minute (0-59, default: 0)
+EVENING_HOUR=20    # Evening summary hour (0-23, default: 20 for 8 PM)
+EVENING_MINUTE=0   # Evening summary minute (0-59, default: 0)
+```
+
+Example: To send morning summaries at 6:30 AM and evening summaries at 7:00 PM:
+```bash
+MORNING_HOUR=6 MORNING_MINUTE=30 EVENING_HOUR=19 EVENING_MINUTE=0 make service-run
 ```
 
 ### Summary Features

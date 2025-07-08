@@ -14,6 +14,7 @@ from models.email_summary import (
     EmailSummaryStats, 
     DailySummaryReport,
     CategoryCount,
+    DomainCount,
     EmailAction
 )
 from services.database_service import DatabaseService
@@ -248,6 +249,40 @@ class EmailSummaryService:
                     percentage=round(percentage, 1)
                 ))
             
+            # Calculate domain statistics
+            kept_domains = defaultdict(int)
+            archived_domains = defaultdict(int)
+            
+            for email in emails:
+                domain = email.sender_domain or email.sender.split('@')[-1] if '@' in email.sender else email.sender
+                if email.action == EmailAction.KEPT:
+                    kept_domains[domain] += 1
+                elif email.action in [EmailAction.DELETED, EmailAction.ARCHIVED]:
+                    archived_domains[domain] += 1
+            
+            # Get top 10 kept domains
+            top_kept_domains = []
+            for domain, count in sorted(kept_domains.items(), key=lambda x: x[1], reverse=True)[:10]:
+                percentage = (count / total_kept) * 100 if total_kept > 0 else 0
+                top_kept_domains.append(DomainCount(
+                    domain=domain,
+                    count=count,
+                    percentage=round(percentage, 1),
+                    action=EmailAction.KEPT
+                ))
+            
+            # Get top 10 archived domains
+            top_archived_domains = []
+            archived_total = total_deleted  # Using total_deleted as it includes archived
+            for domain, count in sorted(archived_domains.items(), key=lambda x: x[1], reverse=True)[:10]:
+                percentage = (count / archived_total) * 100 if archived_total > 0 else 0
+                top_archived_domains.append(DomainCount(
+                    domain=domain,
+                    count=count,
+                    percentage=round(percentage, 1),
+                    action=EmailAction.DELETED
+                ))
+            
             # Create summary stats
             stats = EmailSummaryStats(
                 start_time=start_time,
@@ -256,6 +291,8 @@ class EmailSummaryService:
                 total_kept=total_kept,
                 total_deleted=total_deleted,
                 top_categories=top_categories,
+                top_kept_domains=top_kept_domains,
+                top_archived_domains=top_archived_domains,
                 processing_hours=round(hours, 1)
             )
             

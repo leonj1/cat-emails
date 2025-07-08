@@ -33,6 +33,14 @@ class CategoryCount(BaseModel):
     percentage: float = Field(description="Percentage of total emails")
 
 
+class DomainCount(BaseModel):
+    """Domain with count and action."""
+    domain: str = Field(description="Domain name")
+    count: int = Field(description="Number of emails from this domain")
+    percentage: float = Field(description="Percentage of total emails")
+    action: EmailAction = Field(description="Primary action taken (kept/archived)")
+
+
 class EmailSummaryStats(BaseModel):
     """Aggregated email processing statistics."""
     start_time: datetime = Field(description="Start of the reporting period")
@@ -41,6 +49,8 @@ class EmailSummaryStats(BaseModel):
     total_kept: int = Field(description="Emails kept in inbox")
     total_deleted: int = Field(description="Emails deleted/archived")
     top_categories: List[CategoryCount] = Field(description="Top categories by count")
+    top_kept_domains: List[DomainCount] = Field(default_factory=list, description="Top 10 domains with kept emails")
+    top_archived_domains: List[DomainCount] = Field(default_factory=list, description="Top 10 domains with archived emails")
     processing_hours: float = Field(description="Hours covered in this period")
     
     @property

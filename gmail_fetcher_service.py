@@ -33,7 +33,8 @@ def signal_handler(signum, frame):
     logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
     running = False
 
-def should_send_summary(last_morning_sent: datetime, last_evening_sent: datetime, last_weekly_sent: datetime) -> str:
+def should_send_summary(last_morning_sent: datetime, last_evening_sent: datetime, last_weekly_sent: datetime,
+                       morning_hour: int, morning_minute: int, evening_hour: int, evening_minute: int) -> str:
     """
     Check if it's time to send a summary report.
     
@@ -41,6 +42,10 @@ def should_send_summary(last_morning_sent: datetime, last_evening_sent: datetime
         last_morning_sent: When morning report was last sent
         last_evening_sent: When evening report was last sent
         last_weekly_sent: When weekly report was last sent
+        morning_hour: Hour for morning summary (0-23)
+        morning_minute: Minute for morning summary (0-59)
+        evening_hour: Hour for evening summary (0-23)
+        evening_minute: Minute for evening summary (0-59)
         
     Returns:
         "morning", "evening", "weekly", or "" if no report needed
@@ -67,13 +72,13 @@ def should_send_summary(last_morning_sent: datetime, last_evening_sent: datetime
     else:
         last_weekly_sent = last_weekly_sent.astimezone(et_tz)
     
-    # Morning report at 8 AM ET
-    morning_start = datetime_time(8, 0)
-    morning_end = datetime_time(8, 30)
+    # Morning report time window (30 minute window)
+    morning_start = datetime_time(morning_hour, morning_minute)
+    morning_end = datetime_time(morning_hour, min(morning_minute + 30, 59))
     
-    # Evening report at 8 PM ET
-    evening_start = datetime_time(20, 0)
-    evening_end = datetime_time(20, 30)
+    # Evening report time window (30 minute window)
+    evening_start = datetime_time(evening_hour, evening_minute)
+    evening_end = datetime_time(evening_hour, min(evening_minute + 30, 59))
     
     # Check weekly report window (Friday 8 PM ET)
     if current_day == 'Friday' and evening_start <= current_time <= evening_end:
@@ -107,6 +112,12 @@ def run_service():
     enable_summaries = os.getenv("ENABLE_SUMMARIES", "true").lower() == "true"
     summary_recipient = os.getenv("SUMMARY_RECIPIENT_EMAIL", email_address)
     
+    # Get schedule configuration once
+    morning_hour = int(os.getenv("MORNING_HOUR", "8"))
+    morning_minute = int(os.getenv("MORNING_MINUTE", "0"))
+    evening_hour = int(os.getenv("EVENING_HOUR", "20"))
+    evening_minute = int(os.getenv("EVENING_MINUTE", "0"))
+    
     # Validate required environment variables
     if not email_address or not app_password:
         logger.error("GMAIL_EMAIL and GMAIL_PASSWORD environment variables are required")
@@ -128,6 +139,8 @@ def run_service():
     logger.info(f"  - Summaries enabled: {enable_summaries}")
     if enable_summaries:
         logger.info(f"  - Summary recipient: {summary_recipient}")
+        logger.info(f"  - Morning summary: {morning_hour:02d}:{morning_minute:02d} ET")
+        logger.info(f"  - Evening summary: {evening_hour:02d}:{evening_minute:02d} ET")
     
     # Track when summaries were last sent
     # Use a date far in the past but not datetime.min to avoid timezone conversion issues
@@ -162,7 +175,8 @@ def run_service():
         
         # Check if we should send a summary
         if running and enable_summaries:
-            report_type = should_send_summary(last_morning_sent, last_evening_sent, last_weekly_sent)
+            report_type = should_send_summary(last_morning_sent, last_evening_sent, last_weekly_sent,
+                                             morning_hour, morning_minute, evening_hour, evening_minute)
             if report_type:
                 logger.info(f"Time to send {report_type} summary report")
                 try:

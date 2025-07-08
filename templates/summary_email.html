@@ -358,6 +358,70 @@
                 </table>
             </div>
             
+            <!-- Top Kept Domains Table -->
+            {% if stats.top_kept_domains %}
+            <div class="data-section">
+                <h3>✅ Top 10 Kept Domains</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Domain</th>
+                            <th style="text-align: center;">Count</th>
+                            <th style="text-align: center;">Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for domain in stats.top_kept_domains %}
+                        <tr>
+                            <td>{{ domain.domain }}</td>
+                            <td style="text-align: center;">{{ domain.count }}</td>
+                            <td style="text-align: center;">{{ domain.percentage }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            
+            <!-- Kept Domains Chart -->
+            {% if charts and charts.kept_domains %}
+            <div class="chart-container">
+                <img src="data:image/png;base64,{{ charts.kept_domains }}" alt="Top Kept Domains Chart">
+            </div>
+            {% endif %}
+            
+            <!-- Top Archived Domains Table -->
+            {% if stats.top_archived_domains %}
+            <div class="data-section">
+                <h3>🗄️ Top 10 Archived Domains</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Domain</th>
+                            <th style="text-align: center;">Count</th>
+                            <th style="text-align: center;">Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for domain in stats.top_archived_domains %}
+                        <tr>
+                            <td>{{ domain.domain }}</td>
+                            <td style="text-align: center;">{{ domain.count }}</td>
+                            <td style="text-align: center;">{{ domain.percentage }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            
+            <!-- Archived Domains Chart -->
+            {% if charts and charts.archived_domains %}
+            <div class="chart-container">
+                <img src="data:image/png;base64,{{ charts.archived_domains }}" alt="Top Archived Domains Chart">
+            </div>
+            {% endif %}
+            
             <!-- Daily Volume Chart (for weekly reports) -->
             {% if charts and charts.daily_volume %}
             <div class="chart-container">
