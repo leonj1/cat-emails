@@ -583,7 +583,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
             # Get the email body
             body = fetcher.get_email_body(msg)
             pre_categorized = False
-            deletion_candidate = True
+            deletion_candidate = False
             
             # Check domain lists
             from_header = str(msg.get('From', ''))
@@ -617,6 +617,8 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 # Check if category is blocked
                 if fetcher._is_category_blocked(category):
                     deletion_candidate = True
+                else:
+                    deletion_candidate = False
 
 
             try:
@@ -654,6 +656,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                         if fetcher.delete_email(message_id):
                             print("Email deleted successfully")
                             action_taken = "deleted"
+                            fetcher.stats['deleted'] += 1
                         else:
                             print("Failed to delete email")
                             fetcher.stats['kept'] += 1
