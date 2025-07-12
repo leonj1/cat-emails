@@ -22,30 +22,13 @@ CONSOLIDATOR_IMAGE_NAME = gmail-label-consolidator
 EMAIL_TEST_IMAGE_NAME = gmail-email-test
 API_IMAGE_NAME = gmail-cleaner-api
 
-# Build the Docker image
-build:
-	docker build -t $(IMAGE_NAME) .
-
-# Run the container with environment variables
-run: validate-env
-	@if [ -z "$(GMAIL_EMAIL)" ] || [ -z "$(GMAIL_PASSWORD)" ] || [ -z "$(CONTROL_API_TOKEN)" ]; then \
-		echo "Error: Required environment variables are missing. Please set them in .env file:"; \
-		echo "GMAIL_EMAIL, GMAIL_PASSWORD, and CONTROL_API_TOKEN"; \
-		exit 1; \
-	fi
-	docker run --rm \
-		-e GMAIL_EMAIL="$(GMAIL_EMAIL)" \
-		-e GMAIL_PASSWORD="$(GMAIL_PASSWORD)" \
-		-e CONTROL_API_TOKEN="$(CONTROL_API_TOKEN)" \
-		$(IMAGE_NAME) \
-		--hours $(or $(HOURS),2)
 
 # Build the service Docker image
-service-build:
+build:
 	docker build -t $(SERVICE_IMAGE_NAME) -f Dockerfile.service .
 
 # Run the service container
-service-run: validate-env
+start: validate-env
 	@echo "Starting Gmail Cleaner Service..."
 	@echo "Configuration:"
 	@echo "  - Scan interval: $(or $(SCAN_INTERVAL),2) minutes"
@@ -80,14 +63,16 @@ service-run: validate-env
 	@echo "Service started. Use 'make service-logs' to view logs."
 
 # Stop the service container
-service-stop:
+stop:
 	@echo "Stopping Gmail Cleaner Service..."
-	docker stop $(SERVICE_IMAGE_NAME)
-	docker rm $(SERVICE_IMAGE_NAME)
+	docker stop -t 0 $(SERVICE_IMAGE_NAME) || true
+	docker rm -f $(SERVICE_IMAGE_NAME) || true
 	@echo "Service stopped."
 
+restart: stop start
+
 # View service logs
-service-logs:
+logs:
 	docker logs -f $(SERVICE_IMAGE_NAME)
 
 # Build the API Docker image
@@ -196,7 +181,7 @@ clean:
 	docker rmi $(IMAGE_NAME) $(TEST_IMAGE_NAME) $(SERVICE_IMAGE_NAME) $(API_IMAGE_NAME)
 
 # Build and run in one command
-all: build run
+all: build start
 
 # Build consolidator image
 consolidator-build:

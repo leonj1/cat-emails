@@ -568,6 +568,9 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     # Initialize and use the fetcher
     fetcher = GmailFetcher(email_address, app_password, api_token)
     
+    # Clear any existing tracked data to start fresh
+    fetcher.summary_service.clear_tracked_data()
+    
     # Start processing run in database
     fetcher.summary_service.start_processing_run(scan_hours=hours)
     

@@ -222,8 +222,13 @@ class EmailSummaryService:
             # Convert to ProcessedEmail objects
             emails = [ProcessedEmail(**data) for data in tracked_data]
             
-            # Calculate time range
-            if emails:
+            # Calculate time range using performance metrics if available
+            if self.performance_metrics['start_time'] and self.performance_metrics['end_time']:
+                start_time = self.performance_metrics['start_time']
+                end_time = self.performance_metrics['end_time']
+                hours = (end_time - start_time).total_seconds() / 3600
+            elif emails:
+                # Fallback to email timestamps if performance metrics not available
                 start_time = min(email.processed_at for email in emails)
                 end_time = max(email.processed_at for email in emails)
                 hours = (end_time - start_time).total_seconds() / 3600
@@ -365,6 +370,14 @@ class EmailSummaryService:
             self.category_stats.clear()
             self.sender_stats.clear()
             self.domain_stats.clear()
+            
+            # Reset performance metrics
+            self.performance_metrics = {
+                'start_time': None,
+                'end_time': None,
+                'email_processing_times': [],
+                'total_emails': 0
+            }
                 
         except Exception as e:
             logger.error(f"Failed to clear tracked data: {str(e)}")
