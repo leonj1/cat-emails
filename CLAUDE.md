@@ -103,6 +103,10 @@ HOURS=2  # Hours to look back for emails (default: 2)
 SCAN_INTERVAL=2  # Minutes between scans in service mode (default: 2)
 OLLAMA_HOST_PRIMARY=10.1.1.247:11434  # Primary Ollama host (default: 10.1.1.247:11434)
 OLLAMA_HOST_SECONDARY=10.1.1.212:11434  # Secondary Ollama host (default: 10.1.1.212:11434)
+MORNING_HOUR=5  # Morning summary hour (0-23, default: 5 for 5:30 AM)
+MORNING_MINUTE=30  # Morning summary minute (0-59, default: 30)
+EVENING_HOUR=16  # Evening summary hour (0-23, default: 16 for 4:30 PM)
+EVENING_MINUTE=30  # Evening summary minute (0-59, default: 30)
 ```
 
 ### Setting Up Gmail Access
@@ -285,8 +289,8 @@ make test-mailfrom-integration
 ## Email Summary Reports
 
 The service automatically sends summary reports at the following times (Eastern Time):
-- **Morning Report**: Configurable (default: 8 AM ET daily)
-- **Evening Report**: Configurable (default: 8 PM ET daily)  
+- **Morning Report**: Configurable (default: 5:30 AM ET daily)
+- **Evening Report**: Configurable (default: 4:30 PM ET daily)  
 - **Weekly Report**: Same as evening time on Fridays
 
 Each report contains:
@@ -310,10 +314,10 @@ GMAIL_EMAIL=your-email@gmail.com
 MAILTRAP_API_TOKEN=your-mailtrap-api-token
 
 # Email schedule configuration (24-hour format, Eastern Time)
-MORNING_HOUR=8     # Morning summary hour (0-23, default: 8 for 8 AM)
-MORNING_MINUTE=0   # Morning summary minute (0-59, default: 0)
-EVENING_HOUR=20    # Evening summary hour (0-23, default: 20 for 8 PM)
-EVENING_MINUTE=0   # Evening summary minute (0-59, default: 0)
+MORNING_HOUR=5     # Morning summary hour (0-23, default: 5 for 5:30 AM)
+MORNING_MINUTE=30   # Morning summary minute (0-59, default: 30)
+EVENING_HOUR=16    # Evening summary hour (0-23, default: 16 for 4:30 PM)
+EVENING_MINUTE=30   # Evening summary minute (0-59, default: 30)
 ```
 
 Example: To send morning summaries at 6:30 AM and evening summaries at 7:00 PM:

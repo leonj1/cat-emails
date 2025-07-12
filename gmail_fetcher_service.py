@@ -113,10 +113,10 @@ def run_service():
     summary_recipient = os.getenv("SUMMARY_RECIPIENT_EMAIL", email_address)
     
     # Get schedule configuration once
-    morning_hour = int(os.getenv("MORNING_HOUR", "8"))
-    morning_minute = int(os.getenv("MORNING_MINUTE", "0"))
-    evening_hour = int(os.getenv("EVENING_HOUR", "20"))
-    evening_minute = int(os.getenv("EVENING_MINUTE", "0"))
+    morning_hour = int(os.getenv("MORNING_HOUR", "5"))
+    morning_minute = int(os.getenv("MORNING_MINUTE", "30"))
+    evening_hour = int(os.getenv("EVENING_HOUR", "16"))
+    evening_minute = int(os.getenv("EVENING_MINUTE", "30"))
     
     # Validate required environment variables
     if not email_address or not app_password:
