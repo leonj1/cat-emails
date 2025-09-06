@@ -12,6 +12,7 @@ from typing import Optional, Dict, List
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError
 
 # Add the current directory to the Python path
@@ -39,6 +40,22 @@ app = FastAPI(
     title="Cat Emails API",
     description="API for email summary reports and account category management",
     version="1.1.0"
+)
+
+# Configure CORS
+origins = [
+    "http://localhost",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "http://192.168.1.162:5000",  # Allow your frontend's origin
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Optional API key authentication
@@ -343,19 +360,19 @@ def background_gmail_processor():
             # Get list of active Gmail accounts from database
             try:
                 service = AccountCategoryService()
-                accounts = service.list_accounts()
+                accounts = service.get_all_accounts()
                 
-                if not accounts or len(accounts.accounts) == 0:
+                if not accounts:
                     logger.info("📭 No Gmail accounts found in database to process")
                     logger.info("💡 Tip: Add accounts via POST /api/accounts endpoint")
                 else:
-                    logger.info(f"👥 Found {len(accounts.accounts)} Gmail accounts to process")
+                    logger.info(f"👥 Found {len(accounts)} Gmail accounts to process")
                     
                     # Process each account
                     total_processed = 0
                     total_errors = 0
                     
-                    for account in accounts.accounts:
+                    for account in accounts:
                         if not background_thread_running:
                             logger.info("🛑 Background processing stopped during account processing")
                             break
@@ -372,7 +389,7 @@ def background_gmail_processor():
                         time.sleep(5)
                     
                     logger.info(f"📈 Cycle #{cycle_count} completed:")
-                    logger.info(f"   - Accounts processed: {len(accounts.accounts)}")
+                    logger.info(f"   - Accounts processed: {len(accounts)}")
                     logger.info(f"   - Total emails processed: {total_processed}")
                     logger.info(f"   - Errors: {total_errors}")
                         
@@ -1399,6 +1416,94 @@ async def deactivate_account(
         )
 
 
+@app.delete("/api/accounts/{email_address}", response_model=StandardResponse)
+async def delete_account(
+    email_address: str = Path(..., description="Gmail email address to delete"),
+    x_api_key: Optional[str] = Header(None),
+    service: AccountCategoryService = Depends(get_account_service)
+):
+    """
+    Delete an email account and all associated data.
+    
+    Permanently removes an account and all its associated category statistics
+    from the system. This operation cannot be undone.
+    
+    Args:
+        email_address: Gmail email address to delete
+        
+    Returns:
+        StandardResponse with operation status
+        
+    Raises:
+        400: Invalid email address format
+        401: Invalid or missing API key
+        404: Account not found
+        500: Internal server error
+    """
+    verify_api_key(x_api_key)
+    
+    try:
+        logger.info(f"Deleting account: {email_address}")
+        
+        # Validate email address
+        email_address = service._validate_email_address(email_address)
+        
+        # Get account to verify it exists
+        account = service.get_account_by_email(email_address)
+        if not account:
+            logger.warning(f"Account not found for deletion: {email_address}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Account not found: {email_address}"
+            )
+        
+        # Delete account and associated data
+        if service.owns_session:
+            with service._get_session() as session:
+                session.delete(account)
+                session.commit()
+        else:
+            service.session.delete(account)
+            service.session.commit()
+        
+        response = StandardResponse(
+            status="success",
+            message=f"Account and all associated data deleted successfully: {email_address}",
+            timestamp=datetime.now().isoformat()
+        )
+        logger.info(f"Successfully deleted account: {email_address}")
+        return response
+        
+    except ValueError as e:
+        error_msg = str(e)
+        if "Invalid email address" in error_msg:
+            logger.warning(f"Invalid email address format: {email_address}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
+        else:
+            logger.error(f"Value error in delete_account: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete account"
+            )
+    except SQLAlchemyError as e:
+        logger.error(f"Database error in delete_account: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error occurred"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in delete_account: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred"
+        )
+
+    
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize WebSocket manager and start background tasks on server startup"""
@@ -1464,6 +1569,7 @@ async def not_found(request, exc):
                 "list_accounts": "GET /api/accounts",
                 "create_account": "POST /api/accounts",
                 "deactivate_account": "PUT /api/accounts/{email_address}/deactivate",
+                "delete_account": "DELETE /api/accounts/{email_address}",
                 "processing_status": "GET /api/processing/status",
                 "processing_history": "GET /api/processing/history",
                 "processing_statistics": "GET /api/processing/statistics",

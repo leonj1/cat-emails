@@ -101,7 +101,12 @@ async function refreshDashboardData(period = 'week') {
         }
         
         console.log('Dashboard data refreshed successfully');
-        showSuccess('Dashboard updated successfully');
+        // Only show success toast for manual refreshes, not initial page load
+        if (window.dashboardInitialized) {
+            showSuccess('Dashboard updated successfully');
+        } else {
+            window.dashboardInitialized = true;
+        }
     } catch (error) {
         console.error('Error refreshing dashboard:', error);
         showError('Failed to refresh dashboard data');
@@ -553,6 +558,36 @@ async function refreshSendersData() {
                 <p>Error loading senders</p>
             </div>
         `;
+    }
+}
+
+// Accounts functions
+async function fetchAccountsData() {
+    try {
+        const response = await fetch('/api/accounts');
+        const data = await response.json();
+        
+        return data.accounts;
+    } catch (error) {
+        console.error('Error fetching accounts data:', error);
+        throw error;
+    }
+}
+
+async function deleteAccount(emailAddress) {
+    try {
+        const response = await fetch(`/api/accounts/${emailAddress}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error deleting account:', error);
+        throw error;
     }
 }
 
@@ -1087,3 +1122,6 @@ window.refreshCategoriesData = refreshCategoriesData;
 window.switchCategoriesView = switchCategoriesView;
 window.renderCategoriesChart = renderCategoriesChart;
 window.renderCategoriesColumns = renderCategoriesColumns;
+window.fetchData = fetchData;
+window.fetchAccountsData = fetchAccountsData;
+window.deleteAccount = deleteAccount;

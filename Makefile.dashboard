@@ -35,6 +35,7 @@ dashboard-docker-run:
 		-e FLASK_PORT=5000 \
 		-e FLASK_DEBUG=False \
 		-e DB_PATH=/app/email_summaries/summaries.db \
+		--user $(shell id -u):$(shell id -g) \
 		$(DASHBOARD_IMAGE_NAME)
 	@echo "✅ Dashboard running at http://localhost:$(DASHBOARD_PORT)"
 

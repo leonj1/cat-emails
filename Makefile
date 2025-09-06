@@ -85,11 +85,13 @@ api-run:
 	@echo "Configuration:"
 	@echo "  - API Port: $(or $(API_PORT),8000)"
 	@echo "  - API Key Required: $(if $(API_KEY),Yes,No)"
+	@mkdir -p email_summaries
 	@docker stop $(API_IMAGE_NAME) 2>/dev/null || true
 	@docker rm $(API_IMAGE_NAME) 2>/dev/null || true
 	docker run -d \
 		--name $(API_IMAGE_NAME) \
 		-p $(or $(API_PORT),8000):8000 \
+		-v $(shell pwd)/email_summaries:/app/email_summaries \
 		-e API_KEY="$(API_KEY)" \
 		-e GMAIL_EMAIL="$(GMAIL_EMAIL)" \
 		-e SUMMARY_RECIPIENT_EMAIL=$(or $(SUMMARY_RECIPIENT_EMAIL),$(GMAIL_EMAIL)) \
@@ -98,6 +100,7 @@ api-run:
 		$(API_IMAGE_NAME)
 	@echo "API started on port $(or $(API_PORT),8000). Use 'make api-logs' to view logs."
 	@echo "API documentation available at: http://localhost:$(or $(API_PORT),8000)/docs"
+
 
 # Stop the API container
 api-stop:

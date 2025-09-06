@@ -11,6 +11,7 @@ from typing import Dict, List, Any
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 from services.database_service import DatabaseService
 from services.dashboard_service import DashboardService
+from services.account_category_service import AccountCategoryService
 
 # Configure logging
 logging.basicConfig(
@@ -26,6 +27,7 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-pro
 db_path = os.getenv('DB_PATH', './email_summaries/summaries.db')
 db_service = DatabaseService(db_path)
 dashboard_service = DashboardService(db_service)
+account_service = AccountCategoryService(db_path=db_path)
 
 def truncate_category_name(name: str, max_length: int = 40) -> str:
     """Truncate category names to specified length with ellipsis if needed"""
@@ -230,6 +232,75 @@ def api_processing_runs():
         return jsonify({
             'success': False,
             'error': str(e)
+        }), 500
+
+
+@app.route('/api/accounts')
+def api_accounts():
+    """API endpoint for email accounts"""
+    try:
+        # Get accounts from the AccountCategoryService
+        accounts = account_service.get_all_accounts(active_only=False)
+        
+        # Convert to JSON-serializable format
+        accounts_data = [
+            {
+                'id': account.id,
+                'email_address': account.email_address,
+                'display_name': account.display_name,
+                'is_active': account.is_active,
+                'last_scan_at': account.last_scan_at.isoformat() + 'Z' if account.last_scan_at else None,
+                'created_at': account.created_at.isoformat() + 'Z' if account.created_at else None
+            }
+            for account in accounts
+        ]
+        
+        return jsonify({
+            'success': True,
+            'accounts': accounts_data,
+            'total_count': len(accounts_data)
+        })
+    except Exception as e:
+        logger.error(f"Error getting accounts: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/accounts/<email_address>', methods=['DELETE'])
+def api_delete_account(email_address):
+    """API endpoint to delete an email account"""
+    try:
+        logger.info(f"Deleting account: {email_address}")
+        
+        # Get account to verify it exists
+        account = account_service.get_account_by_email(email_address)
+        if not account:
+            logger.warning(f"Account not found for deletion: {email_address}")
+            return jsonify({
+                'status': 'error',
+                'detail': f'Account not found: {email_address}'
+            }), 404
+        
+        # Delete account and associated data using SQLAlchemy session
+        with account_service._get_session() as session:
+            # Get the account instance within this session
+            account_to_delete = session.merge(account)
+            session.delete(account_to_delete)
+            session.commit()
+        
+        logger.info(f"Successfully deleted account: {email_address}")
+        return jsonify({
+            'status': 'success',
+            'message': f'Account and all associated data deleted successfully: {email_address}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting account {email_address}: {e}")
+        return jsonify({
+            'status': 'error',
+            'detail': f'Failed to delete account: {str(e)}'
         }), 500
 
 

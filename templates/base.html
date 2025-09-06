@@ -44,6 +44,12 @@
                 
                 <div class="navbar-nav">
                     <div class="nav-item">
+                        <button class="btn btn-outline-light btn-sm me-2" id="accounts-btn" onclick="showAccountsModal()">
+                            <i class="bi bi-person-lines-fill me-1"></i>
+                            Accounts
+                        </button>
+                    </div>
+                    <div class="nav-item">
                         <span class="nav-link text-light">
                             <i class="bi bi-clock me-1"></i>
                             <span id="last-updated">Loading...</span>
@@ -99,7 +105,7 @@
         </div>
     </div>
 
-    <!-- Success Toast -->
+<!-- Success Toast -->
     <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1056;">
         <div id="success-toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header bg-success text-white">
@@ -107,6 +113,39 @@
                 <strong class="me-auto">Success</strong>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
+            <div class="toast-body" id="success-message">
+                Operation completed successfully.
+            </div>
+        </div>
+    </div>
+
+    <!-- Accounts Modal -->
+    <div class="modal fade" id="accountsModal" tabindex="-1" aria-labelledby="accountsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="accountsModalLabel">
+                        <i class="bi bi-person-lines-fill me-2"></i>
+                        Configured Email Accounts
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="accounts-list-container">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Loading accounts...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
             <div class="toast-body" id="success-message">
                 Operation completed successfully.
             </div>
@@ -173,6 +212,137 @@
         
         window.hideLoading = function() {
             document.getElementById('loading-overlay').classList.add('d-none');
+        };
+        
+        // Accounts modal functions
+        window.showAccountsModal = function() {
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('accountsModal'));
+            modal.show();
+            
+            // Fetch and display accounts
+            fetchAccountsData();
+        };
+        
+        window.fetchAccountsData = async function() {
+            try {
+                const response = await fetch('/api/accounts');
+                const data = await response.json();
+                
+                if (data.accounts) {
+                    displayAccounts(data.accounts);
+                } else {
+                    displayAccountsError('Failed to load accounts');
+                }
+            } catch (error) {
+                displayAccountsError('Failed to load accounts: ' + error.message);
+            }
+        };
+        
+        window.displayAccounts = function(accounts) {
+            const container = document.getElementById('accounts-list-container');
+            
+            if (accounts.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox fs-1 text-muted"></i>
+                        <h6 class="mt-3 text-muted">No Accounts Configured</h6>
+                        <p class="text-muted small">No email accounts are currently set up for processing.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let accountsHtml = `
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Email Address</th>
+                                <th>Display Name</th>
+                                <th>Status</th>
+                                <th>Last Scan</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            accounts.forEach(account => {
+                const statusBadge = account.is_active 
+                    ? '<span class="badge bg-success">Active</span>' 
+                    : '<span class="badge bg-secondary">Inactive</span>';
+                
+                const lastScan = account.last_scan_at 
+                    ? new Date(account.last_scan_at).toLocaleString()
+                    : 'Never';
+                
+                const displayName = account.display_name || '--';
+                
+                accountsHtml += `
+                    <tr>
+                        <td>${account.email_address}</td>
+                        <td>${displayName}</td>
+                        <td>${statusBadge}</td>
+                        <td>${lastScan}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteAccount('${account.email_address}')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            accountsHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = accountsHtml;
+        };
+        
+        window.displayAccountsError = function(error) {
+            const container = document.getElementById('accounts-list-container');
+            container.innerHTML = `
+                <div class="text-center py-5 text-danger">
+                    <i class="bi bi-exclamation-triangle fs-1"></i>
+                    <h6 class="mt-3">Error Loading Accounts</h6>
+                    <p class="small">${error}</p>
+                    <button class="btn btn-sm btn-outline-primary" onclick="fetchAccountsData()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                    </button>
+                </div>
+            `;
+        };
+        
+        window.deleteAccount = async function(emailAddress) {
+            // Confirm deletion
+            if (!confirm(`Are you sure you want to delete the account ${emailAddress} and all its associated data? This action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/accounts/${emailAddress}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showSuccess(data.message);
+                    // Refresh the accounts list
+                    fetchAccountsData();
+                } else {
+                    showError(data.detail || 'Failed to delete account');
+                }
+            } catch (error) {
+                showError('Failed to delete account: ' + error.message);
+            }
         };
     </script>
 </body>

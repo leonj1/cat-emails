@@ -6,3 +6,5 @@ logdir
 __pycache__/
 
 .agent-os/
+*.db
+
