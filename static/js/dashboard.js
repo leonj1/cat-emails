@@ -1113,6 +1113,104 @@ function showCategoryDetails(category) {
     showSuccess(`Clicked on category: ${category.name} (${formatNumber(category.count)} emails)`);
 }
 
+// Background execution time functions
+async function fetchBackgroundExecutionTime() {
+    try {
+        const API_BASE_URL = 'http://192.168.1.162:8001'; // FastAPI service
+        const response = await fetch(`${API_BASE_URL}/api/background/next-execution`);
+        const data = await response.json();
+        
+        if (response.ok && !data.error) {
+            return data;
+        } else {
+            console.warn('Background service not running or error:', data.error || 'Unknown error');
+            return { error: data.error || 'Service unavailable', running: false };
+        }
+    } catch (error) {
+        console.warn('Error fetching background execution time:', error);
+        return { error: 'Connection failed', running: false };
+    }
+}
+
+function updateBackgroundExecutionDisplay(data) {
+    const countdownEl = document.getElementById('next-execution-countdown');
+    const timeEl = document.getElementById('next-execution-time');
+    const statusBadgeEl = document.getElementById('background-status-badge');
+    
+    if (!countdownEl || !timeEl || !statusBadgeEl) {
+        console.warn('Background execution display elements not found');
+        return;
+    }
+    
+    if (data.error || !data.running) {
+        countdownEl.textContent = '--';
+        timeEl.textContent = data.error || 'Service stopped';
+        statusBadgeEl.textContent = data.running === false ? 'Stopped' : 'Disabled';
+        statusBadgeEl.className = 'badge bg-danger-subtle text-danger small';
+        return;
+    }
+    
+    // Calculate and display countdown
+    const secondsUntilNext = data.seconds_until_next || 0;
+    if (secondsUntilNext > 0) {
+        const minutes = Math.floor(secondsUntilNext / 60);
+        const seconds = secondsUntilNext % 60;
+        
+        if (minutes > 60) {
+            const hours = Math.floor(minutes / 60);
+            const remainingMinutes = minutes % 60;
+            countdownEl.textContent = `${hours}h ${remainingMinutes}m`;
+        } else if (minutes > 0) {
+            countdownEl.textContent = `${minutes}m ${seconds}s`;
+        } else {
+            countdownEl.textContent = `${seconds}s`;
+        }
+    } else {
+        countdownEl.textContent = 'Running...';
+    }
+    
+    // Display formatted next execution time
+    if (data.next_execution_formatted) {
+        const nextTime = new Date(data.next_execution).toLocaleTimeString('en-US', { 
+            hour12: false, 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        timeEl.textContent = `at ${nextTime}`;
+    } else {
+        timeEl.textContent = 'Calculating...';
+    }
+    
+    // Update status badge
+    statusBadgeEl.textContent = 'Running';
+    statusBadgeEl.className = 'badge bg-success-subtle text-success small';
+}
+
+async function refreshBackgroundExecutionTime() {
+    const data = await fetchBackgroundExecutionTime();
+    updateBackgroundExecutionDisplay(data);
+}
+
+// Start background execution time updates
+let backgroundExecutionInterval;
+
+function startBackgroundExecutionUpdates() {
+    // Initial load
+    refreshBackgroundExecutionTime();
+    
+    // Update every 10 seconds
+    backgroundExecutionInterval = setInterval(() => {
+        refreshBackgroundExecutionTime();
+    }, 10000);
+}
+
+function stopBackgroundExecutionUpdates() {
+    if (backgroundExecutionInterval) {
+        clearInterval(backgroundExecutionInterval);
+        backgroundExecutionInterval = null;
+    }
+}
+
 // Export functions for global access
 window.refreshDashboardData = refreshDashboardData;
 window.refreshProcessingRuns = refreshProcessingRuns;
@@ -1125,3 +1223,6 @@ window.renderCategoriesColumns = renderCategoriesColumns;
 window.fetchData = fetchData;
 window.fetchAccountsData = fetchAccountsData;
 window.deleteAccount = deleteAccount;
+window.refreshBackgroundExecutionTime = refreshBackgroundExecutionTime;
+window.startBackgroundExecutionUpdates = startBackgroundExecutionUpdates;
+window.stopBackgroundExecutionUpdates = stopBackgroundExecutionUpdates;

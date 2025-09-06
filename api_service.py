@@ -69,6 +69,7 @@ BACKGROUND_PROCESS_HOURS = int(os.getenv("BACKGROUND_PROCESS_HOURS", "2"))  # Lo
 # Global flag for background thread control
 background_thread_running = True
 background_thread = None
+next_execution_time = None
 
 # Global processing status manager instance
 processing_status_manager = ProcessingStatusManager(max_history=100)
@@ -342,7 +343,7 @@ def background_gmail_processor():
     """
     Background thread function that continuously processes Gmail accounts.
     """
-    global background_thread_running
+    global background_thread_running, next_execution_time
     
     logger.info("🚀 Background Gmail processor thread started")
     logger.info(f"⚙️  Configuration:")
@@ -397,8 +398,8 @@ def background_gmail_processor():
                 logger.error(f"❌ Error in background processing cycle: {str(e)}")
             
             if background_thread_running:
-                next_run = datetime.now() + timedelta(seconds=BACKGROUND_SCAN_INTERVAL)
-                logger.info(f"💤 Sleeping {BACKGROUND_SCAN_INTERVAL} seconds. Next cycle at {next_run.strftime('%H:%M:%S')}")
+                next_execution_time = datetime.now() + timedelta(seconds=BACKGROUND_SCAN_INTERVAL)
+                logger.info(f"💤 Sleeping {BACKGROUND_SCAN_INTERVAL} seconds. Next cycle at {next_execution_time.strftime('%H:%M:%S')}")
                 
                 # Sleep in smaller intervals to allow for graceful shutdown
                 sleep_interval = 10  # Check for shutdown every 10 seconds
@@ -419,7 +420,7 @@ def background_gmail_processor():
 
 def start_background_processor():
     """Start the background processing thread."""
-    global background_thread
+    global background_thread, next_execution_time
     
     if BACKGROUND_PROCESSING_ENABLED and not background_thread:
         logger.info("🎬 Starting background Gmail processor...")
@@ -429,6 +430,7 @@ def start_background_processor():
             daemon=True
         )
         background_thread.start()
+        next_execution_time = datetime.now() + timedelta(seconds=BACKGROUND_SCAN_INTERVAL)
         logger.info("✅ Background Gmail processor thread launched")
     elif not BACKGROUND_PROCESSING_ENABLED:
         logger.info("⏸️  Background processing is disabled (BACKGROUND_PROCESSING=false)")
@@ -438,7 +440,7 @@ def start_background_processor():
 
 def stop_background_processor():
     """Stop the background processing thread."""
-    global background_thread_running, background_thread
+    global background_thread_running, background_thread, next_execution_time
     
     if background_thread and background_thread.is_alive():
         logger.info("🛑 Stopping background Gmail processor...")
@@ -451,6 +453,7 @@ def stop_background_processor():
             logger.info("✅ Background Gmail processor stopped cleanly")
         
         background_thread = None
+        next_execution_time = None
 
 
 @app.get("/")
@@ -464,6 +467,7 @@ async def root():
             "background_start": "POST /api/background/start",
             "background_stop": "POST /api/background/stop",
             "background_status": "GET /api/background/status",
+            "background_next_execution": "GET /api/background/next-execution",
             "morning_summary": "POST /api/summaries/morning",
             "evening_summary": "POST /api/summaries/evening",
             "weekly_summary": "POST /api/summaries/weekly",
@@ -593,6 +597,40 @@ async def get_background_status(x_api_key: Optional[str] = Header(None)):
             "scan_interval_seconds": BACKGROUND_SCAN_INTERVAL,
             "process_hours": BACKGROUND_PROCESS_HOURS
         },
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/api/background/next-execution")
+async def get_next_execution_time(x_api_key: Optional[str] = Header(None)):
+    """Get the next scheduled execution time of the background service"""
+    verify_api_key(x_api_key)
+    
+    global next_execution_time, background_thread_running
+    
+    if not BACKGROUND_PROCESSING_ENABLED:
+        return {
+            "error": "Background processing is disabled",
+            "next_execution": None,
+            "enabled": False,
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    if not background_thread_running or next_execution_time is None:
+        return {
+            "error": "Background service is not running",
+            "next_execution": None,
+            "running": False,
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    return {
+        "next_execution": next_execution_time.isoformat(),
+        "next_execution_formatted": next_execution_time.strftime('%Y-%m-%d %H:%M:%S'),
+        "seconds_until_next": max(0, int((next_execution_time - datetime.now()).total_seconds())),
+        "scan_interval_seconds": BACKGROUND_SCAN_INTERVAL,
+        "running": background_thread_running,
+        "enabled": BACKGROUND_PROCESSING_ENABLED,
         "timestamp": datetime.now().isoformat()
     }
 
