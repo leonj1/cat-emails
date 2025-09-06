@@ -1132,6 +1132,10 @@ async function fetchBackgroundExecutionTime() {
     }
 }
 
+// Store next execution data globally for countdown updates
+let nextExecutionData = null;
+let countdownInterval = null;
+
 function updateBackgroundExecutionDisplay(data) {
     const countdownEl = document.getElementById('next-execution-countdown');
     const timeEl = document.getElementById('next-execution-time');
@@ -1142,41 +1146,36 @@ function updateBackgroundExecutionDisplay(data) {
         return;
     }
     
+    // Store the data globally for countdown updates
+    nextExecutionData = data;
+    
     if (data.error || !data.running) {
         countdownEl.textContent = '--';
         timeEl.textContent = data.error || 'Service stopped';
         statusBadgeEl.textContent = data.running === false ? 'Stopped' : 'Disabled';
         statusBadgeEl.className = 'badge bg-danger-subtle text-danger small';
+        
+        // Clear any existing countdown interval
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
         return;
     }
     
-    // Calculate and display countdown
-    const secondsUntilNext = data.seconds_until_next || 0;
-    if (secondsUntilNext > 0) {
-        const minutes = Math.floor(secondsUntilNext / 60);
-        const seconds = secondsUntilNext % 60;
-        
-        if (minutes > 60) {
-            const hours = Math.floor(minutes / 60);
-            const remainingMinutes = minutes % 60;
-            countdownEl.textContent = `${hours}h ${remainingMinutes}m`;
-        } else if (minutes > 0) {
-            countdownEl.textContent = `${minutes}m ${seconds}s`;
-        } else {
-            countdownEl.textContent = `${seconds}s`;
-        }
-    } else {
-        countdownEl.textContent = 'Running...';
-    }
-    
-    // Display formatted next execution time
+    // Display formatted next execution time (absolute time)
     if (data.next_execution_formatted) {
-        const nextTime = new Date(data.next_execution).toLocaleTimeString('en-US', { 
-            hour12: false, 
+        // Parse UTC time and convert to local timezone
+        const nextTime = new Date(data.next_execution + 'Z'); // Append 'Z' to indicate UTC
+        const timeString = nextTime.toLocaleString('en-US', { 
+            month: 'short',
+            day: 'numeric',
             hour: '2-digit', 
-            minute: '2-digit' 
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
         });
-        timeEl.textContent = `at ${nextTime}`;
+        timeEl.textContent = `${timeString}`;
     } else {
         timeEl.textContent = 'Calculating...';
     }
@@ -1184,6 +1183,64 @@ function updateBackgroundExecutionDisplay(data) {
     // Update status badge
     statusBadgeEl.textContent = 'Running';
     statusBadgeEl.className = 'badge bg-success-subtle text-success small';
+    
+    // Start the real-time countdown
+    startRealTimeCountdown(data);
+}
+
+function startRealTimeCountdown(data) {
+    // Clear any existing countdown interval
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+    
+    const countdownEl = document.getElementById('next-execution-countdown');
+    if (!countdownEl) return;
+    
+    // Parse UTC time correctly by appending 'Z'
+    const nextExecution = new Date(data.next_execution + 'Z');
+    
+    // Update countdown immediately
+    updateCountdownDisplay(nextExecution, countdownEl);
+    
+    // Update countdown every second
+    countdownInterval = setInterval(() => {
+        updateCountdownDisplay(nextExecution, countdownEl);
+    }, 1000);
+}
+
+function updateCountdownDisplay(nextExecution, countdownEl) {
+    const now = new Date();
+    const timeDiff = nextExecution - now;
+    
+    if (timeDiff <= 0) {
+        countdownEl.textContent = 'Running...';
+        countdownEl.className = 'metric-value text-warning mb-1 fw-bold';
+        return;
+    }
+    
+    const totalSeconds = Math.floor(timeDiff / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
+    let displayText = '';
+    let colorClass = 'metric-value text-secondary mb-1';
+    
+    if (hours > 0) {
+        displayText = `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+        displayText = `${minutes}m ${seconds}s`;
+        // Make it more prominent when under 1 hour
+        colorClass = 'metric-value text-primary mb-1 fw-bold';
+    } else {
+        displayText = `${seconds}s`;
+        // Make it urgent when under 1 minute
+        colorClass = 'metric-value text-danger mb-1 fw-bold';
+    }
+    
+    countdownEl.textContent = displayText;
+    countdownEl.className = colorClass;
 }
 
 async function refreshBackgroundExecutionTime() {
@@ -1208,6 +1265,12 @@ function stopBackgroundExecutionUpdates() {
     if (backgroundExecutionInterval) {
         clearInterval(backgroundExecutionInterval);
         backgroundExecutionInterval = null;
+    }
+    
+    // Also clear the countdown interval
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
     }
 }
 
