@@ -5,3 +5,4 @@ ollama.txt
 logdir
 __pycache__/
 
+.agent-os/

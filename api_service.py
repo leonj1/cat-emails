@@ -10,7 +10,7 @@ import time
 import asyncio
 from typing import Optional, Dict, List
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends
+from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
@@ -19,6 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from send_emails import send_summary_by_type
 from services.account_category_service import AccountCategoryService
+from services.processing_status_manager import ProcessingStatusManager, ProcessingState
+from services.websocket_handler import StatusWebSocketManager
 from models.account_models import (
     TopCategoriesResponse, AccountListResponse, EmailAccountInfo,
     AccountCategoryStatsRequest
@@ -51,6 +53,12 @@ BACKGROUND_PROCESS_HOURS = int(os.getenv("BACKGROUND_PROCESS_HOURS", "2"))  # Lo
 background_thread_running = True
 background_thread = None
 
+# Global processing status manager instance
+processing_status_manager = ProcessingStatusManager(max_history=100)
+
+# Global WebSocket manager instance
+websocket_manager: Optional[StatusWebSocketManager] = None
+
 
 class SummaryResponse(BaseModel):
     """Response model for summary endpoints"""
@@ -78,6 +86,16 @@ class ErrorResponse(BaseModel):
     error: str
     detail: str
     timestamp: str
+
+
+class ProcessingCurrentStatusResponse(BaseModel):
+    """Response model for current processing status endpoint"""
+    is_processing: bool
+    current_status: Optional[Dict]
+    recent_runs: Optional[List[Dict]]
+    statistics: Optional[Dict]
+    timestamp: str
+    websocket_available: bool
 
 
 def get_account_service() -> AccountCategoryService:
@@ -111,9 +129,37 @@ def verify_api_key(x_api_key: Optional[str] = Header(None)) -> bool:
     return True
 
 
+def verify_websocket_api_key(websocket: WebSocket) -> bool:
+    """
+    Verify API key for WebSocket connections.
+    
+    Args:
+        websocket: WebSocket connection to check
+        
+    Returns:
+        True if valid or no API key required, False otherwise
+    """
+    if not API_KEY:
+        return True
+    
+    # Check for API key in query parameters first
+    api_key = websocket.query_params.get("api_key")
+    
+    # If not in query params, check headers
+    if not api_key:
+        api_key = websocket.headers.get("x-api-key")
+    
+    # Verify the API key
+    if not api_key or api_key != API_KEY:
+        logger.warning(f"WebSocket connection rejected: Invalid or missing API key")
+        return False
+    
+    return True
+
+
 def process_account_emails(email_address: str) -> Dict:
     """
-    Process emails for a single Gmail account.
+    Process emails for a single Gmail account with real-time status tracking.
     This is a placeholder - in a real implementation, this would:
     1. Connect to Gmail via IMAP
     2. Fetch recent emails
@@ -126,20 +172,42 @@ def process_account_emails(email_address: str) -> Dict:
     Returns:
         Dictionary with processing results
     """
+    global processing_status_manager
+    
     logger.info(f"🔍 Processing emails for account: {email_address}")
     
     try:
+        # Start processing session
+        try:
+            processing_status_manager.start_processing(email_address)
+        except ValueError as e:
+            logger.warning(f"Could not start processing for {email_address}: {str(e)}")
+            return {
+                "account": email_address,
+                "error": f"Processing already in progress: {str(e)}",
+                "success": False,
+                "timestamp": datetime.now().isoformat()
+            }
+        
         # Simulate email processing work
         start_time = time.time()
         
         # Get account service to check if account exists in database
         service = AccountCategoryService()
         
-        # This would be the actual Gmail processing logic
-        # For now, we'll simulate with some realistic processing steps
+        # Step 1: Connect to Gmail IMAP
+        processing_status_manager.update_status(
+            ProcessingState.CONNECTING,
+            f"Connecting to Gmail IMAP for {email_address}"
+        )
         logger.info(f"  📬 Connecting to Gmail IMAP for {email_address}...")
         time.sleep(1)  # Simulate connection time
         
+        # Step 2: Fetch emails
+        processing_status_manager.update_status(
+            ProcessingState.FETCHING,
+            f"Fetching emails from last {BACKGROUND_PROCESS_HOURS} hours"
+        )
         logger.info(f"  🔎 Fetching emails from last {BACKGROUND_PROCESS_HOURS} hours...")
         time.sleep(2)  # Simulate email fetching
         
@@ -151,15 +219,43 @@ def process_account_emails(email_address: str) -> Dict:
         categorized_count = 0
         labeled_count = 0
         
+        # Step 3: Process emails in batches
+        processing_status_manager.update_status(
+            ProcessingState.PROCESSING,
+            f"Processing {simulated_email_count} emails",
+            {"current": 0, "total": simulated_email_count}
+        )
+        
         # Simulate processing each email
         for i in range(simulated_email_count):
             logger.info(f"    ⚡ Processing email {i+1}/{simulated_email_count}")
             
+            # Update progress every email
+            processing_status_manager.update_status(
+                ProcessingState.PROCESSING,
+                f"Processing email {i+1} of {simulated_email_count}",
+                {"current": i+1, "total": simulated_email_count}
+            )
+            
             # Simulate AI categorization
+            if i % 3 == 0:  # Update status periodically for categorization
+                processing_status_manager.update_status(
+                    ProcessingState.CATEGORIZING,
+                    f"Categorizing email {i+1} with AI",
+                    {"current": i+1, "total": simulated_email_count}
+                )
+            
             time.sleep(0.5)  # Simulate AI processing time
             categorized_count += 1
             
             # Simulate applying Gmail labels
+            if i % 3 == 1:  # Update status periodically for labeling
+                processing_status_manager.update_status(
+                    ProcessingState.LABELING,
+                    f"Applying Gmail labels for email {i+1}",
+                    {"current": i+1, "total": simulated_email_count}
+                )
+            
             time.sleep(0.2)  # Simulate Gmail API call
             labeled_count += 1
             
@@ -167,8 +263,20 @@ def process_account_emails(email_address: str) -> Dict:
             
             if i % 5 == 4:  # Log progress every 5 emails
                 logger.info(f"    📊 Progress: {processed_count}/{simulated_email_count} emails processed")
+                processing_status_manager.update_status(
+                    ProcessingState.PROCESSING,
+                    f"Processed {processed_count} of {simulated_email_count} emails",
+                    {"current": processed_count, "total": simulated_email_count}
+                )
         
         processing_time = time.time() - start_time
+        
+        # Mark processing as completed
+        processing_status_manager.update_status(
+            ProcessingState.COMPLETED,
+            f"Successfully processed {processed_count} emails",
+            {"current": processed_count, "total": simulated_email_count}
+        )
         
         result = {
             "account": email_address,
@@ -182,10 +290,29 @@ def process_account_emails(email_address: str) -> Dict:
         }
         
         logger.info(f"✅ Successfully processed {email_address}: {processed_count} emails in {processing_time:.2f}s")
+        
+        # Complete the processing session
+        processing_status_manager.complete_processing()
+        
         return result
         
     except Exception as e:
         logger.error(f"❌ Error processing emails for {email_address}: {str(e)}")
+        
+        # Update status to error and complete processing
+        try:
+            processing_status_manager.update_status(
+                ProcessingState.ERROR,
+                f"Processing failed: {str(e)}",
+                error_message=str(e)
+            )
+        except RuntimeError:
+            # If no processing session is active, log the error but don't fail
+            logger.warning(f"Could not update status to ERROR - no active session for {email_address}")
+        finally:
+            # Always try to complete processing to clean up state
+            processing_status_manager.complete_processing()
+        
         return {
             "account": email_address,
             "error": str(e),
@@ -327,9 +454,24 @@ async def root():
             "top_categories": "GET /api/accounts/{email_address}/categories/top",
             "list_accounts": "GET /api/accounts",
             "create_account": "POST /api/accounts",
-            "deactivate_account": "PUT /api/accounts/{email_address}/deactivate"
+            "deactivate_account": "PUT /api/accounts/{email_address}/deactivate",
+            "processing_status": "GET /api/processing/status",
+            "processing_history": "GET /api/processing/history",
+            "processing_statistics": "GET /api/processing/statistics",
+            "processing_current_status": "GET /api/processing/current-status (comprehensive status with polling support)",
+            "websocket_status": "WS /ws/status (real-time processing status updates)"
         },
-        "authentication": "Optional via X-API-Key header" if API_KEY else "None"
+        "authentication": "Optional via X-API-Key header or api_key query param" if API_KEY else "None",
+        "websocket_info": {
+            "endpoint": "/ws/status",
+            "authentication": "api_key query parameter or X-API-Key header" if API_KEY else "None required",
+            "features": [
+                "Real-time processing status updates",
+                "Connection heartbeat",
+                "Client message handling",
+                "Automatic reconnection support"
+            ]
+        }
     }
 
 
@@ -436,6 +578,238 @@ async def get_background_status(x_api_key: Optional[str] = Header(None)):
         },
         "timestamp": datetime.now().isoformat()
     }
+
+
+@app.get("/api/processing/status")
+async def get_processing_status(x_api_key: Optional[str] = Header(None)):
+    """Get current email processing status"""
+    verify_api_key(x_api_key)
+    
+    global processing_status_manager
+    
+    current_status = processing_status_manager.get_current_status()
+    is_active = processing_status_manager.is_processing()
+    
+    return {
+        "is_processing": is_active,
+        "current_status": current_status,
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/api/processing/history")
+async def get_processing_history(
+    limit: int = Query(10, ge=1, le=100, description="Number of recent runs to retrieve (1-100)"),
+    x_api_key: Optional[str] = Header(None)
+):
+    """Get recent processing history"""
+    verify_api_key(x_api_key)
+    
+    global processing_status_manager
+    
+    recent_runs = processing_status_manager.get_recent_runs(limit=limit)
+    
+    return {
+        "recent_runs": recent_runs,
+        "total_retrieved": len(recent_runs),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/api/processing/statistics")
+async def get_processing_statistics(x_api_key: Optional[str] = Header(None)):
+    """Get processing statistics"""
+    verify_api_key(x_api_key)
+    
+    global processing_status_manager
+    
+    stats = processing_status_manager.get_statistics()
+    
+    return {
+        "statistics": stats,
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.get("/api/processing/current-status", response_model=ProcessingCurrentStatusResponse)
+async def get_current_processing_status(
+    include_recent: bool = Query(True, description="Include recent processing runs"),
+    recent_limit: int = Query(5, ge=1, le=50, description="Number of recent runs to return (1-50)"),
+    include_stats: bool = Query(False, description="Include processing statistics"),
+    x_api_key: Optional[str] = Header(None)
+):
+    """
+    Get comprehensive current processing status as a REST API fallback for WebSocket functionality.
+    
+    This endpoint provides the same real-time processing information available via WebSocket
+    in a traditional REST API format, suitable for polling-based clients that cannot use WebSockets.
+    
+    Query Parameters:
+        include_recent: Whether to include recent processing runs (default: True)
+        recent_limit: Number of recent runs to return, 1-50 (default: 5)
+        include_stats: Whether to include processing statistics (default: False)
+    
+    Returns:
+        ProcessingCurrentStatusResponse containing:
+        - is_processing: Boolean indicating if processing is currently active
+        - current_status: Current processing status object (or None if idle)
+        - recent_runs: Array of recent processing runs (if include_recent=True)
+        - statistics: Processing statistics (if include_stats=True)
+        - timestamp: When the status was retrieved
+        - websocket_available: Boolean indicating if WebSocket endpoint is available
+    
+    Authentication:
+        Requires X-API-Key header if API key is configured
+    
+    Raises:
+        400: Invalid query parameters
+        401: Invalid or missing API key
+        500: Internal server error
+    
+    Example Response:
+        {
+            "is_processing": true,
+            "current_status": {
+                "email_address": "user@example.com",
+                "state": "PROCESSING",
+                "current_step": "Processing email 15 of 30",
+                "progress": {"current": 15, "total": 30},
+                "start_time": "2025-01-15T10:30:00Z",
+                "last_updated": "2025-01-15T10:32:15Z"
+            },
+            "recent_runs": [
+                {
+                    "email_address": "user@example.com",
+                    "start_time": "2025-01-15T09:00:00Z",
+                    "end_time": "2025-01-15T09:05:30Z",
+                    "duration_seconds": 330.5,
+                    "final_state": "COMPLETED",
+                    "final_step": "Successfully processed 25 emails"
+                }
+            ],
+            "statistics": {
+                "total_runs": 50,
+                "successful_runs": 48,
+                "failed_runs": 2,
+                "average_duration_seconds": 285.4,
+                "success_rate": 96.0
+            },
+            "timestamp": "2025-01-15T10:32:20Z",
+            "websocket_available": true
+        }
+    
+    Use Cases:
+        - Polling-based status monitoring for web dashboards
+        - Mobile apps that don't support WebSockets reliably
+        - Simple integrations that prefer REST over WebSocket complexity
+        - Debugging and testing processing status without WebSocket setup
+        
+    Polling Recommendations:
+        - For active processing: Poll every 2-5 seconds
+        - For idle monitoring: Poll every 30-60 seconds
+        - Use include_stats=False for frequent polling to reduce response size
+        - Consider WebSocket endpoint for true real-time updates when possible
+    """
+    verify_api_key(x_api_key)
+    
+    try:
+        global processing_status_manager, websocket_manager
+        
+        # Validate query parameters
+        if recent_limit < 1 or recent_limit > 50:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="recent_limit must be between 1 and 50"
+            )
+        
+        # Get current processing status
+        is_processing = processing_status_manager.is_processing()
+        current_status = processing_status_manager.get_current_status()
+        
+        # Get recent runs if requested
+        recent_runs = None
+        if include_recent:
+            recent_runs = processing_status_manager.get_recent_runs(limit=recent_limit)
+        
+        # Get statistics if requested
+        statistics = None
+        if include_stats:
+            statistics = processing_status_manager.get_statistics()
+        
+        # Check if WebSocket is available
+        websocket_available = websocket_manager is not None
+        
+        response = ProcessingCurrentStatusResponse(
+            is_processing=is_processing,
+            current_status=current_status,
+            recent_runs=recent_runs,
+            statistics=statistics,
+            timestamp=datetime.now().isoformat(),
+            websocket_available=websocket_available
+        )
+        
+        return response
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_current_processing_status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve processing status: {str(e)}"
+        )
+
+
+@app.websocket("/ws/status")
+async def websocket_status_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time processing status updates.
+    
+    This endpoint provides real-time updates about email processing status,
+    including current processing state, recent runs, and statistics.
+    
+    Authentication:
+        - If API_KEY is configured, provide it via:
+          - Query parameter: /ws/status?api_key=your-key
+          - Header: X-API-Key: your-key
+        - If no API_KEY configured, no authentication required
+    
+    Message Types:
+        - status_update: Regular processing status broadcasts
+        - connection_confirmed: Connection establishment confirmation
+        - heartbeat: Connection health checks
+        - error: Error messages
+        - pong: Response to ping messages
+    
+    Client Messages:
+        - {"type": "ping"}: Request heartbeat response
+        - {"type": "get_current_status"}: Request current status
+        - {"type": "get_recent_runs", "limit": 10}: Request recent runs
+        - {"type": "get_statistics"}: Request processing statistics
+    """
+    global websocket_manager
+    
+    # Verify authentication before accepting connection
+    if not verify_websocket_api_key(websocket):
+        await websocket.close(code=4001, reason="Authentication required")
+        return
+    
+    # Ensure WebSocket manager is initialized
+    if websocket_manager is None:
+        logger.error("WebSocket manager not initialized")
+        await websocket.close(code=1011, reason="Internal server error")
+        return
+    
+    # Handle the client connection
+    try:
+        await websocket_manager.handle_client(websocket)
+    except Exception as e:
+        logger.error(f"Error in WebSocket endpoint: {e}")
+        try:
+            await websocket.close(code=1011, reason="Internal server error")
+        except:
+            pass
 
 
 @app.post("/api/test/create-sample-data")
@@ -1025,6 +1399,53 @@ async def deactivate_account(
         )
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize WebSocket manager and start background tasks on server startup"""
+    global websocket_manager
+    
+    try:
+        # Initialize WebSocket manager
+        websocket_manager = StatusWebSocketManager(
+            status_manager=processing_status_manager,
+            max_clients=50  # Configure max clients as needed
+        )
+        
+        # Start background broadcasting task
+        websocket_manager.broadcast_task = asyncio.create_task(
+            websocket_manager.start_broadcasting()
+        )
+        
+        # Start heartbeat task
+        websocket_manager.heartbeat_task = asyncio.create_task(
+            websocket_manager.start_heartbeat()
+        )
+        
+        logger.info("WebSocket manager initialized and background tasks started")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize WebSocket manager: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Gracefully shutdown WebSocket manager and background tasks"""
+    global websocket_manager
+    
+    try:
+        if websocket_manager:
+            logger.info("Shutting down WebSocket manager...")
+            await websocket_manager.shutdown()
+            websocket_manager = None
+            logger.info("WebSocket manager shutdown completed")
+        
+        # Stop background processor if running
+        stop_background_processor()
+        
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
+
+
 @app.exception_handler(404)
 async def not_found(request, exc):
     """Custom 404 handler"""
@@ -1042,7 +1463,12 @@ async def not_found(request, exc):
                 "top_categories": "GET /api/accounts/{email_address}/categories/top",
                 "list_accounts": "GET /api/accounts",
                 "create_account": "POST /api/accounts",
-                "deactivate_account": "PUT /api/accounts/{email_address}/deactivate"
+                "deactivate_account": "PUT /api/accounts/{email_address}/deactivate",
+                "processing_status": "GET /api/processing/status",
+                "processing_history": "GET /api/processing/history",
+                "processing_statistics": "GET /api/processing/statistics",
+                "processing_current_status": "GET /api/processing/current-status",
+                "websocket_status": "WS /ws/status"
             }
         }
     )

@@ -149,35 +149,26 @@ class AccountCategoryStats(Base):
 
 
 class ProcessingRun(Base):
-    """Individual email processing run details"""
+    """Historical tracking of email processing sessions"""
     __tablename__ = 'processing_runs'
     
-    id = Column(Integer, primary_key=True)
-    run_id = Column(String(50), unique=True, nullable=False)  # UUID for each run
-    
-    started_at = Column(DateTime, nullable=False)
-    completed_at = Column(DateTime)
-    duration_seconds = Column(Float)
-    
-    # Metrics
-    emails_fetched = Column(Integer, default=0)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email_address = Column(Text, nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=True)
+    state = Column(Text, nullable=False)  # current processing state
+    current_step = Column(Text, nullable=True)  # description of current step
+    emails_found = Column(Integer, default=0)
     emails_processed = Column(Integer, default=0)
-    emails_deleted = Column(Integer, default=0)
-    emails_archived = Column(Integer, default=0)
-    emails_error = Column(Integer, default=0)
-    
-    # Configuration
-    scan_hours = Column(Integer)
-    
-    # Error tracking
-    error_message = Column(Text)
-    success = Column(Boolean, default=True)
-    
-    # Metadata
+    error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     __table_args__ = (
-        Index('idx_run_time', 'started_at', 'completed_at'),
+        Index('idx_processing_runs_email_address', 'email_address'),
+        Index('idx_processing_runs_start_time', 'start_time'),
+        Index('idx_processing_runs_email_start', 'email_address', 'start_time'),
+        Index('idx_processing_runs_state', 'state'),
     )
 
 
