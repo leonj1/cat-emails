@@ -1,0 +1,702 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Cat-Emails Account Tracking API",
+    "description": "API for managing email account tracking and retrieving category statistics for the Cat-Emails AI-powered Gmail categorizer system.",
+    "version": "1.1.0",
+    "contact": {
+      "name": "Cat-Emails Project",
+      "url": "https://github.com/your-org/cat-emails"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local development server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    },
+    {}
+  ],
+  "paths": {
+    "/api/accounts/{email_address}/categories/top": {
+      "get": {
+        "tags": ["Account Statistics"],
+        "summary": "Get top email categories for an account",
+        "description": "Retrieves the most frequent email categories for a specific Gmail account over a specified time period, ranked by email volume.",
+        "operationId": "getTopCategories",
+        "parameters": [
+          {
+            "name": "email_address",
+            "in": "path",
+            "required": true,
+            "description": "Gmail email address",
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "example": "user@gmail.com"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": true,
+            "description": "Number of days to look back from today",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "example": 30
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of categories to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "example": 5
+            }
+          },
+          {
+            "name": "include_counts",
+            "in": "query",
+            "required": false,
+            "description": "Include detailed action counts (kept/deleted/archived)",
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "example": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top categories retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopCategoriesResponse"
+                },
+                "examples": {
+                  "with_counts": {
+                    "summary": "Response with detailed counts",
+                    "value": {
+                      "email_address": "user@gmail.com",
+                      "period": {
+                        "start_date": "2024-12-05",
+                        "end_date": "2025-01-04",
+                        "days": 30
+                      },
+                      "total_emails": 245,
+                      "top_categories": [
+                        {
+                          "category": "Marketing",
+                          "total_count": 89,
+                          "percentage": 36.33,
+                          "kept_count": 12,
+                          "deleted_count": 77,
+                          "archived_count": 0
+                        },
+                        {
+                          "category": "Personal",
+                          "total_count": 67,
+                          "percentage": 27.35,
+                          "kept_count": 65,
+                          "deleted_count": 2,
+                          "archived_count": 0
+                        }
+                      ]
+                    }
+                  },
+                  "without_counts": {
+                    "summary": "Response without detailed counts",
+                    "value": {
+                      "email_address": "user@gmail.com",
+                      "period": {
+                        "start_date": "2024-12-05",
+                        "end_date": "2025-01-04",
+                        "days": 30
+                      },
+                      "total_emails": 245,
+                      "top_categories": [
+                        {
+                          "category": "Marketing",
+                          "total_count": 89,
+                          "percentage": 36.33
+                        },
+                        {
+                          "category": "Personal",
+                          "total_count": 67,
+                          "percentage": 27.35
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Invalid email address format"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "description": "Account not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Account not found: user@gmail.com"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity - Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Invalid request parameters: days must be between 1 and 365"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/accounts": {
+      "get": {
+        "tags": ["Account Management"],
+        "summary": "List all tracked accounts",
+        "description": "Retrieves a list of all Gmail accounts being tracked by the system, with optional filtering for active accounts only.",
+        "operationId": "listAccounts",
+        "parameters": [
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "description": "Filter to only active accounts",
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "example": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accounts retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountListResponse"
+                },
+                "example": {
+                  "accounts": [
+                    {
+                      "id": 1,
+                      "email_address": "user1@gmail.com",
+                      "display_name": "John Doe",
+                      "is_active": true,
+                      "last_scan_at": "2025-01-04T14:30:00.123456",
+                      "created_at": "2024-11-15T08:00:00.000000"
+                    },
+                    {
+                      "id": 2,
+                      "email_address": "user2@gmail.com",
+                      "display_name": null,
+                      "is_active": false,
+                      "last_scan_at": "2024-12-20T10:15:00.987654",
+                      "created_at": "2024-10-01T12:30:00.000000"
+                    }
+                  ],
+                  "total_count": 2
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {}
+        ]
+      },
+      "post": {
+        "tags": ["Account Management"],
+        "summary": "Register new account",
+        "description": "Creates a new account entry in the system for email category tracking. If the account already exists, it will be reactivated and updated.",
+        "operationId": "createAccount",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountRequest"
+              },
+              "example": {
+                "email_address": "newuser@gmail.com",
+                "display_name": "New User"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                },
+                "example": {
+                  "status": "success",
+                  "message": "Account registered successfully: newuser@gmail.com",
+                  "timestamp": "2025-01-04T15:30:00.123456"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid email address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Invalid email address format"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "422": {
+            "description": "Unprocessable entity - Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Invalid request format: field required"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/accounts/{email_address}/deactivate": {
+      "put": {
+        "tags": ["Account Management"],
+        "summary": "Deactivate account",
+        "description": "Marks an account as inactive, excluding it from active scanning while preserving historical data. The account can be reactivated later by creating it again.",
+        "operationId": "deactivateAccount",
+        "parameters": [
+          {
+            "name": "email_address",
+            "in": "path",
+            "required": true,
+            "description": "Gmail email address to deactivate",
+            "schema": {
+              "type": "string",
+              "format": "email",
+              "example": "user@gmail.com"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account deactivated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                },
+                "example": {
+                  "status": "success",
+                  "message": "Account deactivated successfully: user@gmail.com",
+                  "timestamp": "2025-01-04T15:45:00.123456"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid email address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Invalid email address format"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "description": "Account not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "detail": "Account not found: user@gmail.com"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {}
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key for authentication (optional if not configured)"
+      }
+    },
+    "schemas": {
+      "CategoryStats": {
+        "type": "object",
+        "description": "Statistics for a single email category",
+        "required": ["category", "total_count", "percentage"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Email category name",
+            "enum": [
+              "Marketing",
+              "Advertising", 
+              "Personal",
+              "Wants-Money",
+              "Financial-Notification",
+              "Work-related",
+              "Service-Updates",
+              "Appointment-Reminder",
+              "Other"
+            ],
+            "example": "Marketing"
+          },
+          "total_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of emails in this category",
+            "example": 89
+          },
+          "percentage": {
+            "type": "number",
+            "format": "float",
+            "minimum": 0.0,
+            "maximum": 100.0,
+            "description": "Percentage of total emails this category represents (rounded to 2 decimal places)",
+            "example": 36.33
+          },
+          "kept_count": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Number of emails kept in inbox (only included if include_counts=true)",
+            "example": 12
+          },
+          "deleted_count": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Number of emails deleted (only included if include_counts=true)",
+            "example": 77
+          },
+          "archived_count": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Number of emails archived (only included if include_counts=true)",
+            "example": 0
+          }
+        }
+      },
+      "DatePeriod": {
+        "type": "object",
+        "description": "Represents a date range period",
+        "required": ["start_date", "end_date", "days"],
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Start date of the period (inclusive)",
+            "example": "2024-12-05"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "description": "End date of the period (inclusive)",
+            "example": "2025-01-04"
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of days in the period",
+            "example": 30
+          }
+        }
+      },
+      "TopCategoriesResponse": {
+        "type": "object",
+        "description": "Response model for top categories by account",
+        "required": ["email_address", "period", "total_emails", "top_categories"],
+        "properties": {
+          "email_address": {
+            "type": "string",
+            "format": "email",
+            "description": "The Gmail account email address",
+            "example": "user@gmail.com"
+          },
+          "period": {
+            "$ref": "#/components/schemas/DatePeriod"
+          },
+          "total_emails": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of emails processed in the period",
+            "example": 245
+          },
+          "top_categories": {
+            "type": "array",
+            "description": "List of top categories ranked by email count (descending order)",
+            "items": {
+              "$ref": "#/components/schemas/CategoryStats"
+            }
+          }
+        }
+      },
+      "EmailAccountInfo": {
+        "type": "object",
+        "description": "Information about an email account being tracked",
+        "required": ["id", "email_address", "is_active", "created_at"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Unique account identifier",
+            "example": 1
+          },
+          "email_address": {
+            "type": "string",
+            "format": "email",
+            "description": "Gmail email address",
+            "example": "user@gmail.com"
+          },
+          "display_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional display name for the account",
+            "example": "John Doe"
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Whether the account is actively being scanned",
+            "example": true
+          },
+          "last_scan_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of the last successful email scan",
+            "example": "2025-01-04T14:30:00.123456"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the account was first added to tracking",
+            "example": "2024-11-15T08:00:00.000000"
+          }
+        }
+      },
+      "AccountListResponse": {
+        "type": "object",
+        "description": "Response model for listing all tracked email accounts",
+        "required": ["accounts", "total_count"],
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "description": "List of all tracked email accounts",
+            "items": {
+              "$ref": "#/components/schemas/EmailAccountInfo"
+            }
+          },
+          "total_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of accounts in the system",
+            "example": 2
+          }
+        }
+      },
+      "CreateAccountRequest": {
+        "type": "object",
+        "description": "Request model for creating new accounts",
+        "required": ["email_address"],
+        "properties": {
+          "email_address": {
+            "type": "string",
+            "format": "email",
+            "description": "Valid Gmail email address",
+            "example": "newuser@gmail.com"
+          },
+          "display_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional display name for the account",
+            "example": "New User"
+          }
+        }
+      },
+      "StandardResponse": {
+        "type": "object",
+        "description": "Standard response model for simple operations",
+        "required": ["status", "message", "timestamp"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success"],
+            "description": "Operation status",
+            "example": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable success message",
+            "example": "Account registered successfully: newuser@gmail.com"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the operation",
+            "example": "2025-01-04T15:30:00.123456"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Error response model",
+        "required": ["detail"],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "Human-readable error description",
+            "example": "Invalid email address format"
+          }
+        }
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Authentication required - Invalid or missing API key",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "detail": "Invalid or missing API key"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "detail": "Database error occurred"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Account Management",
+      "description": "Operations for managing tracked email accounts"
+    },
+    {
+      "name": "Account Statistics",
+      "description": "Operations for retrieving email category statistics by account"
+    }
+  ]
+}

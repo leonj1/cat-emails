@@ -246,8 +246,9 @@ def main():
     else:
         report_type = "Daily"
     
-    # Initialize summary service
-    summary_service = EmailSummaryService()
+    # Initialize summary service  
+    gmail_email = os.getenv('GMAIL_EMAIL')
+    summary_service = EmailSummaryService(gmail_email=gmail_email)
     
     # Generate summary
     report = summary_service.generate_summary(report_type)

@@ -3,11 +3,32 @@ Database models for email summary persistence
 """
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Boolean, Text, ForeignKey, Index
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Date, Float, Boolean, Text, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 Base = declarative_base()
+
+
+class EmailAccount(Base):
+    """Email account information for multi-account support"""
+    __tablename__ = 'email_accounts'
+    
+    id = Column(Integer, primary_key=True)
+    email_address = Column(String(255), unique=True, nullable=False, index=True)
+    display_name = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_active = Column(Boolean, default=True, index=True)
+    last_scan_at = Column(DateTime)
+    
+    # Relationships
+    email_summaries = relationship("EmailSummary", back_populates="email_account", cascade="all, delete-orphan")
+    category_stats = relationship("AccountCategoryStats", back_populates="email_account", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        Index('idx_email_active', 'email_address', 'is_active'),
+    )
 
 
 class EmailSummary(Base):
@@ -15,6 +36,7 @@ class EmailSummary(Base):
     __tablename__ = 'email_summaries'
     
     id = Column(Integer, primary_key=True)
+    account_id = Column(Integer, ForeignKey('email_accounts.id'), nullable=True)  # Nullable for backward compatibility
     date = Column(DateTime, nullable=False, index=True)
     
     # Core metrics
@@ -28,6 +50,7 @@ class EmailSummary(Base):
     scan_interval_hours = Column(Integer)
     
     # Relationships
+    email_account = relationship("EmailAccount", back_populates="email_summaries")
     categories = relationship("CategorySummary", back_populates="email_summary", cascade="all, delete-orphan")
     senders = relationship("SenderSummary", back_populates="email_summary", cascade="all, delete-orphan")
     domains = relationship("DomainSummary", back_populates="email_summary", cascade="all, delete-orphan")
@@ -96,6 +119,32 @@ class DomainSummary(Base):
     
     __table_args__ = (
         Index('idx_summary_domain', 'email_summary_id', 'domain'),
+    )
+
+
+class AccountCategoryStats(Base):
+    """Category statistics per account per day"""
+    __tablename__ = 'account_category_stats'
+    
+    id = Column(Integer, primary_key=True)
+    account_id = Column(Integer, ForeignKey('email_accounts.id'), nullable=False)
+    date = Column(Date, nullable=False)
+    category_name = Column(String(100), nullable=False)
+    email_count = Column(Integer, default=0)
+    deleted_count = Column(Integer, default=0)
+    archived_count = Column(Integer, default=0)
+    kept_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    email_account = relationship("EmailAccount", back_populates="category_stats")
+    
+    __table_args__ = (
+        UniqueConstraint('account_id', 'date', 'category_name', name='uq_account_date_category'),
+        Index('idx_account_date', 'account_id', 'date'),
+        Index('idx_account_category', 'account_id', 'category_name'),
+        Index('idx_date_category', 'date', 'category_name'),
     )
 
 

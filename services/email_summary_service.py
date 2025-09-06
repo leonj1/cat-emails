@@ -18,6 +18,7 @@ from models.email_summary import (
     EmailAction
 )
 from services.database_service import DatabaseService
+from services.account_category_service import AccountCategoryService
 
 
 logger = logging.getLogger(__name__)
@@ -26,13 +27,15 @@ logger = logging.getLogger(__name__)
 class EmailSummaryService:
     """Service for tracking processed emails and generating summaries."""
     
-    def __init__(self, data_dir: str = "./email_summaries", use_database: bool = True):
+    def __init__(self, data_dir: str = "./email_summaries", use_database: bool = True, 
+                 gmail_email: Optional[str] = None):
         """
         Initialize the summary service.
         
         Args:
             data_dir: Directory to store summary data
             use_database: Whether to persist summaries to database
+            gmail_email: Gmail account email for account tracking (optional)
         """
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
@@ -40,21 +43,38 @@ class EmailSummaryService:
         self.archive_dir = self.data_dir / "archives"
         self.archive_dir.mkdir(exist_ok=True)
         
+        # Store gmail account email for account tracking
+        self.gmail_email = gmail_email
+        
         # Initialize database service if enabled
         self.use_database = use_database
         self.db_service = None
+        self.account_service = None
+        
         if use_database:
             try:
                 self.db_service = DatabaseService(
                     db_path=str(self.data_dir / "summaries.db")
                 )
                 logger.info("Database service initialized for email summaries")
+                
+                # Initialize account category service
+                try:
+                    self.account_service = AccountCategoryService(
+                        db_path=str(self.data_dir / "summaries.db")
+                    )
+                    logger.info("Account category service initialized")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize account service: {str(e)}")
+                    # Continue without account service for backward compatibility
+                    
             except Exception as e:
                 logger.error(f"Failed to initialize database service: {str(e)}")
                 self.use_database = False
         
-        # Track current run ID if using database
+        # Track current run ID and account ID if using database
         self.current_run_id = None
+        self.current_account_id = None
         
         # Track run metrics
         self.run_metrics = {
@@ -84,6 +104,33 @@ class EmailSummaryService:
         self.performance_metrics['start_time'] = datetime.now()
         self.performance_metrics['email_processing_times'] = []
         self.performance_metrics['total_emails'] = 0
+        
+        # Get or create account if account service is available and gmail_email is set
+        if self.account_service and self.gmail_email:
+            try:
+                # Create account and get its ID, but don't keep reference to avoid session issues
+                account = self.account_service.get_or_create_account(self.gmail_email)
+                self.current_account_id = account.id
+                account_id = account.id  # Store ID before account object goes out of scope
+                logger.info(f"Processing run linked to account: {self.gmail_email} (ID: {account_id})")
+                
+                # Update last scan timestamp (in separate try/catch to avoid blocking main flow)
+                try:
+                    self.account_service.update_account_last_scan(self.gmail_email)
+                except Exception as scan_error:
+                    logger.warning(f"Failed to update last scan time: {str(scan_error)}")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to link to account {self.gmail_email}: {str(e)}")
+                # Try to get account ID as fallback
+                try:
+                    existing_account = self.account_service.get_account_by_email(self.gmail_email)
+                    if existing_account:
+                        self.current_account_id = existing_account.id
+                        logger.info(f"Fallback: Retrieved account ID {existing_account.id} for {self.gmail_email}")
+                except Exception as fallback_error:
+                    logger.warning(f"Fallback account retrieval also failed: {str(fallback_error)}")
+                    self.current_account_id = None
         
         if self.db_service and self.use_database:
             self.current_run_id = self.db_service.start_processing_run(scan_hours)
@@ -337,10 +384,37 @@ class EmailSummaryService:
                     'domains': dict(self.domain_stats)
                 }
                 
-                # Save to database
+                # Save to database with account_id if available
                 try:
-                    summary_id = self.db_service.save_email_summary(summary_data)
+                    summary_id = self.db_service.save_email_summary(summary_data, self.current_account_id)
                     logger.info(f"Saved summary to database with ID: {summary_id}")
+                    
+                    # Also record account category stats if account service is available
+                    if self.account_service and self.gmail_email and self.current_account_id:
+                        try:
+                            # Convert category stats to the format expected by AccountCategoryService
+                            account_category_stats = {}
+                            for category, stats in self.category_stats.items():
+                                account_category_stats[category] = {
+                                    'total': stats['count'],
+                                    'deleted': stats['deleted'], 
+                                    'archived': stats['archived'],
+                                    'kept': stats['count'] - stats['deleted']  # kept = total - deleted
+                                }
+                            
+                            # Record today's category stats for this account
+                            from datetime import date
+                            self.account_service.record_category_stats(
+                                self.gmail_email, 
+                                date.today(), 
+                                account_category_stats
+                            )
+                            logger.info(f"Recorded account category stats for {self.gmail_email}")
+                            
+                        except Exception as e:
+                            logger.warning(f"Failed to record account category stats: {str(e)}")
+                            # Don't fail the entire operation for account stats errors
+                            
                 except Exception as e:
                     logger.error(f"Failed to save summary to database: {str(e)}")
             
@@ -381,6 +455,47 @@ class EmailSummaryService:
                 
         except Exception as e:
             logger.error(f"Failed to clear tracked data: {str(e)}")
+    
+    def set_gmail_account(self, gmail_email: str) -> None:
+        """
+        Set the Gmail account for account tracking.
+        
+        Args:
+            gmail_email: Gmail account email address
+        """
+        self.gmail_email = gmail_email
+        
+        # Reset account ID to force re-lookup on next run
+        self.current_account_id = None
+        logger.info(f"Gmail account set for tracking: {gmail_email}")
+    
+    def get_account_info(self) -> Optional[Dict[str, any]]:
+        """
+        Get information about the current account.
+        
+        Returns:
+            Dictionary with account info or None if no account service
+        """
+        if not self.account_service or not self.gmail_email:
+            return None
+            
+        try:
+            account = self.account_service.get_account_by_email(self.gmail_email)
+            if account:
+                # Extract all data immediately to avoid session issues
+                account_info = {
+                    'email': account.email_address,
+                    'display_name': account.display_name,
+                    'is_active': account.is_active,
+                    'last_scan_at': account.last_scan_at,
+                    'created_at': account.created_at,
+                    'account_id': account.id
+                }
+                return account_info
+        except Exception as e:
+            logger.error(f"Failed to get account info: {str(e)}")
+        
+        return None
     
     def _load_current_data(self) -> List[Dict]:
         """Load current tracking data."""

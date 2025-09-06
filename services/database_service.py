@@ -70,11 +70,12 @@ class DatabaseService:
                 run.error_message = error_message
                 session.commit()
     
-    def save_email_summary(self, summary_data: Dict):
+    def save_email_summary(self, summary_data: Dict, account_id: Optional[int] = None):
         """Save email summary to database"""
         with self.Session() as session:
             # Create main summary
             summary = EmailSummary(
+                account_id=account_id,  # Link to account if provided
                 date=datetime.utcnow(),
                 total_emails_processed=summary_data['total_processed'],
                 total_emails_deleted=summary_data['total_deleted'],

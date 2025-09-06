@@ -235,7 +235,8 @@ def send_summary_by_type(report_type: str) -> tuple[bool, str]:
             return False, f"Invalid report type. Must be one of: {', '.join(valid_types)}"
         
         # Initialize services
-        summary_service = EmailSummaryService()
+        gmail_email = os.getenv('GMAIL_EMAIL')
+        summary_service = EmailSummaryService(gmail_email=gmail_email)
         email_sender = EmailSender()
         
         # Generate summary

@@ -6,7 +6,7 @@ import os
 import ssl
 import imaplib
 from email import message_from_bytes
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from email.utils import parsedate_to_datetime, parseaddr
 from typing import List, Optional, Set
 from bs4 import BeautifulSoup
@@ -16,6 +16,7 @@ from tabulate import tabulate
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 from services.email_summary_service import EmailSummaryService
 from services.ollama_client import create_resilient_client
+from services.account_category_service import AccountCategoryService
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--primary-host", default=os.environ.get('OLLAMA_HOST_PRIMARY', '10.1.1.247:11434'), 
@@ -170,8 +171,21 @@ class GmailFetcher:
         # Initialize domain service and load domain data
         self.domain_service = DomainService(api_token=api_token)
         
-        # Initialize summary service for tracking
-        self.summary_service = EmailSummaryService()
+        # Initialize summary service for tracking with account integration
+        self.summary_service = EmailSummaryService(gmail_email=self.email_address)
+        
+        # Initialize account category service for tracking account-specific statistics
+        self.account_service = None
+        try:
+            self.account_service = AccountCategoryService()
+            # Register/activate the account (don't store the returned object to avoid session issues)
+            self.account_service.get_or_create_account(self.email_address)
+            logger.info(f"Account registered for category tracking: {self.email_address}")
+        except Exception as e:
+            logger.error(f"Failed to initialize AccountCategoryService for {self.email_address}: {str(e)}")
+            logger.warning("Account category tracking will be disabled for this session")
+            self.account_service = None
+        
         self._allowed_domains: Set[str] = set()
         self._blocked_domains: Set[str] = set()
         self._blocked_categories: Set[str] = set()
@@ -574,6 +588,9 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     # Start processing run in database
     fetcher.summary_service.start_processing_run(scan_hours=hours)
     
+    # Initialize category tracking for this session
+    category_actions = {}  # Track actions per category: {category: {"total": N, "deleted": N, "kept": N, "archived": N}}
+    
     try:
         fetcher.connect()
         recent_emails = fetcher.get_recent_emails(hours)
@@ -682,6 +699,18 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                     sender_domain=sender_domain,
                     was_pre_categorized=pre_categorized
                 )
+                
+                # Track category statistics for account service
+                if category not in category_actions:
+                    category_actions[category] = {"total": 0, "deleted": 0, "kept": 0, "archived": 0}
+                
+                category_actions[category]["total"] += 1
+                if action_taken == "deleted":
+                    category_actions[category]["deleted"] += 1
+                elif action_taken == "kept":
+                    category_actions[category]["kept"] += 1
+                elif action_taken == "archived":
+                    category_actions[category]["archived"] += 1
                         
                 print("-" * 50)
             except Exception as e:
@@ -691,6 +720,30 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
             
         # Print summary at the end
         print_summary(hours, fetcher.stats)
+        
+        # Record category statistics and update account last scan timestamp
+        if fetcher.account_service and category_actions:
+            try:
+                today = date.today()
+                fetcher.account_service.record_category_stats(
+                    email_address=email_address,
+                    stats_date=today,
+                    category_stats=category_actions
+                )
+                
+                # Update account last scan timestamp
+                fetcher.account_service.update_account_last_scan(email_address)
+                logger.info(f"Recorded category statistics for {email_address}: {len(category_actions)} categories")
+            except Exception as e:
+                logger.error(f"Failed to record category statistics for {email_address}: {str(e)}")
+                logger.warning("Email processing completed but account statistics were not recorded")
+        elif fetcher.account_service:
+            try:
+                # Still update last scan timestamp even if no emails processed
+                fetcher.account_service.update_account_last_scan(email_address)
+                logger.info(f"Updated last scan timestamp for {email_address} (no emails processed)")
+            except Exception as e:
+                logger.error(f"Failed to update last scan timestamp for {email_address}: {str(e)}")
         
         # Complete processing run in database
         fetcher.summary_service.complete_processing_run(success=True)

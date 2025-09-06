@@ -1,0 +1,32 @@
+# Flask Web Dashboard Dependencies
+# Add these to your main requirements.txt or install separately for the web dashboard
+
+flask>=3.0.0
+werkzeug>=3.0.0
+
+# Template engine (already included with Flask but listing for clarity)
+jinja2>=3.1.2
+
+# Static file serving and security
+flask-talisman>=1.1.0  # Security headers
+
+# Development server (optional, use gunicorn for production)
+gunicorn>=21.2.0
+
+# Time zone handling (already in main requirements but needed for dashboard)
+pytz>=2023.3
+
+# Database dependencies (already in main requirements)
+sqlalchemy>=2.0.0
+
+# Optional: Rate limiting for API endpoints
+flask-limiter>=3.5.0
+
+# Optional: CORS support if dashboard will be accessed from different domains
+flask-cors>=4.0.0
+
+# Optional: Caching for better performance
+flask-caching>=2.1.0
+
+# Optional: Compression for better performance
+flask-compress>=1.14

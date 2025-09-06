@@ -1,0 +1,106 @@
+# Makefile for Cat-Emails Web Dashboard
+# Additional targets for web dashboard development and deployment
+
+# Dashboard-specific variables
+DASHBOARD_IMAGE_NAME = cat-emails-dashboard
+DASHBOARD_CONTAINER_NAME = cat-emails-dashboard-container
+DASHBOARD_PORT = 5000
+
+# Dashboard development
+dashboard-dev:
+	@echo "🚀 Starting Cat-Emails Dashboard (Development Mode)..."
+	FLASK_DEBUG=True python run_dashboard.py
+
+dashboard-run:
+	@echo "🚀 Starting Cat-Emails Dashboard..."
+	python run_dashboard.py
+
+# Install web dependencies
+dashboard-deps:
+	@echo "📦 Installing web dashboard dependencies..."
+	pip install -r requirements-web.txt
+
+# Docker targets for dashboard
+dashboard-build:
+	@echo "🐳 Building Cat-Emails Dashboard Docker image..."
+	docker build -t $(DASHBOARD_IMAGE_NAME) -f Dockerfile.dashboard .
+
+dashboard-docker-run:
+	@echo "🐳 Running Cat-Emails Dashboard in Docker..."
+	docker run -d \
+		--name $(DASHBOARD_CONTAINER_NAME) \
+		-p $(DASHBOARD_PORT):5000 \
+		-v $(PWD)/email_summaries:/app/email_summaries \
+		-e FLASK_HOST=0.0.0.0 \
+		-e FLASK_PORT=5000 \
+		-e FLASK_DEBUG=False \
+		-e DB_PATH=/app/email_summaries/summaries.db \
+		$(DASHBOARD_IMAGE_NAME)
+	@echo "✅ Dashboard running at http://localhost:$(DASHBOARD_PORT)"
+
+dashboard-docker-stop:
+	@echo "🛑 Stopping Cat-Emails Dashboard container..."
+	docker stop $(DASHBOARD_CONTAINER_NAME) || true
+	docker rm $(DASHBOARD_CONTAINER_NAME) || true
+
+dashboard-docker-logs:
+	@echo "📋 Viewing Cat-Emails Dashboard logs..."
+	docker logs -f $(DASHBOARD_CONTAINER_NAME)
+
+# Health check
+dashboard-health:
+	@echo "🏥 Checking dashboard health..."
+	@curl -f http://localhost:$(DASHBOARD_PORT)/api/health || echo "❌ Dashboard is not responding"
+
+# Clean dashboard containers and images
+dashboard-clean:
+	@echo "🧹 Cleaning up dashboard containers and images..."
+	docker stop $(DASHBOARD_CONTAINER_NAME) || true
+	docker rm $(DASHBOARD_CONTAINER_NAME) || true
+	docker rmi $(DASHBOARD_IMAGE_NAME) || true
+
+# Test dashboard API endpoints
+dashboard-test-api:
+	@echo "🧪 Testing dashboard API endpoints..."
+	@curl -s http://localhost:$(DASHBOARD_PORT)/api/health | jq '.' || echo "Health check failed"
+	@curl -s http://localhost:$(DASHBOARD_PORT)/api/stats/overview?period=week | jq '.success' || echo "Overview API failed"
+	@curl -s http://localhost:$(DASHBOARD_PORT)/api/stats/categories?limit=5 | jq '.success' || echo "Categories API failed"
+
+# Development helpers
+dashboard-watch:
+	@echo "👁️  Watching for changes (requires entr)..."
+	find . -name "*.py" -o -name "*.html" -o -name "*.css" -o -name "*.js" | entr -r make dashboard-dev
+
+dashboard-check:
+	@echo "🔍 Checking dashboard files..."
+	@python -c "import web_dashboard; print('✅ Flask app imports successfully')"
+	@python -c "import services.database_service; print('✅ Database service working')"
+	@echo "✅ Dashboard files are ready"
+
+# Help
+dashboard-help:
+	@echo "Cat-Emails Web Dashboard Commands:"
+	@echo ""
+	@echo "Development:"
+	@echo "  dashboard-dev       Start dashboard in development mode"
+	@echo "  dashboard-run       Start dashboard in production mode"  
+	@echo "  dashboard-deps      Install web dependencies"
+	@echo "  dashboard-check     Check dashboard imports and files"
+	@echo ""
+	@echo "Docker:"
+	@echo "  dashboard-build     Build dashboard Docker image"
+	@echo "  dashboard-docker-run   Run dashboard in Docker"
+	@echo "  dashboard-docker-stop  Stop dashboard container"
+	@echo "  dashboard-docker-logs  View dashboard logs"
+	@echo ""
+	@echo "Testing:"
+	@echo "  dashboard-health    Check dashboard health"
+	@echo "  dashboard-test-api  Test API endpoints"
+	@echo ""
+	@echo "Maintenance:"
+	@echo "  dashboard-clean     Clean up Docker containers/images"
+
+# Default dashboard target
+dashboard: dashboard-run
+
+.PHONY: dashboard dashboard-dev dashboard-run dashboard-deps dashboard-build dashboard-docker-run dashboard-docker-stop dashboard-docker-logs dashboard-health dashboard-clean dashboard-test-api dashboard-watch dashboard-check dashboard-help
