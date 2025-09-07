@@ -45,15 +45,13 @@ if args.base_url:
     args.primary_host = args.base_url
 
 
-def _make_llm_categorizer(model: str) -> LLMCategorizeEmails:
-    """Construct LLMCategorizeEmails using env/args for base_url and api key."""
-    base_url = args.primary_host or os.environ.get('OLLAMA_HOST_PRIMARY')
-    if base_url and not base_url.startswith("http"):
-        base_url = f"http://{base_url}"
-    api_key = os.environ.get("OPENAI_API_KEY", "ollama")
-    return LLMCategorizeEmails(provider="ollama", api_token=api_key, model=model, base_url=base_url)
+def _make_llm_categorizer(model: str = "google/gemini-2.0-flash-001") -> LLMCategorizeEmails:
+    """Construct LLMCategorizeEmails for RequestYAI (OpenAI-compatible) using env for base_url and api key."""
+    base_url = os.environ.get("REQUESTYAI_BASE_URL", "https://api.requesty.ai")
+    api_key = os.environ.get("REQUESTYAI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
+    return LLMCategorizeEmails(provider="requestyai", api_token=api_key, model=model, base_url=base_url)
 
-def categorize_email_with_resilient_client(contents: str, model: str = "llama3.2:latest") -> str:
+def categorize_email_with_resilient_client(contents: str, model: str = "google/gemini-2.0-flash-001") -> str:
     """
     Categorize email using the LLMCategorizeEmails interface (OpenAI-compatible / Ollama gateway).
     """
@@ -75,7 +73,7 @@ def categorize_email_with_resilient_client(contents: str, model: str = "llama3.2
 def categorize_email_ell_marketing(contents: str):
     """Categorize email using LLMCategorizeEmails with the primary model."""
     try:
-        result = _make_llm_categorizer("llama3.2:latest").category(contents)
+        result = _make_llm_categorizer().category(contents)
         return result.value if isinstance(result, SimpleEmailCategory) else "Other"
     except Exception as e:
         logger.error(f"categorize_email_ell_marketing failed: {e}")
@@ -85,7 +83,7 @@ def categorize_email_ell_marketing(contents: str):
 def categorize_email_ell_marketing2(contents: str):
     """Categorize email using LLMCategorizeEmails with the secondary model."""
     try:
-        result = _make_llm_categorizer("gemma2:latest").category(contents)
+        result = _make_llm_categorizer().category(contents)
         return result.value if isinstance(result, SimpleEmailCategory) else "Other"
     except Exception as e:
         logger.error(f"categorize_email_ell_marketing2 failed: {e}")

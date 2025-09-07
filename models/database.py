@@ -1,6 +1,7 @@
 """
 Database models for email summary persistence
 """
+import os
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Date, Float, Boolean, Text, ForeignKey, Index, UniqueConstraint
@@ -190,14 +191,32 @@ class ProcessingRun(Base):
 
 
 # Database initialization functions
-def get_database_url(db_path: str = "./email_summaries/summaries.db") -> str:
-    """Get the database URL"""
+def get_database_url(db_path: Optional[str] = None) -> str:
+    """
+    Build an absolute SQLite database URL and ensure the parent directory exists.
+
+    If db_path is not provided, default to a path inside the project:
+    ../email_summaries/summaries.db relative to this file.
+    """
+    # Determine the database file path
+    if db_path is None or not isinstance(db_path, str) or not db_path.strip():
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        db_path = os.path.join(base_dir, "email_summaries", "summaries.db")
+    else:
+        # Expand user and make absolute
+        db_path = os.path.abspath(os.path.expanduser(db_path))
+
+    # Ensure the directory exists
+    db_dir = os.path.dirname(db_path)
+    os.makedirs(db_dir, exist_ok=True)
+
     return f"sqlite:///{db_path}"
 
 
-def init_database(db_path: str = "./email_summaries/summaries.db"):
+def init_database(db_path: Optional[str] = None):
     """Initialize the database schema"""
-    engine = create_engine(get_database_url(db_path))
+    # For SQLite in multi-threaded app, allow cross-thread access per engine
+    engine = create_engine(get_database_url(db_path), connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     return engine
 

@@ -48,8 +48,8 @@ class LLMCategorizeEmails(CategorizeEmails):
         self.agent = None   # pydantic-ai Agent when applicable
 
         # Provider-specific client/agent creation
-        if provider_norm in {"openai", "ollama"}:
-            # Use OpenAI SDK for OpenAI and OpenAI-compatible endpoints (e.g., Ollama gateways)
+        if provider_norm in {"openai", "ollama", "requestyai"}:
+            # Use OpenAI SDK for OpenAI and OpenAI-compatible endpoints (e.g., Ollama gateways, RequestYAI)
             client_kwargs = {"api_key": api_token}
             if base_url:
                 client_kwargs["base_url"] = base_url.rstrip("/") + "/v1"
@@ -137,4 +137,3 @@ class LLMCategorizeEmails(CategorizeEmails):
         except Exception as e:
             logger.error(f"LLM provider error: {e}")
             return CategoryError(error="ProviderError", detail=str(e))
-
