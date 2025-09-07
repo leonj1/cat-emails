@@ -344,16 +344,14 @@ def process_email(client, msg_id, category_counter=None):
     contents_without_encoded = remove_encoded_content(contents_without_images)
     contents_cleaned = contents_without_encoded
 
-    ignore_existing_labels = True
-    
-    if not ignore_existing_labels:
-        if existing_email_labels is not None and len(existing_email_labels) > 0:
-            if len(existing_email_labels) == 1 and existing_email_labels[0] == b'\\Important':
-                pass
-            else:
-                logger.info(f"Email - {msg_id} has labels {existing_email_labels}. Skipping...")
-                logger.info("---")
-                return existing_email_labels
+    # The GMail label '\Important' is special and should be ignored when checking for seen labels
+    has_seen_labels = existing_email_labels and any(label != b'\Important' for label in existing_email_labels)
+
+    if has_seen_labels:
+        logger.info(f"Message {msg_id} was previously seen. Labels: {existing_email_labels}")
+        return existing_email_labels
+    else:
+        logger.info(f"Message {msg_id} is a new message.")
     
     category = categorize_email_ell_for_me(contents_cleaned)
     category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '')
