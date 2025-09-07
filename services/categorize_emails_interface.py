@@ -6,10 +6,14 @@ from typing import TypedDict, Union
 
 
 class SimpleEmailCategory(str, Enum):
-    """Three basic categories for commercial email classification."""
+    """Basic categories for commercial email classification."""
     ADVERTISING = "Advertising"
     MARKETING = "Marketing"
-    WANTS_MONEY = "Wants-Money"
+    WANTS_MONEY1 = "Wants-Money"
+    WANTS_MONEY2 = "WantsMoney"
+    OTHER = "Other"
+    BLOCKED_DOMAIN = "Blocked_Domain"
+    ALLOWED_DOMAIN = "Allowed_Domain"
 
 
 class CategoryError(TypedDict):

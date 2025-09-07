@@ -35,7 +35,7 @@ async function fetchData(endpoint) {
         const data = await response.json();
         
         // Handle FastAPI responses (direct data) vs Flask responses (wrapped in success/data structure)
-        if (endpoint.includes('192.168.1.162:8005') || endpoint.startsWith('/api/accounts') || endpoint.startsWith('/api/processing')) {
+        if (endpoint.includes('localhost:8001') || endpoint.startsWith('/api/accounts') || endpoint.startsWith('/api/processing')) {
             // FastAPI endpoints return data directly
             if (!response.ok) {
                 throw new Error(data.detail || data.message || 'API request failed');
@@ -199,7 +199,7 @@ async function refreshCategoriesData() {
         showCategoriesLoading();
         
         // First get accounts list to find primary account
-        const accountsData = await fetchData('http://192.168.1.162:8005/api/accounts');
+        const accountsData = await fetchData('`${window.API_BASE_URL}/api/accounts');
         
         if (!accountsData || !accountsData.accounts || accountsData.accounts.length === 0) {
             console.warn('No email accounts found');
@@ -226,7 +226,7 @@ async function refreshCategoriesData() {
         }
         
         // Fetch category data from FastAPI endpoint
-        const categoriesResponse = await fetchData(`http://192.168.1.162:8005/api/accounts/${encodeURIComponent(primaryAccount.email)}/categories/top?days=${days}&limit=25&include_counts=true`);
+        const categoriesResponse = await fetchData(``${window.API_BASE_URL}/api/accounts/${encodeURIComponent(primaryAccount.email)}/categories/top?days=${days}&limit=25&include_counts=true`);
         
         if (!categoriesResponse || !categoriesResponse.top_categories) {
             console.warn('No category data returned');
@@ -1173,7 +1173,7 @@ function showCategoryDetails(category) {
 // Background execution time functions
 async function fetchBackgroundExecutionTime() {
     try {
-        const API_BASE_URL = 'http://192.168.1.162:8005'; // FastAPI service
+        const API_BASE_URL = '`${window.API_BASE_URL}'; // FastAPI service
         const response = await fetch(`${API_BASE_URL}/api/background/next-execution`);
         const data = await response.json();
         

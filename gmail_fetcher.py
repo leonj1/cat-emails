@@ -16,8 +16,8 @@ from services.email_summary_service import EmailSummaryService
 from services.account_category_service import AccountCategoryService
 
 from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
-from services.categorize_emails_llm import LLMCategorizeEmails
 from services.categorize_emails_interface import SimpleEmailCategory
+from services.categorize_emails_llm import LLMCategorizeEmails
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--primary-host", default=os.environ.get('OLLAMA_HOST_PRIMARY', '10.1.1.247:11434'),
@@ -555,22 +555,39 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     try:
         fetcher.connect()
         recent_emails = fetcher.get_recent_emails(hours)
+        logger.info(f"Fetched {len(recent_emails)} records from the last {hours} hours.")
+
+        # Identify which emails are new
+        new_emails = []
+        db_svc = getattr(fetcher.summary_service, "db_service", None)
+        if db_svc:
+            for msg in recent_emails:
+                message_id = msg.get("Message-ID", '')
+                if message_id and not db_svc.is_message_processed(email_address, message_id):
+                    new_emails.append(msg)
+                elif not message_id:
+                    logger.warning("Found an email without a Message-ID, processing it as new.")
+                    new_emails.append(msg)
+            logger.info(f"Identified {len(new_emails)} records that are new.")
+        else:
+            logger.warning("Database service not available. Processing all fetched emails as new.")
+            new_emails = recent_emails
 
         # Update fetched count
         fetcher.summary_service.run_metrics['fetched'] = len(recent_emails)
 
-        print(f"Found {len(recent_emails)} emails in the last {hours} hours:")
-        for msg in recent_emails:
+        print(f"Found {len(new_emails)} new emails to process:")
+        for msg in new_emails:
             # Early extract identifiers and prevent duplicate processing before any LLM calls
             from_header = str(msg.get('From', ''))
             subject = msg.get('Subject', '')
             message_id = msg.get("Message-ID", '')
 
-            db_svc = getattr(fetcher.summary_service, "db_service", None)
+            # This check is now redundant because we pre-filter, but we'll keep it as a safeguard.
             if db_svc and message_id:
                 try:
                     if db_svc.is_message_processed(email_address, message_id):
-                        print(f"Skipping already-processed message for {email_address}: {message_id}")
+                        logger.info(f"Skipping already-processed message (safeguard): {message_id}")
                         continue
                 except Exception as e:
                     logger.warning(f"Duplicate check failed for message {message_id}: {e}. Proceeding without skip.")
@@ -604,7 +621,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '').strip()
 
                 # Validate category response
-                valid_categories = {'Wants-Money', 'Advertising', 'Marketing', 'Other'}
+                valid_categories = {category.value for category in SimpleEmailCategory}
                 if len(category) > 30 or category not in valid_categories:
                     logger.warning(f"Invalid category response: '{category}', defaulting to 'Other'")
                     category = 'Other'

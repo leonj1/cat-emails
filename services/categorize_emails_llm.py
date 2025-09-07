@@ -132,8 +132,16 @@ class LLMCategorizeEmails(CategorizeEmails):
                 return SimpleEmailCategory.ADVERTISING
             if normalized == "marketing":
                 return SimpleEmailCategory.MARKETING
+            if normalized == "wants-money":
+                return SimpleEmailCategory.WANTS_MONEY1
             if normalized == "wantsmoney":
-                return SimpleEmailCategory.WANTS_MONEY
+                return SimpleEmailCategory.WANTS_MONEY2
+
+            # Check for "Wants-Money" with a hyphen, in case the model returns it
+            if "wants-money" in content.lower():
+                return SimpleEmailCategory.WANTS_MONEY1
+            if "wantsmoney" in content.lower():
+                return SimpleEmailCategory.WANTS_MONEY2
 
             logger.warning(f"LLM returned unexpected category output: {content!r}")
             return CategoryError(

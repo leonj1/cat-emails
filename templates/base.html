@@ -17,6 +17,10 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     
+    <script>
+        window.API_BASE_URL = "{{ api_base_url|safe }}";
+    </script>
+    
     {% block extra_head %}{% endblock %}
 </head>
 <body>

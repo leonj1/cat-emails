@@ -47,7 +47,8 @@ def dashboard():
     """Main dashboard page"""
     try:
         logger.info("Rendering dashboard page")
-        return render_template('dashboard.html')
+        api_base_url = os.getenv('API_BASE_URL', 'http://localhost:8001')
+        return render_template('dashboard.html', api_base_url=api_base_url)
     except Exception as e:
         logger.error(f"Error rendering dashboard: {e}")
         return f"Error loading dashboard: {str(e)}", 500

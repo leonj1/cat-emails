@@ -78,9 +78,9 @@ class GmailFetcher(GmailFetcherInterface):
             blocked = self.domain_service.fetch_blocked_domains()
             self._blocked_domains = {d.domain for d in blocked}
 
-            # Fetch and cache blocked categories
+            # Fetch and cache blocked categories, converting them to lowercase for case-insensitive matching
             categories = self.domain_service.fetch_blocked_categories()
-            self._blocked_categories = {c.category for c in categories}
+            self._blocked_categories = {c.category.lower() for c in categories}
 
         except Exception as e:
             error_msg = str(e)
@@ -119,8 +119,8 @@ class GmailFetcher(GmailFetcherInterface):
         return domain in self._blocked_domains
 
     def _is_category_blocked(self, category: str) -> bool:
-        """Check if the category is in the blocked categories list."""
-        return category in self._blocked_categories
+        """Check if the category is in the blocked categories list (case-insensitive)."""
+        return category.lower() in self._blocked_categories
 
     def connect(self) -> None:
         """Establish connection to Gmail IMAP server."""
