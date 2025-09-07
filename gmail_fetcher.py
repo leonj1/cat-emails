@@ -561,6 +561,20 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
 
         print(f"Found {len(recent_emails)} emails in the last {hours} hours:")
         for msg in recent_emails:
+            # Early extract identifiers and prevent duplicate processing before any LLM calls
+            from_header = str(msg.get('From', ''))
+            subject = msg.get('Subject', '')
+            message_id = msg.get("Message-ID", '')
+
+            db_svc = getattr(fetcher.summary_service, "db_service", None)
+            if db_svc and message_id:
+                try:
+                    if db_svc.is_message_processed(email_address, message_id):
+                        print(f"Skipping already-processed message for {email_address}: {message_id}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"Duplicate check failed for message {message_id}: {e}. Proceeding without skip.")
+
             # Get the email body
             body = fetcher.get_email_body(msg)
             pre_categorized = False
@@ -672,6 +686,14 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                     category_actions[category]["kept"] += 1
                 elif action_taken == "archived":
                     category_actions[category]["archived"] += 1
+
+                # Record as processed to prevent reprocessing on future runs
+                db_svc = getattr(fetcher.summary_service, "db_service", None)
+                if db_svc and message_id:
+                    try:
+                        db_svc.log_processed_email(email_address, message_id)
+                    except Exception as e:
+                        logger.warning(f"Failed to log processed message {message_id}: {e}")
 
                 print("-" * 50)
             except Exception as e:

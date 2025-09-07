@@ -190,6 +190,21 @@ class ProcessingRun(Base):
     )
 
 
+class ProcessedEmailLog(Base):
+    """Log of processed emails to prevent duplicate processing per account"""
+    __tablename__ = 'processed_email_log'
+
+    id = Column(Integer, primary_key=True)
+    account_email = Column(String(255), nullable=False, index=True)
+    message_id = Column(String(255), nullable=False, index=True)
+    processed_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        UniqueConstraint('account_email', 'message_id', name='uq_account_email_message_id'),
+        Index('idx_processed_account_message', 'account_email', 'message_id'),
+    )
+
+
 # Database initialization functions
 def get_database_url(db_path: Optional[str] = None) -> str:
     """

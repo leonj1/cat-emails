@@ -8,10 +8,11 @@ from typing import List, Dict, Optional, Tuple
 from uuid import uuid4
 from sqlalchemy import create_engine, func, and_
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.exc import IntegrityError
 
 from models.database import (
     Base, EmailSummary, CategorySummary, SenderSummary, 
-    DomainSummary, ProcessingRun, get_database_url, init_database
+    DomainSummary, ProcessingRun, get_database_url, init_database, ProcessedEmailLog
 )
 
 logger = logging.getLogger(__name__)
@@ -307,3 +308,30 @@ class DatabaseService:
                 category_trends[category].append((date, count))
             
             return category_trends
+
+    def is_message_processed(self, account_email: str, message_id: str) -> bool:
+        """Check if a message has already been processed for an account."""
+        if not account_email or not message_id:
+            return False
+        with self.Session() as session:
+            exists = session.query(ProcessedEmailLog).filter_by(
+                account_email=account_email,
+                message_id=message_id
+            ).first()
+            return exists is not None
+
+    def log_processed_email(self, account_email: str, message_id: str) -> None:
+        """Record that a message has been processed to prevent re-processing."""
+        if not account_email or not message_id:
+            return
+        with self.Session() as session:
+            try:
+                record = ProcessedEmailLog(account_email=account_email, message_id=message_id)
+                session.add(record)
+                session.commit()
+            except IntegrityError:
+                # Already recorded (unique constraint), safe to ignore
+                session.rollback()
+            except Exception:
+                session.rollback()
+                raise
