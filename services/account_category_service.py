@@ -4,6 +4,7 @@ Handles business logic for account management and email category tracking.
 """
 import logging
 import re
+import os
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Optional
 from sqlalchemy import create_engine, func, and_, or_
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 class AccountCategoryService:
     """Service for managing email accounts and category statistics."""
     
-    def __init__(self, db_session: Optional[Session] = None, db_path: str = "./email_summaries/summaries.db"):
+    def __init__(self, db_session: Optional[Session] = None, db_path: Optional[str] = None):
         """
         Initialize the AccountCategoryService.
         
@@ -38,8 +39,8 @@ class AccountCategoryService:
             self.engine = None
             self.Session = None
         else:
-            self.db_path = db_path
-            self.engine = init_database(db_path)
+            self.db_path = db_path if (isinstance(db_path, str) and db_path.strip()) else os.getenv("DATABASE_PATH") or "./email_summaries/summaries.db"
+            self.engine = init_database(self.db_path)
             self.Session = sessionmaker(bind=self.engine)
             self.session = None
             self.owns_session = True

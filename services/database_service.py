@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 class DatabaseService:
     """Service for managing database operations"""
     
-    def __init__(self, db_path: str = "./email_summaries/summaries.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: Optional[str] = None):
+        self.db_path = db_path if (isinstance(db_path, str) and db_path.strip()) else os.getenv("DATABASE_PATH") or "./email_summaries/summaries.db"
         self.engine = None
         self.Session = None
         self._ensure_database()
@@ -39,8 +39,7 @@ class DatabaseService:
         logger.info(f"Database initialized at {self.db_path}")
     
     def start_processing_run(self, email_address: str) -> str:
-        """Start a new processing run and return its ID"""
-        run_id = str(uuid4())
+        """Start a new processing run and return its ID (format: 'run-<id>')"""
         
         with self.Session() as session:
             run = ProcessingRun(
@@ -50,8 +49,8 @@ class DatabaseService:
             )
             session.add(run)
             session.commit()
-        
-        return run_id
+            # Use the auto-incrementing DB ID for consistency across the system
+            return f"run-{run.id}"
     
     def complete_processing_run(self, run_id: str, metrics: Dict[str, int], 
                                success: bool = True, error_message: Optional[str] = None):

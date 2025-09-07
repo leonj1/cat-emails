@@ -12,11 +12,8 @@ import pytest
 REQUESTY_API_KEY = os.getenv("REQUESTY_API_KEY")
 REQUESTY_API_URL = os.getenv("REQUESTY_API_URL")
 
-# Normalize base URL for OpenAI-compatible client: strip trailing '/v1' if provided,
-# since LLMCategorizeEmails appends '/v1' internally.
+# Normalize base URL for OpenAI-compatible client: provide full root (often includes '/v1')
 REQUESTY_BASE_URL = (REQUESTY_API_URL or "").rstrip("/")
-if REQUESTY_BASE_URL.endswith("/v1"):
-    REQUESTY_BASE_URL = REQUESTY_BASE_URL[:-3]
 
 # Skip the test at collection time if required env vars are not provided
 if not REQUESTY_API_KEY or not REQUESTY_BASE_URL:

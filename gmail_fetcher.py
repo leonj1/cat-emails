@@ -45,13 +45,23 @@ if args.base_url:
     args.primary_host = args.base_url
 
 
-def _make_llm_categorizer(model: str = "google/gemini-2.0-flash-001") -> LLMCategorizeEmails:
-    """Construct LLMCategorizeEmails for RequestYAI (OpenAI-compatible) using env for base_url and api key."""
-    base_url = os.environ.get("REQUESTYAI_BASE_URL", "https://api.requesty.ai")
-    api_key = os.environ.get("REQUESTYAI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
+def _make_llm_categorizer(model: str) -> LLMCategorizeEmails:
+    """Construct LLMCategorizeEmails for RequestYAI (OpenAI-compatible) using env for base_url and api key.
+    Provide full OpenAI-compatible root (may include version), e.g. https://api.requesty.ai/openai/v1
+    """
+    base_url = (
+        os.environ.get("REQUESTYAI_BASE_URL")
+        or os.environ.get("REQUESTY_API_URL")
+        or "https://api.requesty.ai/openai/v1"
+    )
+    api_key = (
+        os.environ.get("REQUESTYAI_API_KEY")
+        or os.environ.get("REQUESTY_API_KEY")
+        or os.environ.get("OPENAI_API_KEY", "")
+    )
     return LLMCategorizeEmails(provider="requestyai", api_token=api_key, model=model, base_url=base_url)
 
-def categorize_email_with_resilient_client(contents: str, model: str = "google/gemini-2.0-flash-001") -> str:
+def categorize_email_with_resilient_client(contents: str, model: str) -> str:
     """
     Categorize email using the LLMCategorizeEmails interface (OpenAI-compatible / Ollama gateway).
     """
@@ -197,15 +207,23 @@ class GmailFetcher:
     def connect(self) -> None:
         """Establish connection to Gmail IMAP server."""
         try:
-            # Use original credentials without encoding
-            email = self.email_address
-            password = self.password
+            # Prepare credentials (do not mutate password; only normalize email display)
+            email = (self.email_address or "").replace("\u00a0", " ").strip()
+            password = self.password or ""
 
             logger.info(f"Attempting to connect to {self.imap_server} for {email}")
             self.conn = imaplib.IMAP4_SSL(self.imap_server)
-            self.conn.login(email, password)
+
+            # Use SASL AUTHENTICATE PLAIN with explicit UTF-8 bytes to avoid ASCII encoding issues
+            def _auth_plain(_challenge: bytes) -> bytes:
+                return b"\0" + email.encode("utf-8") + b"\0" + password.encode("utf-8")
+
+            typ, data = self.conn.authenticate("PLAIN", _auth_plain)
+            if typ != "OK":
+                raise imaplib.IMAP4.error(f"AUTHENTICATE PLAIN failed: {data!r}")
+
             logger.info("Successfully connected to Gmail IMAP server")
-        except imaplib.IMAP4_SSL.error as e:
+        except (imaplib.IMAP4.error, UnicodeEncodeError) as e:
             logger.error(f"Failed to connect to Gmail: {str(e)}")
             raise Exception(f"Failed to connect to Gmail: {str(e)}")
 
@@ -532,6 +550,8 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     # Initialize category tracking for this session
     category_actions = {}  # Track actions per category: {category: {"total": N, "deleted": N, "kept": N, "archived": N}}
 
+    model = "vertex/google/gemini-2.5-flash"
+
     try:
         fetcher.connect()
         recent_emails = fetcher.get_recent_emails(hours)
@@ -564,7 +584,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 contents_without_encoded = fetcher.remove_encoded_content(contents_without_images)
                 contents_cleaned = contents_without_encoded
                 # Use the resilient client for categorization
-                category = categorize_email_with_resilient_client(contents_cleaned)
+                category = categorize_email_with_resilient_client(contents_cleaned, model)
 
                 # Clean up the category response
                 category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '').strip()

@@ -195,22 +195,31 @@ def get_database_url(db_path: Optional[str] = None) -> str:
     """
     Build an absolute SQLite database URL and ensure the parent directory exists.
 
-    If db_path is not provided, default to a path inside the project:
-    ../email_summaries/summaries.db relative to this file.
+    Priority order for database path:
+    1) Explicit db_path parameter (if provided)
+    2) DATABASE_PATH environment variable
+    3) Default: <project_root>/email_summaries/summaries.db
     """
     # Determine the database file path
-    if db_path is None or not isinstance(db_path, str) or not db_path.strip():
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        db_path = os.path.join(base_dir, "email_summaries", "summaries.db")
+    env_db_path = os.getenv("DATABASE_PATH")
+    chosen_path = None
+
+    if isinstance(db_path, str) and db_path.strip():
+        chosen_path = db_path
+    elif isinstance(env_db_path, str) and env_db_path.strip():
+        chosen_path = env_db_path
     else:
-        # Expand user and make absolute
-        db_path = os.path.abspath(os.path.expanduser(db_path))
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        chosen_path = os.path.join(base_dir, "email_summaries", "summaries.db")
+
+    # Expand user and make absolute
+    db_path_abs = os.path.abspath(os.path.expanduser(chosen_path))
 
     # Ensure the directory exists
-    db_dir = os.path.dirname(db_path)
+    db_dir = os.path.dirname(db_path_abs)
     os.makedirs(db_dir, exist_ok=True)
 
-    return f"sqlite:///{db_path}"
+    return f"sqlite:///{db_path_abs}"
 
 
 def init_database(db_path: Optional[str] = None):

@@ -873,6 +873,14 @@ async def websocket_status_endpoint(websocket: WebSocket):
             pass
 
 
+@app.websocket("/ws")
+async def websocket_status_alias(websocket: WebSocket):
+    """
+    Backward-compatible alias for /ws/status to support clients requesting `/ws`.
+    """
+    await websocket_status_endpoint(websocket)
+
+
 @app.post("/api/test/create-sample-data")
 async def create_sample_data(x_api_key: Optional[str] = Header(None), report_type: Optional[str] = "Daily"):
     """

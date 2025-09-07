@@ -54,14 +54,14 @@ class EmailSummaryService:
         if use_database:
             try:
                 self.db_service = DatabaseService(
-                    db_path=str(self.data_dir / "summaries.db")
+                    db_path=os.getenv("DATABASE_PATH") or str(self.data_dir / "summaries.db")
                 )
                 logger.info("Database service initialized for email summaries")
                 
                 # Initialize account category service
                 try:
                     self.account_service = AccountCategoryService(
-                        db_path=str(self.data_dir / "summaries.db")
+                        db_path=os.getenv("DATABASE_PATH") or str(self.data_dir / "summaries.db")
                     )
                     logger.info("Account category service initialized")
                 except Exception as e:
@@ -133,7 +133,9 @@ class EmailSummaryService:
                     self.current_account_id = None
         
         if self.db_service and self.use_database:
-            self.current_run_id = self.db_service.start_processing_run(scan_hours)
+            # Use the Gmail account email as the identifier for the processing run
+            email_address = self.gmail_email or "unknown"
+            self.current_run_id = self.db_service.start_processing_run(email_address)
             logger.info(f"Started processing run: {self.current_run_id}")
     
     def complete_processing_run(self, success: bool = True, error_message: Optional[str] = None) -> None:

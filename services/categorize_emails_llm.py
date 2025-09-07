@@ -25,8 +25,11 @@ class LLMCategorizeEmails(CategorizeEmails):
       - model: model name to use for categorization
 
     Optionally, base_url can be provided to target non-default OpenAI-compatible endpoints
-    (e.g., an Ollama/OpenAI-compatible gateway). If not provided, defaults to the
-    provider's SDK default where applicable.
+    (e.g., an Ollama/OpenAI-compatible gateway). Provide the full API root as required by
+    your provider (often includes a version path), for example:
+      - http://localhost:11434/v1 (Ollama)
+      - https://api.requesty.ai/openai/v1 (RequestYAI)
+    If not provided, defaults to the provider's SDK default where applicable.
     """
 
     def __init__(self, provider: str, api_token: str, model: str, *, base_url: Optional[str] = None):
@@ -44,15 +47,18 @@ class LLMCategorizeEmails(CategorizeEmails):
 
         self.provider = provider_norm
         self.model = model
+
+        logger.info(f"LLM configuration: provider={self.provider}, model={self.model}, base_url={'(default SDK)' if not base_url else base_url}")
+
         self.client = None  # OpenAI-compatible client when applicable
         self.agent = None   # pydantic-ai Agent when applicable
 
         # Provider-specific client/agent creation
         if provider_norm in {"openai", "ollama", "requestyai"}:
-            # Use OpenAI SDK for OpenAI and OpenAI-compatible endpoints (e.g., Ollama gateways, RequestYAI)
+            # Use OpenAI SDK for OpenAI-compatible endpoints. Expect base_url to be full root (may include version path).
             client_kwargs = {"api_key": api_token}
             if base_url:
-                client_kwargs["base_url"] = base_url.rstrip("/") + "/v1"
+                client_kwargs["base_url"] = base_url.rstrip("/")
             self.client = OpenAI(**client_kwargs)
         else:
             # Prefer pydantic-ai Agent clients for non-OpenAI providers
@@ -68,7 +74,7 @@ class LLMCategorizeEmails(CategorizeEmails):
                 elif provider_norm == "requestyai":
                     # Treat RequestYAI as OpenAI-compatible if using pydantic-ai
                     from pydantic_ai.models.openai import OpenAIModel  # type: ignore
-                    base = base_url.rstrip("/") + "/v1" if base_url else None
+                    base = base_url.rstrip("/") if base_url else None
                     model_provider = OpenAIModel(model, api_key=api_token, base_url=base)
                 else:
                     raise ValueError(f"Unhandled provider: {provider}")

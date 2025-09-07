@@ -2,6 +2,7 @@
 Settings service for managing user preferences and configuration
 """
 import logging
+import os
 from typing import Optional, Any, Union
 from sqlalchemy.orm import Session, sessionmaker
 from datetime import datetime
@@ -14,9 +15,9 @@ logger = logging.getLogger(__name__)
 class SettingsService:
     """Service for managing user settings and preferences"""
     
-    def __init__(self, db_path: str = "./email_summaries/summaries.db"):
-        self.db_path = db_path
-        self.engine = init_database(db_path)
+    def __init__(self, db_path: Optional[str] = None):
+        self.db_path = db_path if (isinstance(db_path, str) and db_path.strip()) else os.getenv("DATABASE_PATH") or "./email_summaries/summaries.db"
+        self.engine = init_database(self.db_path)
         self.Session = sessionmaker(bind=self.engine)
         self._initialize_default_settings()
     

@@ -17,7 +17,7 @@ validate-env:
 # Docker image name
 IMAGE_NAME = gmail-cleaner
 TEST_IMAGE_NAME = gmail-cleaner-test
-SERVICE_IMAGE_NAME = gmail-cleaner-service
+SERVICE_IMAGE_NAME = gmail-cleaner-api
 CONSOLIDATOR_IMAGE_NAME = gmail-label-consolidator
 EMAIL_TEST_IMAGE_NAME = gmail-email-test
 API_IMAGE_NAME = gmail-cleaner-api
@@ -58,6 +58,8 @@ start: validate-env
 		-e MORNING_MINUTE=$(or $(MORNING_MINUTE),30) \
 		-e EVENING_HOUR=$(or $(EVENING_HOUR),16) \
 		-e EVENING_MINUTE=$(or $(EVENING_MINUTE),30) \
+		-e REQUESTYAI_API_KEY="$(REQUESTY_API_KEY)" \
+		-e REQUESTY_API_URL="$(REQUESTY_API_URL)" \
 		--restart unless-stopped \
 		$(SERVICE_IMAGE_NAME)
 	@echo "Service started. Use 'make service-logs' to view logs."

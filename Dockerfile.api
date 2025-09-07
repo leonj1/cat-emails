@@ -28,6 +28,8 @@ ENV GMAIL_EMAIL=""
 ENV SUMMARY_RECIPIENT_EMAIL=""
 ENV MAILTRAP_API_TOKEN=""
 ENV PYTHONUNBUFFERED=1
+# Ensure SQLite DB path is explicit and writable inside the container
+ENV DATABASE_PATH="/app/email_summaries/summaries.db"
 
 # Expose the API port
 EXPOSE 8000
