@@ -22,6 +22,7 @@ from send_emails import send_summary_by_type
 from services.account_category_service import AccountCategoryService
 from services.processing_status_manager import ProcessingStatusManager, ProcessingState
 from services.websocket_handler import StatusWebSocketManager
+from services.settings_service import SettingsService
 from models.account_models import (
     TopCategoriesResponse, AccountListResponse, EmailAccountInfo,
     AccountCategoryStatsRequest
@@ -76,6 +77,9 @@ processing_status_manager = ProcessingStatusManager(max_history=100)
 
 # Global WebSocket manager instance
 websocket_manager: Optional[StatusWebSocketManager] = None
+
+# Global settings service instance
+settings_service = SettingsService()
 
 
 class SummaryResponse(BaseModel):
@@ -222,11 +226,13 @@ def process_account_emails(email_address: str) -> Dict:
         time.sleep(1)  # Simulate connection time
         
         # Step 2: Fetch emails
+        # Get the current lookback hours from settings
+        current_lookback_hours = settings_service.get_lookback_hours()
         processing_status_manager.update_status(
             ProcessingState.FETCHING,
-            f"Fetching emails from last {BACKGROUND_PROCESS_HOURS} hours"
+            f"Fetching emails from last {current_lookback_hours} hours"
         )
-        logger.info(f"  🔎 Fetching emails from last {BACKGROUND_PROCESS_HOURS} hours...")
+        logger.info(f"  🔎 Fetching emails from last {current_lookback_hours} hours...")
         time.sleep(2)  # Simulate email fetching
         
         # Simulate finding some emails
@@ -348,7 +354,7 @@ def background_gmail_processor():
     logger.info("🚀 Background Gmail processor thread started")
     logger.info(f"⚙️  Configuration:")
     logger.info(f"   - Scan interval: {BACKGROUND_SCAN_INTERVAL} seconds")
-    logger.info(f"   - Process emails from last: {BACKGROUND_PROCESS_HOURS} hours")
+    logger.info(f"   - Process emails from last: {settings_service.get_lookback_hours()} hours")
     logger.info(f"   - Background processing enabled: {BACKGROUND_PROCESSING_ENABLED}")
     
     cycle_count = 0
@@ -516,7 +522,7 @@ async def health_check():
             "enabled": BACKGROUND_PROCESSING_ENABLED,
             "status": background_status,
             "scan_interval_seconds": BACKGROUND_SCAN_INTERVAL,
-            "process_hours": BACKGROUND_PROCESS_HOURS
+            "process_hours": settings_service.get_lookback_hours()
         }
     }
 
@@ -595,7 +601,7 @@ async def get_background_status(x_api_key: Optional[str] = Header(None)):
         "thread": thread_info,
         "configuration": {
             "scan_interval_seconds": BACKGROUND_SCAN_INTERVAL,
-            "process_hours": BACKGROUND_PROCESS_HOURS
+            "process_hours": settings_service.get_lookback_hours()
         },
         "timestamp": datetime.now().isoformat()
     }

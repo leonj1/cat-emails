@@ -1,98 +1,31 @@
-import argparse
+"""
+Concrete Gmail fetcher service implementing the GmailFetcherInterface.
+This logic was extracted from gmail_fetcher.py to a dedicated service module.
+"""
+from __future__ import annotations
 import logging
-import os
 import ssl
 import imaplib
-from email import message_from_bytes
-from datetime import datetime, timedelta, timezone, date
-from email.utils import parsedate_to_datetime, parseaddr
-from typing import List, Optional, Set
-from bs4 import BeautifulSoup
 import re
 from collections import Counter
-from tabulate import tabulate
-from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
+from datetime import datetime, timedelta, timezone
+from email import message_from_bytes
+from email.utils import parsedate_to_datetime, parseaddr
+from typing import List, Optional, Set
+
+from bs4 import BeautifulSoup
+
+from domain_service import DomainService
 from services.email_summary_service import EmailSummaryService
 from services.account_category_service import AccountCategoryService
+from services.gmail_fetcher_interface import GmailFetcherInterface
 
-from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
-from services.categorize_emails_llm import LLMCategorizeEmails
-from services.categorize_emails_interface import SimpleEmailCategory
 
-parser = argparse.ArgumentParser(description="Email Fetcher")
-parser.add_argument("--primary-host", default=os.environ.get('OLLAMA_HOST_PRIMARY', '10.1.1.247:11434'),
-                   help="Primary Ollama host URL")
-parser.add_argument("--secondary-host", default=os.environ.get('OLLAMA_HOST_SECONDARY', '10.1.1.212:11434'),
-                   help="Secondary Ollama host URL (for failover)")
-parser.add_argument("--base-url", help="Deprecated: Use --primary-host instead")
-parser.add_argument("--hours", type=int, default=int(os.environ.get('HOURS', '2')), help="The hours to fetch emails")
-args = parser.parse_args()
-
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('email_processor.log'),
-        logging.StreamHandler()
-    ]
-)
 logger = logging.getLogger(__name__)
 
-# Handle deprecated --base-url argument
-if args.base_url:
-    logger.warning("--base-url is deprecated. Use --primary-host instead.")
-    args.primary_host = args.base_url
 
-
-def _make_llm_categorizer(model: str) -> LLMCategorizeEmails:
-    """Construct LLMCategorizeEmails using env/args for base_url and api key."""
-    base_url = args.primary_host or os.environ.get('OLLAMA_HOST_PRIMARY')
-    if base_url and not base_url.startswith("http"):
-        base_url = f"http://{base_url}"
-    api_key = os.environ.get("OPENAI_API_KEY", "ollama")
-    return LLMCategorizeEmails(provider="ollama", api_token=api_key, model=model, base_url=base_url)
-
-def categorize_email_with_resilient_client(contents: str, model: str = "llama3.2:latest") -> str:
-    """
-    Categorize email using the LLMCategorizeEmails interface (OpenAI-compatible / Ollama gateway).
-    """
-    try:
-        categorizer = _make_llm_categorizer(model)
-        result = categorizer.category(contents)
-
-        if isinstance(result, SimpleEmailCategory):
-            return result.value
-
-        logger.warning(f"Categorization returned error or unexpected result: {result}")
-        return "Other"
-    except Exception as e:
-        logger.error(f"Failed to categorize email via LLMCategorizeEmails: {str(e)}")
-        return "Other"
-
-# Keep the original function names for backward compatibility but route directly to LLMCategorizeEmails
-
-def categorize_email_ell_marketing(contents: str):
-    """Categorize email using LLMCategorizeEmails with the primary model."""
-    try:
-        result = _make_llm_categorizer("llama3.2:latest").category(contents)
-        return result.value if isinstance(result, SimpleEmailCategory) else "Other"
-    except Exception as e:
-        logger.error(f"categorize_email_ell_marketing failed: {e}")
-        return "Other"
-
-
-def categorize_email_ell_marketing2(contents: str):
-    """Categorize email using LLMCategorizeEmails with the secondary model."""
-    try:
-        result = _make_llm_categorizer("gemma2:latest").category(contents)
-        return result.value if isinstance(result, SimpleEmailCategory) else "Other"
-    except Exception as e:
-        logger.error(f"categorize_email_ell_marketing2 failed: {e}")
-        return "Other"
-
-class GmailFetcher:
-    def __init__(self, email_address: str, app_password: str, api_token: str = None):
+class GmailFetcher(GmailFetcherInterface):
+    def __init__(self, email_address: str, app_password: str, api_token: str | None = None):
         """
         Initialize Gmail connection using IMAP.
 
@@ -169,14 +102,7 @@ class GmailFetcher:
             self._blocked_categories = set()
 
     def _extract_domain(self, from_header: str) -> str:
-        """Extract domain from email address in From header.
-
-        Args:
-            from_header: Raw From header string
-
-        Returns:
-            str: Domain part of the email address
-        """
+        """Extract domain from email address in From header."""
         _, email_address = parseaddr(from_header)
         if '@' in email_address:
             return email_address.split('@')[-1].lower()
@@ -266,10 +192,10 @@ class GmailFetcher:
         Remove images from email contents.
 
         Args:
-        email_body (str): The email body content (can be HTML or plain text).
+            email_body (str): The email body content (can be HTML or plain text).
 
         Returns:
-        str: Email body with images removed.
+            str: Email body with images removed.
         """
         # Check if the email body is HTML
         if re.search(r'<[^>]+>', email_body):
@@ -480,235 +406,3 @@ class GmailFetcher:
             logger.error(f"Error deleting email {message_id}: {str(e)}")
             return False
 
-def print_summary(hours: int, stats: dict):
-    """Print a summary of email processing results."""
-    print("\n" + "="*50)
-    print("SUMMARY")
-    print("="*50)
-    print(f"Time window: Last {hours} hours")
-    print(f"Emails processed: {stats['deleted'] + stats['kept']}")
-    print(f"Emails deleted: {stats['deleted']}")
-    print(f"Emails kept: {stats['kept']}")
-
-    # Create category table
-    if stats['categories']:
-        print("\nCategories:")
-        table = [[category, count] for category, count in stats['categories'].most_common()]
-        print(tabulate(table, headers=['Category', 'Count'], tablefmt='grid'))
-    print("="*50 + "\n")
-
-def test_api_connection(api_token: str) -> bool:
-    """Test connection to control API before proceeding"""
-    service = DomainService(api_token=api_token)
-    try:
-        # Try to fetch domains to verify API connection
-        service.fetch_allowed_domains()
-        logger.info("Successfully connected to control API")
-        return True
-    except Exception as e:
-        logger.warning(f"Failed to connect to control API: {str(e)}")
-        logger.warning("Continuing with mock mode - no domain filtering will be applied")
-        return False
-
-def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
-    logger.info("Starting email processing")
-    logger.info(f"Processing emails from the last {hours} hours")
-
-    # Test API connection first
-    logger.info("Testing API connection")
-    api_connected = test_api_connection(api_token)
-
-    # Use mock mode if API connection failed
-    if not api_connected:
-        api_token = None  # This will enable mock mode in DomainService
-
-    # Initialize and use the fetcher
-    fetcher = ServiceGmailFetcher(email_address, app_password, api_token)
-
-    # Clear any existing tracked data to start fresh
-    fetcher.summary_service.clear_tracked_data()
-
-    # Start processing run in database
-    fetcher.summary_service.start_processing_run(scan_hours=hours)
-
-    # Initialize category tracking for this session
-    category_actions = {}  # Track actions per category: {category: {"total": N, "deleted": N, "kept": N, "archived": N}}
-
-    try:
-        fetcher.connect()
-        recent_emails = fetcher.get_recent_emails(hours)
-
-        # Update fetched count
-        fetcher.summary_service.run_metrics['fetched'] = len(recent_emails)
-
-        print(f"Found {len(recent_emails)} emails in the last {hours} hours:")
-        for msg in recent_emails:
-            # Get the email body
-            body = fetcher.get_email_body(msg)
-            pre_categorized = False
-            deletion_candidate = False
-
-            # Check domain lists
-            from_header = str(msg.get('From', ''))
-            if fetcher._is_domain_blocked(from_header):
-                category = "Blocked_Domain"
-                pre_categorized = True
-                deletion_candidate = True
-            elif fetcher._is_domain_allowed(from_header):
-                category = "Allowed_Domain"
-                pre_categorized = True
-                deletion_candidate = False
-
-            # Categorize the email if not pre-categorized
-            if not pre_categorized:
-                contents_without_links = fetcher.remove_http_links(f"{msg.get('Subject')}. {body}")
-                contents_without_images = fetcher.remove_images_from_email(contents_without_links)
-                contents_without_encoded = fetcher.remove_encoded_content(contents_without_images)
-                contents_cleaned = contents_without_encoded
-                # Use the resilient client for categorization
-                category = categorize_email_with_resilient_client(contents_cleaned)
-
-                # Clean up the category response
-                category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '').strip()
-
-                # Validate category response
-                valid_categories = {'Wants-Money', 'Advertising', 'Marketing', 'Other'}
-                if len(category) > 30 or category not in valid_categories:
-                    logger.warning(f"Invalid category response: '{category}', defaulting to 'Other'")
-                    category = 'Other'
-
-                # Check if category is blocked
-                if fetcher._is_category_blocked(category):
-                    deletion_candidate = True
-                else:
-                    deletion_candidate = False
-
-
-            try:
-                from_header = msg.get('From', '')
-                subject = msg.get('Subject', '')
-                message_id = msg.get("Message-ID", '')
-
-                print(f"From: {from_header}")
-                print(f"Subject: {subject}")
-                if len(category) < 20:
-                    print(f"Category: {category}")
-                print(f"Deletion Candidate: {deletion_candidate}")
-
-                # Extract sender domain for tracking
-                sender_domain = fetcher._extract_domain(from_header) if from_header else None
-
-                try:
-                    fetcher.add_label(message_id, category)
-                    # Track categories
-                    fetcher.stats['categories'][category] += 1
-                except ssl.SSLError as ssl_err:
-                    logger.error(f"SSL Error while adding label: {ssl_err}")
-                    print("Skipping label addition due to SSL error")
-                    continue
-                except Exception as e:
-                    logger.error(f"Error adding label: {e}")
-                    print("Skipping label addition due to error")
-                    continue
-
-                # Track kept/deleted emails
-                action_taken = "kept"  # Default action
-
-                if deletion_candidate:
-                    try:
-                        if fetcher.delete_email(message_id):
-                            print("Email deleted successfully")
-                            action_taken = "deleted"
-                            fetcher.stats['deleted'] += 1
-                        else:
-                            print("Failed to delete email")
-                            fetcher.stats['kept'] += 1
-                    except ssl.SSLError as ssl_err:
-                        logger.error(f"SSL Error while deleting email: {ssl_err}")
-                        print("Skipping email deletion due to SSL error")
-                        fetcher.stats['kept'] += 1
-                        continue
-                else:
-                    print("Email left in inbox")
-                    fetcher.stats['kept'] += 1
-
-                # Track email in summary service
-                fetcher.summary_service.track_email(
-                    message_id=message_id,
-                    sender=from_header,
-                    subject=subject,
-                    category=category,
-                    action=action_taken,
-                    sender_domain=sender_domain,
-                    was_pre_categorized=pre_categorized
-                )
-
-                # Track category statistics for account service
-                if category not in category_actions:
-                    category_actions[category] = {"total": 0, "deleted": 0, "kept": 0, "archived": 0}
-
-                category_actions[category]["total"] += 1
-                if action_taken == "deleted":
-                    category_actions[category]["deleted"] += 1
-                elif action_taken == "kept":
-                    category_actions[category]["kept"] += 1
-                elif action_taken == "archived":
-                    category_actions[category]["archived"] += 1
-
-                print("-" * 50)
-            except Exception as e:
-                logger.error(f"Error processing email: {e}")
-                print(f"Skipping email due to error: {e}")
-                continue
-
-        # Print summary at the end
-        print_summary(hours, fetcher.stats)
-
-        # Record category statistics and update account last scan timestamp
-        if fetcher.account_service and category_actions:
-            try:
-                today = date.today()
-                fetcher.account_service.record_category_stats(
-                    email_address=email_address,
-                    stats_date=today,
-                    category_stats=category_actions
-                )
-
-                # Update account last scan timestamp
-                fetcher.account_service.update_account_last_scan(email_address)
-                logger.info(f"Recorded category statistics for {email_address}: {len(category_actions)} categories")
-            except Exception as e:
-                logger.error(f"Failed to record category statistics for {email_address}: {str(e)}")
-                logger.warning("Email processing completed but account statistics were not recorded")
-        elif fetcher.account_service:
-            try:
-                # Still update last scan timestamp even if no emails processed
-                fetcher.account_service.update_account_last_scan(email_address)
-                logger.info(f"Updated last scan timestamp for {email_address} (no emails processed)")
-            except Exception as e:
-                logger.error(f"Failed to update last scan timestamp for {email_address}: {str(e)}")
-
-        # Complete processing run in database
-        fetcher.summary_service.complete_processing_run(success=True)
-
-    except Exception as e:
-        logger.error(f"Error during email processing: {str(e)}")
-        # Complete processing run with error
-        fetcher.summary_service.complete_processing_run(success=False, error_message=str(e))
-        raise
-    finally:
-        fetcher.disconnect()
-
-if __name__ == "__main__":
-    # Get credentials from environment variables
-    email_address = os.getenv("GMAIL_EMAIL")
-    app_password = os.getenv("GMAIL_PASSWORD")
-    api_token = os.getenv("CONTROL_API_TOKEN")
-
-    if not email_address or not app_password:
-        raise ValueError("Please set GMAIL_EMAIL and GMAIL_PASSWORD environment variables")
-
-    if not api_token:
-        raise ValueError("Please set CONTROL_API_TOKEN environment variable")
-
-    main(email_address, app_password, api_token, args.hours)

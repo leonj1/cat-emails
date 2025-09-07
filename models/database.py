@@ -10,6 +10,23 @@ from sqlalchemy.orm import relationship, sessionmaker
 Base = declarative_base()
 
 
+class UserSettings(Base):
+    """Global user settings and preferences"""
+    __tablename__ = 'user_settings'
+    
+    id = Column(Integer, primary_key=True)
+    setting_key = Column(String(100), unique=True, nullable=False, index=True)
+    setting_value = Column(String(255), nullable=False)
+    setting_type = Column(String(50), default='string')  # string, integer, float, boolean
+    description = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        UniqueConstraint('setting_key', name='uq_setting_key'),
+    )
+
+
 class EmailAccount(Base):
     """Email account information for multi-account support"""
     __tablename__ = 'email_accounts'

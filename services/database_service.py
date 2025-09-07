@@ -38,15 +38,15 @@ class DatabaseService:
         self.Session = sessionmaker(bind=self.engine)
         logger.info(f"Database initialized at {self.db_path}")
     
-    def start_processing_run(self, scan_hours: int) -> str:
+    def start_processing_run(self, email_address: str) -> str:
         """Start a new processing run and return its ID"""
         run_id = str(uuid4())
         
         with self.Session() as session:
             run = ProcessingRun(
-                run_id=run_id,
-                started_at=datetime.utcnow(),
-                scan_hours=scan_hours
+                email_address=email_address,
+                start_time=datetime.utcnow(),
+                state='started'
             )
             session.add(run)
             session.commit()
@@ -57,16 +57,11 @@ class DatabaseService:
                                success: bool = True, error_message: Optional[str] = None):
         """Complete a processing run with final metrics"""
         with self.Session() as session:
-            run = session.query(ProcessingRun).filter_by(run_id=run_id).first()
+            run = session.query(ProcessingRun).filter_by(id=int(run_id.replace('run-', ''))).first()
             if run:
-                run.completed_at = datetime.utcnow()
-                run.duration_seconds = (run.completed_at - run.started_at).total_seconds()
-                run.emails_fetched = metrics.get('fetched', 0)
+                run.end_time = datetime.utcnow()
                 run.emails_processed = metrics.get('processed', 0)
-                run.emails_deleted = metrics.get('deleted', 0)
-                run.emails_archived = metrics.get('archived', 0)
-                run.emails_error = metrics.get('error', 0)
-                run.success = success
+                run.state = 'completed' if success else 'error'
                 run.error_message = error_message
                 session.commit()
     
@@ -273,18 +268,18 @@ class DatabaseService:
         """Get recent processing runs"""
         with self.Session() as session:
             runs = session.query(ProcessingRun).order_by(
-                ProcessingRun.started_at.desc()
+                ProcessingRun.start_time.desc()
             ).limit(limit).all()
             
             return [
                 {
-                    'run_id': run.run_id,
-                    'started_at': run.started_at,
-                    'completed_at': run.completed_at,
-                    'duration_seconds': run.duration_seconds,
+                    'run_id': f"run-{run.id}",
+                    'started_at': run.start_time,
+                    'completed_at': run.end_time,
+                    'duration_seconds': (run.end_time - run.start_time).total_seconds() if run.end_time else None,
                     'emails_processed': run.emails_processed,
-                    'emails_deleted': run.emails_deleted,
-                    'success': run.success,
+                    'emails_deleted': 0,  # Not tracked in current model
+                    'success': run.state == 'completed' and not run.error_message,
                     'error_message': run.error_message
                 } for run in runs
             ]

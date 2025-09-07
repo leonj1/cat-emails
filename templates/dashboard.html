@@ -45,6 +45,11 @@
                         <button class="btn btn-outline-secondary btn-sm w-100 mt-2" onclick="refreshDashboardData()" title="Refresh dashboard data">
                             <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                         </button>
+                        
+                        <!-- Settings Button -->
+                        <button class="btn btn-outline-info btn-sm w-100 mt-2" data-bs-toggle="modal" data-bs-target="#settingsModal" title="Configure settings">
+                            <i class="bi bi-gear me-1"></i>Settings
+                        </button>
                     </div>
                 </div>
             </div>
@@ -623,4 +628,181 @@
         }
     }
 </script>
+
+<!-- Settings Modal -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="settingsModalLabel">
+                    <i class="bi bi-gear me-2"></i>Settings
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="settingsForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="bi bi-envelope-check me-2"></i>Email Processing</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="lookbackHours" class="form-label">
+                                            Look Back Hours
+                                            <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" 
+                                               title="Number of hours to look back when scanning for new emails"></i>
+                                        </label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="lookbackHours" 
+                                                   min="1" max="168" value="2" required>
+                                            <span class="input-group-text">hours</span>
+                                        </div>
+                                        <div class="form-text">
+                                            Background email scans will look back this many hours for new emails.
+                                            <br><small class="text-muted">Range: 1-168 hours (1 week max)</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="bi bi-clock me-2"></i>Current Status</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi bi-gear-fill text-primary me-2"></i>
+                                        <span class="fw-semibold">Background Processing:</span>
+                                        <span class="badge bg-success ms-auto" id="backgroundStatus">Active</span>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi bi-clock-history text-info me-2"></i>
+                                        <span class="fw-semibold">Current Look Back:</span>
+                                        <span class="badge bg-info ms-auto" id="currentLookback">2 hours</span>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-arrow-repeat text-secondary me-2"></i>
+                                        <span class="fw-semibold">Last Updated:</span>
+                                        <span class="text-muted ms-auto" id="settingsLastUpdated">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveSettings()">
+                    <i class="bi bi-check-circle me-1"></i>Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Settings functionality
+    let currentSettings = {};
+
+    // Load settings when modal opens
+    $('#settingsModal').on('show.bs.modal', function () {
+        loadSettings();
+    });
+
+    function loadSettings() {
+        fetch('/api/settings')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    currentSettings = data.settings;
+                    
+                    // Update form fields
+                    if (currentSettings.lookback_hours) {
+                        document.getElementById('lookbackHours').value = currentSettings.lookback_hours.value;
+                        document.getElementById('currentLookback').textContent = currentSettings.lookback_hours.value + ' hours';
+                        
+                        if (currentSettings.lookback_hours.updated_at) {
+                            const date = new Date(currentSettings.lookback_hours.updated_at);
+                            document.getElementById('settingsLastUpdated').textContent = date.toLocaleString();
+                        }
+                    }
+                } else {
+                    console.error('Failed to load settings:', data.message);
+                    showAlert('Failed to load settings: ' + data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading settings:', error);
+                showAlert('Error loading settings', 'danger');
+            });
+    }
+
+    function saveSettings() {
+        const lookbackHours = parseInt(document.getElementById('lookbackHours').value);
+        
+        if (lookbackHours < 1 || lookbackHours > 168) {
+            showAlert('Look back hours must be between 1 and 168', 'warning');
+            return;
+        }
+
+        const settings = {
+            lookback_hours: lookbackHours
+        };
+
+        fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(settings)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showAlert('Settings saved successfully!', 'success');
+                $('#settingsModal').modal('hide');
+                
+                // Update current status
+                document.getElementById('currentLookback').textContent = lookbackHours + ' hours';
+                document.getElementById('settingsLastUpdated').textContent = new Date().toLocaleString();
+            } else {
+                showAlert('Failed to save settings: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error saving settings:', error);
+            showAlert('Error saving settings', 'danger');
+        });
+    }
+
+    function showAlert(message, type) {
+        const alertContainer = document.createElement('div');
+        alertContainer.className = `alert alert-${type} alert-dismissible fade show`;
+        alertContainer.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        // Insert at top of modal body
+        const modalBody = document.querySelector('#settingsModal .modal-body');
+        modalBody.insertBefore(alertContainer, modalBody.firstChild);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alertContainer.parentNode) {
+                alertContainer.remove();
+            }
+        }, 5000);
+    }
+
+    // Initialize tooltips
+    $(document).ready(function() {
+        $('[data-bs-toggle="tooltip"]').tooltip();
+    });
+</script>
+
 {% endblock %}

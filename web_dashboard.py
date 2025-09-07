@@ -12,6 +12,7 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for
 from services.database_service import DatabaseService
 from services.dashboard_service import DashboardService
 from services.account_category_service import AccountCategoryService
+from services.settings_service import SettingsService
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +29,7 @@ db_path = os.getenv('DB_PATH', './email_summaries/summaries.db')
 db_service = DatabaseService(db_path)
 dashboard_service = DashboardService(db_service)
 account_service = AccountCategoryService(db_path=db_path)
+settings_service = SettingsService(db_path=db_path)
 
 def truncate_category_name(name: str, max_length: int = 40) -> str:
     """Truncate category names to specified length with ellipsis if needed"""
@@ -439,6 +441,91 @@ def api_health():
             'timestamp': datetime.utcnow().isoformat(),
             'error': str(e)
         }), 503
+
+
+@app.route('/api/settings', methods=['GET'])
+def api_get_settings():
+    """Get all settings"""
+    try:
+        settings = settings_service.get_all_settings()
+        return jsonify({
+            'status': 'success',
+            'settings': settings
+        })
+    except Exception as e:
+        logger.error(f"Error getting settings: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/settings', methods=['POST'])
+def api_update_settings():
+    """Update settings"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'status': 'error',
+                'message': 'No data provided'
+            }), 400
+
+        updated_settings = {}
+        
+        # Handle lookback_hours setting
+        if 'lookback_hours' in data:
+            hours = int(data['lookback_hours'])
+            if hours < 1 or hours > 168:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Look back hours must be between 1 and 168'
+                }), 400
+            
+            success = settings_service.set_lookback_hours(hours)
+            if success:
+                updated_settings['lookback_hours'] = hours
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to update lookback hours'
+                }), 500
+        
+        # Handle other settings as needed
+        for key, value in data.items():
+            if key not in updated_settings and key != 'lookback_hours':
+                # Generic setting update - determine type from value
+                setting_type = 'string'
+                if isinstance(value, int):
+                    setting_type = 'integer'
+                elif isinstance(value, float):
+                    setting_type = 'float'
+                elif isinstance(value, bool):
+                    setting_type = 'boolean'
+                
+                success = settings_service.set_setting(key, value, setting_type)
+                if success:
+                    updated_settings[key] = value
+
+        logger.info(f"Updated settings: {updated_settings}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Updated {len(updated_settings)} setting(s)',
+            'updated_settings': updated_settings
+        })
+        
+    except ValueError as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Invalid value format: {str(e)}'
+        }), 400
+    except Exception as e:
+        logger.error(f"Error updating settings: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 
 @app.errorhandler(404)

@@ -34,11 +34,20 @@ async function fetchData(endpoint) {
         const response = await fetch(endpoint);
         const data = await response.json();
         
-        if (!data.success) {
-            throw new Error(data.error || 'Unknown error occurred');
+        // Handle FastAPI responses (direct data) vs Flask responses (wrapped in success/data structure)
+        if (endpoint.includes('192.168.1.162:8005') || endpoint.startsWith('/api/accounts') || endpoint.startsWith('/api/processing')) {
+            // FastAPI endpoints return data directly
+            if (!response.ok) {
+                throw new Error(data.detail || data.message || 'API request failed');
+            }
+            return data;
+        } else {
+            // Flask endpoints wrap data in success/data structure
+            if (!data.success) {
+                throw new Error(data.error || 'Unknown error occurred');
+            }
+            return data.data;
         }
-        
-        return data.data;
     } catch (error) {
         console.error(`Error fetching data from ${endpoint}:`, error);
         showError(`Failed to load data: ${error.message}`);
@@ -77,9 +86,10 @@ async function refreshDashboardData(period = 'week') {
         }
         
         // Fetch all data in parallel for better performance
-        const [overviewResult, categoriesResult] = await Promise.allSettled([
+        const [overviewResult, categoriesResult, processingRunsResult] = await Promise.allSettled([
             refreshOverviewStats(period),
-            refreshCategoriesData()
+            refreshCategoriesData(),
+            refreshProcessingRuns()
         ]);
         
         // Handle any errors gracefully
@@ -91,6 +101,11 @@ async function refreshDashboardData(period = 'week') {
         if (categoriesResult.status === 'rejected') {
             console.error('Failed to load categories:', categoriesResult.reason);
             showError('Failed to load categories data');
+        }
+        
+        if (processingRunsResult.status === 'rejected') {
+            console.error('Failed to load processing runs:', processingRunsResult.reason);
+            showError('Failed to load processing runs data');
         }
         
         // Refresh active analytics tab if any
@@ -183,10 +198,49 @@ async function refreshCategoriesData() {
         // Show loading state
         showCategoriesLoading();
         
-        const data = await fetchData(`/api/stats/categories?period=${currentPeriod}&limit=25`);
+        // First get accounts list to find primary account
+        const accountsData = await fetchData('http://192.168.1.162:8005/api/accounts');
         
-        // Store data globally for view switching
-        window.categoriesData = data;
+        if (!accountsData || !accountsData.accounts || accountsData.accounts.length === 0) {
+            console.warn('No email accounts found');
+            showEmptyCategories();
+            return;
+        }
+        
+        // Use the first active account
+        const primaryAccount = accountsData.accounts.find(acc => acc.is_active) || accountsData.accounts[0];
+        
+        if (!primaryAccount) {
+            console.warn('No active email account found');
+            showEmptyCategories();
+            return;
+        }
+        
+        // Convert period to days for API
+        let days = 7;
+        switch(currentPeriod) {
+            case 'day': days = 1; break;
+            case 'week': days = 7; break;
+            case 'month': days = 30; break;
+            default: days = 7;
+        }
+        
+        // Fetch category data from FastAPI endpoint
+        const categoriesResponse = await fetchData(`http://192.168.1.162:8005/api/accounts/${encodeURIComponent(primaryAccount.email)}/categories/top?days=${days}&limit=25&include_counts=true`);
+        
+        if (!categoriesResponse || !categoriesResponse.top_categories) {
+            console.warn('No category data returned');
+            showEmptyCategories();
+            return;
+        }
+        
+        // Transform FastAPI response to match frontend expectations
+        const data = categoriesResponse.top_categories.map(cat => ({
+            name: cat.category_name,
+            count: cat.total_emails,
+            percentage: 0, // Will be calculated below
+            deleted: cat.deleted_count || 0
+        }));
         
         // Calculate total for percentages
         const total = data.reduce((sum, cat) => sum + cat.count, 0);
@@ -195,6 +249,9 @@ async function refreshCategoriesData() {
         data.forEach(category => {
             category.percentage = total > 0 ? parseFloat((category.count / total * 100).toFixed(1)) : 0;
         });
+        
+        // Store data globally for view switching
+        window.categoriesData = data;
         
         if (data.length === 0) {
             showEmptyCategories();
@@ -1116,7 +1173,7 @@ function showCategoryDetails(category) {
 // Background execution time functions
 async function fetchBackgroundExecutionTime() {
     try {
-        const API_BASE_URL = 'http://192.168.1.162:8001'; // FastAPI service
+        const API_BASE_URL = 'http://192.168.1.162:8005'; // FastAPI service
         const response = await fetch(`${API_BASE_URL}/api/background/next-execution`);
         const data = await response.json();
         
