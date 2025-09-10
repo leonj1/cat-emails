@@ -612,7 +612,16 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
             # Get email details for pattern matching
             from_header = str(msg.get('From', ''))
             subject = str(msg.get('Subject', ''))
-            sender_email = fetcher._extract_email_address(from_header) if from_header else ""
+            
+            # Extract sender email with fallback
+            if hasattr(fetcher, '_extract_email_address'):
+                sender_email = fetcher._extract_email_address(from_header) if from_header else ""
+            else:
+                # Fallback implementation
+                from email.utils import parseaddr
+                _, sender_email = parseaddr(from_header) if from_header else ("", "")
+                sender_email = sender_email.lower() if sender_email else ""
+                
             sender_domain = fetcher._extract_domain(from_header) if from_header else ""
             
             # Check repeat offender patterns first (skip expensive LLM)
