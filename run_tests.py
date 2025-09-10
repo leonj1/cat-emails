@@ -18,6 +18,8 @@ if __name__ == "__main__":
         'tests.test_email_service',
         'tests.test_repeat_offender_service',
         'tests.test_repeat_offender_integration',
+        'tests.test_email_deduplication_integration',
+        'tests.test_processed_email_tracking',
     ]
     
     # Create test suite

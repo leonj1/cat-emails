@@ -569,18 +569,36 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         recent_emails = fetcher.get_recent_emails(hours)
         logger.info(f"Fetched {len(recent_emails)} records from the last {hours} hours.")
 
-        # Identify which emails are new
+        # Identify which emails are new using EmailDeduplicationService
         new_emails = []
+        deduplication_service = None
+        
         db_svc = getattr(fetcher.summary_service, "db_service", None)
         if db_svc:
-            for msg in recent_emails:
-                message_id = msg.get("Message-ID", '')
-                if message_id and not db_svc.is_message_processed(email_address, message_id):
-                    new_emails.append(msg)
-                elif not message_id:
-                    logger.warning("Found an email without a Message-ID, processing it as new.")
-                    new_emails.append(msg)
-            logger.info(f"Identified {len(new_emails)} records that are new.")
+            try:
+                from services.email_deduplication_service import EmailDeduplicationService
+                with db_svc.Session() as session:
+                    deduplication_service = EmailDeduplicationService(session, email_address)
+                    new_emails = deduplication_service.filter_new_emails(recent_emails)
+                    
+                    # Log deduplication stats
+                    stats = deduplication_service.get_stats()
+                    logger.info(f"📊 Email deduplication stats: {stats}")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to use EmailDeduplicationService: {e}")
+                logger.warning("Falling back to legacy deduplication method")
+                
+                # Fallback to legacy method
+                for msg in recent_emails:
+                    message_id = msg.get("Message-ID", '')
+                    if message_id and not db_svc.is_message_processed(email_address, message_id):
+                        new_emails.append(msg)
+                    elif not message_id:
+                        logger.warning("Found an email without a Message-ID, processing it as new.")
+                        new_emails.append(msg)
+                        
+                logger.info(f"Identified {len(new_emails)} records that are new (legacy method).")
         else:
             logger.warning("Database service not available. Processing all fetched emails as new.")
             new_emails = recent_emails
@@ -768,12 +786,25 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                     category_actions[category]["archived"] += 1
 
                 # Record as processed to prevent reprocessing on future runs
-                db_svc = getattr(fetcher.summary_service, "db_service", None)
-                if db_svc and message_id:
-                    try:
-                        db_svc.log_processed_email(email_address, message_id)
-                    except Exception as e:
-                        logger.warning(f"Failed to log processed message {message_id}: {e}")
+                if message_id:
+                    # Use EmailDeduplicationService if available, otherwise fallback to legacy
+                    if db_svc:
+                        try:
+                            from services.email_deduplication_service import EmailDeduplicationService
+                            with db_svc.Session() as session:
+                                dedup_service = EmailDeduplicationService(session, email_address)
+                                success = dedup_service.mark_email_as_processed(message_id)
+                                if not success:
+                                    logger.warning(f"Failed to mark email as processed: {message_id}")
+                        except Exception as e:
+                            logger.warning(f"EmailDeduplicationService failed: {e}")
+                            # Fallback to legacy method
+                            try:
+                                db_svc.log_processed_email(email_address, message_id)
+                            except Exception as fallback_e:
+                                logger.warning(f"Legacy fallback also failed for {message_id}: {fallback_e}")
+                    else:
+                        logger.warning(f"No database service available to log processed email: {message_id}")
 
                 print("-" * 50)
             except Exception as e:
