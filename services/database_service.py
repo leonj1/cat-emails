@@ -323,15 +323,20 @@ class DatabaseService:
     def log_processed_email(self, account_email: str, message_id: str) -> None:
         """Record that a message has been processed to prevent re-processing."""
         if not account_email or not message_id:
+            logger.warning(f"Skipping log_processed_email due to empty inputs: account='{account_email}', message_id='{message_id}'")
             return
+        
         with self.Session() as session:
             try:
                 record = ProcessedEmailLog(account_email=account_email, message_id=message_id)
                 session.add(record)
                 session.commit()
+                logger.info(f"✅ Logged processed email: {account_email} -> {message_id}")
             except IntegrityError:
                 # Already recorded (unique constraint), safe to ignore
                 session.rollback()
-            except Exception:
+                logger.info(f"ℹ️  Email already logged (duplicate): {account_email} -> {message_id}")
+            except Exception as e:
                 session.rollback()
+                logger.error(f"❌ Failed to log processed email {account_email} -> {message_id}: {e}")
                 raise

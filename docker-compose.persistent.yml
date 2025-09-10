@@ -1,0 +1,32 @@
+# Docker Compose with proper volume mounting for database persistence
+
+version: '3.8'
+
+services:
+  email-processor:
+    build: .
+    environment:
+      - GMAIL_EMAIL=${GMAIL_EMAIL}
+      - GMAIL_PASSWORD=${GMAIL_PASSWORD}
+      - DATABASE_PATH=/data/email_summaries/summaries.db
+    volumes:
+      # Mount host directory to persist database across container rebuilds
+      - ./persistent_data:/data
+      - ./email_summaries:/data/email_summaries  # Legacy support
+      - ./logdir:/data/logdir
+    restart: unless-stopped
+    
+  # Alternative: Using named volume (recommended for production)
+  email-processor-named-volume:
+    build: .
+    environment:
+      - GMAIL_EMAIL=${GMAIL_EMAIL}
+      - GMAIL_PASSWORD=${GMAIL_PASSWORD}
+      - DATABASE_PATH=/data/email_summaries/summaries.db
+    volumes:
+      - email_data:/data
+    restart: unless-stopped
+
+volumes:
+  email_data:
+    driver: local
