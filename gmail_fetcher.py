@@ -630,7 +630,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 try:
                     from services.repeat_offender_service import RepeatOffenderService
                     with fetcher.summary_service.db_service.Session() as session:
-                        repeat_offender_service = RepeatOffenderService(session, account_name)
+                        repeat_offender_service = RepeatOffenderService(session, email_address)
                         repeat_offender_category = repeat_offender_service.check_repeat_offender(
                             sender_email, sender_domain, subject
                         )
@@ -744,7 +744,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                     try:
                         from services.repeat_offender_service import RepeatOffenderService
                         with fetcher.summary_service.db_service.Session() as session:
-                            repeat_offender_service = RepeatOffenderService(session, account_name)
+                            repeat_offender_service = RepeatOffenderService(session, email_address)
                             repeat_offender_service.record_email_outcome(
                                 sender_email=sender_email,
                                 sender_domain=sender_domain, 
