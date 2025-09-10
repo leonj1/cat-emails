@@ -189,6 +189,18 @@ class GmailFetcher:
         if '@' in email_address:
             return email_address.split('@')[-1].lower()
         return ''
+    
+    def _extract_email_address(self, from_header: str) -> str:
+        """Extract email address from From header.
+
+        Args:
+            from_header: Raw From header string
+
+        Returns:
+            str: Email address part
+        """
+        _, email_address = parseaddr(from_header)
+        return email_address.lower() if email_address else ''
 
     def _is_domain_allowed(self, from_header: str) -> bool:
         """Check if the email is from an allowed domain."""
@@ -597,20 +609,38 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
             pre_categorized = False
             deletion_candidate = False
 
-            # Check domain lists
+            # Get email details for pattern matching
             from_header = str(msg.get('From', ''))
-            if fetcher._is_domain_blocked(from_header):
-                category = "Blocked_Domain"
+            subject = str(msg.get('Subject', ''))
+            sender_email = fetcher._extract_email_address(from_header) if from_header else ""
+            sender_domain = fetcher._extract_domain(from_header) if from_header else ""
+            
+            # Check repeat offender patterns first (skip expensive LLM)
+            from services.repeat_offender_service import RepeatOffenderService
+            repeat_offender_service = RepeatOffenderService(session, account_name)
+            repeat_offender_category = repeat_offender_service.check_repeat_offender(
+                sender_email, sender_domain, subject
+            )
+            
+            if repeat_offender_category:
+                category = repeat_offender_category
                 pre_categorized = True
                 deletion_candidate = True
-            elif fetcher._is_domain_allowed(from_header):
-                category = "Allowed_Domain"
-                pre_categorized = True
-                deletion_candidate = False
+                logger.info(f"Repeat offender detected: {sender_email or sender_domain} -> {category}")
+            else:
+                # Check domain lists
+                if fetcher._is_domain_blocked(from_header):
+                    category = "Blocked_Domain"
+                    pre_categorized = True
+                    deletion_candidate = True
+                elif fetcher._is_domain_allowed(from_header):
+                    category = "Allowed_Domain"
+                    pre_categorized = True
+                    deletion_candidate = False
 
             # Categorize the email if not pre-categorized
             if not pre_categorized:
-                contents_without_links = fetcher.remove_http_links(f"{msg.get('Subject')}. {body}")
+                contents_without_links = fetcher.remove_http_links(f"{subject}. {body}")
                 contents_without_images = fetcher.remove_images_from_email(contents_without_links)
                 contents_without_encoded = fetcher.remove_encoded_content(contents_without_images)
                 contents_cleaned = contents_without_encoded
@@ -691,6 +721,16 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                     sender_domain=sender_domain,
                     was_pre_categorized=pre_categorized
                 )
+                
+                # Record email outcome for repeat offender tracking
+                if not category.endswith("-RepeatOffender"):  # Don't track repeat offenders to avoid recursion
+                    repeat_offender_service.record_email_outcome(
+                        sender_email=sender_email,
+                        sender_domain=sender_domain, 
+                        subject=subject,
+                        category=category,
+                        was_deleted=(action_taken == "deleted")
+                    )
 
                 # Track category statistics for account service
                 if category not in category_actions:

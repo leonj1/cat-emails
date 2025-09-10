@@ -120,6 +120,40 @@ class SenderSummary(Base):
     )
 
 
+class RepeatOffenderPattern(Base):
+    """Track email patterns that are consistently marked for deletion"""
+    __tablename__ = 'repeat_offender_patterns'
+    
+    id = Column(Integer, primary_key=True)
+    account_name = Column(String(255), nullable=False)
+    
+    # Pattern identifiers (at least one must be set)
+    sender_email = Column(String(255), nullable=True)
+    sender_domain = Column(String(255), nullable=True)
+    subject_pattern = Column(String(500), nullable=True)
+    
+    # Tracking information
+    category = Column(String(100), nullable=False)  # Original category like "WantsMoney"
+    total_occurrences = Column(Integer, default=0)
+    deletion_count = Column(Integer, default=0)
+    confidence_score = Column(Float, default=0.0)  # deletion_count / total_occurrences
+    
+    # Timestamps
+    first_seen = Column(DateTime, nullable=False)
+    last_seen = Column(DateTime, nullable=False)
+    marked_as_repeat_offender = Column(DateTime, nullable=True)
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    
+    __table_args__ = (
+        Index('idx_account_sender', 'account_name', 'sender_email'),
+        Index('idx_account_domain', 'account_name', 'sender_domain'),
+        Index('idx_account_subject', 'account_name', 'subject_pattern'),
+        Index('idx_active_patterns', 'account_name', 'is_active'),
+    )
+
+
 class DomainSummary(Base):
     """Domain statistics for a summary period"""
     __tablename__ = 'domain_summaries'

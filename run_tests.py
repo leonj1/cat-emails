@@ -16,6 +16,8 @@ if __name__ == "__main__":
     test_modules = [
         'tests.test_email_models',
         'tests.test_email_service',
+        'tests.test_repeat_offender_service',
+        'tests.test_repeat_offender_integration',
     ]
     
     # Create test suite
