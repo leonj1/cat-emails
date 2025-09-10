@@ -572,6 +572,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         # Identify which emails are new using EmailDeduplicationService
         new_emails = []
         deduplication_service = None
+        processed_message_ids = []  # Track which emails we process successfully
         
         db_svc = getattr(fetcher.summary_service, "db_service", None)
         if db_svc:
@@ -785,26 +786,12 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 elif action_taken == "archived":
                     category_actions[category]["archived"] += 1
 
-                # Record as processed to prevent reprocessing on future runs
+                # Collect message ID for bulk processing at the end
                 if message_id:
-                    # Use EmailDeduplicationService if available, otherwise fallback to legacy
-                    if db_svc:
-                        try:
-                            from services.email_deduplication_service import EmailDeduplicationService
-                            with db_svc.Session() as session:
-                                dedup_service = EmailDeduplicationService(session, email_address)
-                                success = dedup_service.mark_email_as_processed(message_id)
-                                if not success:
-                                    logger.warning(f"Failed to mark email as processed: {message_id}")
-                        except Exception as e:
-                            logger.warning(f"EmailDeduplicationService failed: {e}")
-                            # Fallback to legacy method
-                            try:
-                                db_svc.log_processed_email(email_address, message_id)
-                            except Exception as fallback_e:
-                                logger.warning(f"Legacy fallback also failed for {message_id}: {fallback_e}")
-                    else:
-                        logger.warning(f"No database service available to log processed email: {message_id}")
+                    processed_message_ids.append(message_id)
+                    logger.info(f"📝 Queued email for bulk processing: {message_id}")
+                else:
+                    logger.warning(f"⚠️ No message_id available - cannot mark as processed")
 
                 print("-" * 50)
             except Exception as e:
@@ -814,6 +801,32 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
 
         # Print summary at the end
         print_summary(hours, fetcher.stats)
+
+        # Bulk mark emails as processed to prevent reprocessing
+        if processed_message_ids and db_svc:
+            logger.info(f"🔄 Bulk marking {len(processed_message_ids)} emails as processed...")
+            try:
+                from services.email_deduplication_service import EmailDeduplicationService
+                with db_svc.Session() as session:
+                    dedup_service = EmailDeduplicationService(session, email_address)
+                    successful, errors = dedup_service.bulk_mark_as_processed(processed_message_ids)
+                    logger.info(f"✅ Bulk processing completed: {successful} successful, {errors} errors")
+            except Exception as e:
+                logger.warning(f"❌ Bulk EmailDeduplicationService failed: {e}")
+                # Fallback to individual legacy logging
+                logger.info(f"🔄 Falling back to individual legacy logging for {len(processed_message_ids)} emails...")
+                failed_count = 0
+                for message_id in processed_message_ids:
+                    try:
+                        db_svc.log_processed_email(email_address, message_id)
+                    except Exception as individual_e:
+                        failed_count += 1
+                        logger.warning(f"❌ Failed to log {message_id}: {individual_e}")
+                
+                success_count = len(processed_message_ids) - failed_count
+                logger.info(f"✅ Legacy bulk processing: {success_count} successful, {failed_count} failed")
+        elif processed_message_ids:
+            logger.warning(f"⚠️ {len(processed_message_ids)} emails processed but no database service to record them")
 
         # Record category statistics and update account last scan timestamp
         if fetcher.account_service and category_actions:
