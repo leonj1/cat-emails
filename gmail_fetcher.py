@@ -625,11 +625,18 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
             sender_domain = fetcher._extract_domain(from_header) if from_header else ""
             
             # Check repeat offender patterns first (skip expensive LLM)
-            from services.repeat_offender_service import RepeatOffenderService
-            repeat_offender_service = RepeatOffenderService(session, account_name)
-            repeat_offender_category = repeat_offender_service.check_repeat_offender(
-                sender_email, sender_domain, subject
-            )
+            repeat_offender_category = None
+            if hasattr(fetcher, 'summary_service') and fetcher.summary_service and fetcher.summary_service.db_service:
+                try:
+                    from services.repeat_offender_service import RepeatOffenderService
+                    with fetcher.summary_service.db_service.Session() as session:
+                        repeat_offender_service = RepeatOffenderService(session, account_name)
+                        repeat_offender_category = repeat_offender_service.check_repeat_offender(
+                            sender_email, sender_domain, subject
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to check repeat offender patterns: {e}")
+                    repeat_offender_category = None
             
             if repeat_offender_category:
                 category = repeat_offender_category
@@ -732,14 +739,21 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 )
                 
                 # Record email outcome for repeat offender tracking
-                if not category.endswith("-RepeatOffender"):  # Don't track repeat offenders to avoid recursion
-                    repeat_offender_service.record_email_outcome(
-                        sender_email=sender_email,
-                        sender_domain=sender_domain, 
-                        subject=subject,
-                        category=category,
-                        was_deleted=(action_taken == "deleted")
-                    )
+                if (not category.endswith("-RepeatOffender") and  # Don't track repeat offenders to avoid recursion
+                    hasattr(fetcher, 'summary_service') and fetcher.summary_service and fetcher.summary_service.db_service):
+                    try:
+                        from services.repeat_offender_service import RepeatOffenderService
+                        with fetcher.summary_service.db_service.Session() as session:
+                            repeat_offender_service = RepeatOffenderService(session, account_name)
+                            repeat_offender_service.record_email_outcome(
+                                sender_email=sender_email,
+                                sender_domain=sender_domain, 
+                                subject=subject,
+                                category=category,
+                                was_deleted=(action_taken == "deleted")
+                            )
+                    except Exception as e:
+                        logger.warning(f"Failed to record repeat offender pattern: {e}")
 
                 # Track category statistics for account service
                 if category not in category_actions:
