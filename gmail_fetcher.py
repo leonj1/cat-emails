@@ -156,6 +156,7 @@ class GmailFetcher:
             # Fetch and cache blocked categories
             categories = self.domain_service.fetch_blocked_categories()
             self._blocked_categories = {c.category for c in categories}
+            logger.info(f"📋 Loaded blocked categories: {sorted(self._blocked_categories)}")
 
         except Exception as e:
             error_msg = str(e)
@@ -213,8 +214,28 @@ class GmailFetcher:
         return domain in self._blocked_domains
 
     def _is_category_blocked(self, category: str) -> bool:
-        """Check if the category is in the blocked categories list."""
-        return category in self._blocked_categories
+        """
+        Check if the category is in the blocked categories list.
+        
+        Handles category name variations:
+        - "Wants-Money" (from API/domain service)
+        - "WantsMoney" (from LLM responses)
+        """
+        if category in self._blocked_categories:
+            return True
+        
+        # Handle category name variations for money-related categories
+        category_variations = {
+            "WantsMoney": ["Wants-Money", "WantsMoney"],
+            "Wants-Money": ["Wants-Money", "WantsMoney"],
+        }
+        
+        if category in category_variations:
+            for variant in category_variations[category]:
+                if variant in self._blocked_categories:
+                    return True
+        
+        return False
 
     def connect(self) -> None:
         """Establish connection to Gmail IMAP server."""
@@ -534,8 +555,7 @@ def test_api_connection(api_token: str) -> bool:
         logger.info("Successfully connected to control API")
         return True
     except Exception as e:
-        logger.warning(f"Failed to connect to control API: {str(e)}")
-        logger.warning("Continuing with mock mode - no domain filtering will be applied")
+        logger.error(f"Failed to connect to control API: {str(e)}")
         return False
 
 def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
@@ -546,9 +566,10 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     logger.info("Testing API connection")
     api_connected = test_api_connection(api_token)
 
-    # Use mock mode if API connection failed
+    # Terminate if API connection failed
     if not api_connected:
-        api_token = None  # This will enable mock mode in DomainService
+        logger.error("Cannot connect to control API. Terminating service.")
+        raise SystemExit(1)
 
     # Initialize and use the fetcher
     fetcher = ServiceGmailFetcher(email_address, app_password, api_token)
@@ -575,34 +596,24 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         processed_message_ids = []  # Track which emails we process successfully
         
         db_svc = getattr(fetcher.summary_service, "db_service", None)
-        if db_svc:
-            try:
-                from services.email_deduplication_service import EmailDeduplicationService
-                with db_svc.Session() as session:
-                    deduplication_service = EmailDeduplicationService(session, email_address)
-                    new_emails = deduplication_service.filter_new_emails(recent_emails)
-                    
-                    # Log deduplication stats
-                    stats = deduplication_service.get_stats()
-                    logger.info(f"📊 Email deduplication stats: {stats}")
-                    
-            except Exception as e:
-                logger.warning(f"Failed to use EmailDeduplicationService: {e}")
-                logger.warning("Falling back to legacy deduplication method")
+        # Fail fast if database service is unavailable
+        if not db_svc:
+            logger.error("Database service not available. Terminating service.")
+            raise Exception("Database service not available")
+
+        try:
+            from services.email_deduplication_service import EmailDeduplicationService
+            with db_svc.Session() as session:
+                deduplication_service = EmailDeduplicationService(session, email_address)
+                new_emails = deduplication_service.filter_new_emails(recent_emails)
                 
-                # Fallback to legacy method
-                for msg in recent_emails:
-                    message_id = msg.get("Message-ID", '')
-                    if message_id and not db_svc.is_message_processed(email_address, message_id):
-                        new_emails.append(msg)
-                    elif not message_id:
-                        logger.warning("Found an email without a Message-ID, processing it as new.")
-                        new_emails.append(msg)
-                        
-                logger.info(f"Identified {len(new_emails)} records that are new (legacy method).")
-        else:
-            logger.warning("Database service not available. Processing all fetched emails as new.")
-            new_emails = recent_emails
+                # Log deduplication stats
+                stats = deduplication_service.get_stats()
+                logger.info(f"📊 Email deduplication stats: {stats}")
+                
+        except Exception as e:
+            logger.error(f"Failed to use EmailDeduplicationService: {e}")
+            raise
 
         # Update fetched count
         fetcher.summary_service.run_metrics['fetched'] = len(recent_emails)
@@ -692,10 +703,14 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                     category = 'Other'
 
                 # Check if category is blocked
-                if fetcher._is_category_blocked(category):
+                is_blocked = fetcher._is_category_blocked(category)
+                if is_blocked:
                     deletion_candidate = True
+                    logger.info(f"🗑️ Category '{category}' is blocked - marking for deletion")
                 else:
                     deletion_candidate = False
+                    logger.info(f"📥 Category '{category}' is not blocked - keeping email")
+                    logger.debug(f"Available blocked categories: {sorted(fetcher._blocked_categories)}")
 
 
             try:
@@ -812,19 +827,8 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                     successful, errors = dedup_service.bulk_mark_as_processed(processed_message_ids)
                     logger.info(f"✅ Bulk processing completed: {successful} successful, {errors} errors")
             except Exception as e:
-                logger.warning(f"❌ Bulk EmailDeduplicationService failed: {e}")
-                # Fallback to individual legacy logging
-                logger.info(f"🔄 Falling back to individual legacy logging for {len(processed_message_ids)} emails...")
-                failed_count = 0
-                for message_id in processed_message_ids:
-                    try:
-                        db_svc.log_processed_email(email_address, message_id)
-                    except Exception as individual_e:
-                        failed_count += 1
-                        logger.warning(f"❌ Failed to log {message_id}: {individual_e}")
-                
-                success_count = len(processed_message_ids) - failed_count
-                logger.info(f"✅ Legacy bulk processing: {success_count} successful, {failed_count} failed")
+                logger.error(f"❌ Bulk EmailDeduplicationService failed: {e}")
+                raise
         elif processed_message_ids:
             logger.warning(f"⚠️ {len(processed_message_ids)} emails processed but no database service to record them")
 
