@@ -9,9 +9,11 @@ import sys
 import logging
 from pathlib import Path
 
-# Add project root to Python path
-project_root = Path(__file__).parent
+# Add project root to Python path (parent of frontend directory)
+frontend_dir = Path(__file__).parent
+project_root = frontend_dir.parent
 sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(frontend_dir))
 
 def check_dependencies():
     """Check if required dependencies are installed"""
@@ -43,7 +45,7 @@ def setup_environment():
         'FLASK_HOST': '0.0.0.0',
         'FLASK_PORT': '5000',
         'FLASK_DEBUG': 'False',
-        'DB_PATH': './email_summaries/summaries.db',
+        'DB_PATH': '../email_summaries/summaries.db',
         'SECRET_KEY': 'dev-secret-key-change-in-production'
     }
     

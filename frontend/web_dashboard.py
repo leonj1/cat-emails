@@ -5,9 +5,14 @@ Provides a web interface for viewing email categorization statistics and trends
 """
 
 import os
+import sys
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
+
+# Add parent directory to path to import services
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 from services.database_service import DatabaseService
 from services.dashboard_service import DashboardService
@@ -25,7 +30,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Initialize services
-db_path = os.getenv('DB_PATH', './email_summaries/summaries.db')
+db_path = os.getenv('DB_PATH', '../email_summaries/summaries.db')
 db_service = DatabaseService(db_path)
 dashboard_service = DashboardService(db_service)
 account_service = AccountCategoryService(db_path=db_path)

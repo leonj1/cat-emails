@@ -23,14 +23,14 @@ dashboard-deps:
 # Docker targets for dashboard
 dashboard-build:
 	@echo "🐳 Building Cat-Emails Dashboard Docker image..."
-	docker build -t $(DASHBOARD_IMAGE_NAME) -f Dockerfile.dashboard .
+	docker build -t $(DASHBOARD_IMAGE_NAME) -f frontend/Dockerfile.dashboard ..
 
 dashboard-docker-run:
 	@echo "🐳 Running Cat-Emails Dashboard in Docker..."
 	docker run -d \
 		--name $(DASHBOARD_CONTAINER_NAME) \
 		-p $(DASHBOARD_PORT):5000 \
-		-v $(PWD)/email_summaries:/app/email_summaries \
+		-v $(PWD)/../email_summaries:/app/email_summaries \
 		-e FLASK_HOST=0.0.0.0 \
 		-e FLASK_PORT=5000 \
 		-e FLASK_DEBUG=False \
@@ -74,8 +74,8 @@ dashboard-watch:
 
 dashboard-check:
 	@echo "🔍 Checking dashboard files..."
-	@python -c "import web_dashboard; print('✅ Flask app imports successfully')"
-	@python -c "import services.database_service; print('✅ Database service working')"
+	@cd .. && python -c "import frontend.web_dashboard; print('✅ Flask app imports successfully')"
+	@cd .. && python -c "import services.database_service; print('✅ Database service working')"
 	@echo "✅ Dashboard files are ready"
 
 # Help
