@@ -18,6 +18,7 @@ from services.account_category_service import AccountCategoryService
 from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
 from services.categorize_emails_interface import SimpleEmailCategory
 from services.categorize_emails_llm import LLMCategorizeEmails
+from services.email_processor_service import EmailProcessorService
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--primary-host", default=os.environ.get('OLLAMA_HOST_PRIMARY', '10.1.1.247:11434'),
@@ -619,205 +620,16 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         fetcher.summary_service.run_metrics['fetched'] = len(recent_emails)
 
         print(f"Found {len(new_emails)} new emails to process:")
+        processor = EmailProcessorService(fetcher, email_address, model, categorize_email_with_resilient_client)
         for msg in new_emails:
-            # Early extract identifiers and prevent duplicate processing before any LLM calls
-            from_header = str(msg.get('From', ''))
-            subject = msg.get('Subject', '')
-            message_id = msg.get("Message-ID", '')
-
-            # This check is now redundant because we pre-filter, but we'll keep it as a safeguard.
-            if db_svc and message_id:
-                try:
-                    if db_svc.is_message_processed(email_address, message_id):
-                        logger.info(f"Skipping already-processed message (safeguard): {message_id}")
-                        continue
-                except Exception as e:
-                    logger.warning(f"Duplicate check failed for message {message_id}: {e}. Proceeding without skip.")
-
-            # Get the email body
-            body = fetcher.get_email_body(msg)
-            pre_categorized = False
-            deletion_candidate = False
-
-            # Get email details for pattern matching
-            from_header = str(msg.get('From', ''))
-            subject = str(msg.get('Subject', ''))
-            
-            # Extract sender email with fallback
-            if hasattr(fetcher, '_extract_email_address'):
-                sender_email = fetcher._extract_email_address(from_header) if from_header else ""
-            else:
-                # Fallback implementation
-                from email.utils import parseaddr
-                _, sender_email = parseaddr(from_header) if from_header else ("", "")
-                sender_email = sender_email.lower() if sender_email else ""
-                
-            sender_domain = fetcher._extract_domain(from_header) if from_header else ""
-            
-            # Check repeat offender patterns first (skip expensive LLM)
-            repeat_offender_category = None
-            if hasattr(fetcher, 'summary_service') and fetcher.summary_service and fetcher.summary_service.db_service:
-                try:
-                    from services.repeat_offender_service import RepeatOffenderService
-                    with fetcher.summary_service.db_service.Session() as session:
-                        repeat_offender_service = RepeatOffenderService(session, email_address)
-                        repeat_offender_category = repeat_offender_service.check_repeat_offender(
-                            sender_email, sender_domain, subject
-                        )
-                except Exception as e:
-                    logger.warning(f"Failed to check repeat offender patterns: {e}")
-                    repeat_offender_category = None
-            
-            if repeat_offender_category:
-                category = repeat_offender_category
-                pre_categorized = True
-                deletion_candidate = True
-                logger.info(f"Repeat offender detected: {sender_email or sender_domain} -> {category}")
-            else:
-                # Check domain lists
-                if fetcher._is_domain_blocked(from_header):
-                    category = "Blocked_Domain"
-                    pre_categorized = True
-                    deletion_candidate = True
-                elif fetcher._is_domain_allowed(from_header):
-                    category = "Allowed_Domain"
-                    pre_categorized = True
-                    deletion_candidate = False
-
-            # Categorize the email if not pre-categorized
-            if not pre_categorized:
-                contents_without_links = fetcher.remove_http_links(f"{subject}. {body}")
-                contents_without_images = fetcher.remove_images_from_email(contents_without_links)
-                contents_without_encoded = fetcher.remove_encoded_content(contents_without_images)
-                contents_cleaned = contents_without_encoded
-                # Use the resilient client for categorization
-                category = categorize_email_with_resilient_client(contents_cleaned, model)
-
-                # Clean up the category response
-                category = category.replace('"', '').replace("'", "").replace('*', '').replace('=', '').replace('+', '').replace('-', '').replace('_', '').strip()
-
-                # Validate category response
-                valid_categories = {category.value for category in SimpleEmailCategory}
-                if len(category) > 30 or category not in valid_categories:
-                    logger.warning(f"Invalid category response: '{category}', defaulting to 'Other'")
-                    category = 'Other'
-
-                # Check if category is blocked
-                is_blocked = fetcher._is_category_blocked(category)
-                if is_blocked:
-                    deletion_candidate = True
-                    logger.info(f"🗑️ Category '{category}' is blocked - marking for deletion")
-                else:
-                    deletion_candidate = False
-                    logger.info(f"📥 Category '{category}' is not blocked - keeping email")
-                    logger.debug(f"Available blocked categories: {sorted(fetcher._blocked_categories)}")
-
-
-            try:
-                from_header = msg.get('From', '')
-                subject = msg.get('Subject', '')
-                message_id = msg.get("Message-ID", '')
-
-                print(f"From: {from_header}")
-                print(f"Subject: {subject}")
-                if len(category) < 20:
-                    print(f"Category: {category}")
-                print(f"Deletion Candidate: {deletion_candidate}")
-
-                # Extract sender domain for tracking
-                sender_domain = fetcher._extract_domain(from_header) if from_header else None
-
-                try:
-                    fetcher.add_label(message_id, category)
-                    # Track categories
-                    fetcher.stats['categories'][category] += 1
-                except ssl.SSLError as ssl_err:
-                    logger.error(f"SSL Error while adding label: {ssl_err}")
-                    print("Skipping label addition due to SSL error")
-                    continue
-                except Exception as e:
-                    logger.error(f"Error adding label: {e}")
-                    print("Skipping label addition due to error")
-                    continue
-
-                # Track kept/deleted emails
-                action_taken = "kept"  # Default action
-
-                if deletion_candidate:
-                    try:
-                        if fetcher.delete_email(message_id):
-                            print("Email deleted successfully")
-                            action_taken = "deleted"
-                            fetcher.stats['deleted'] += 1
-                        else:
-                            print("Failed to delete email")
-                            fetcher.stats['kept'] += 1
-                    except ssl.SSLError as ssl_err:
-                        logger.error(f"SSL Error while deleting email: {ssl_err}")
-                        print("Skipping email deletion due to SSL error")
-                        fetcher.stats['kept'] += 1
-                        continue
-                else:
-                    print("Email left in inbox")
-                    fetcher.stats['kept'] += 1
-
-                # Track email in summary service
-                fetcher.summary_service.track_email(
-                    message_id=message_id,
-                    sender=from_header,
-                    subject=subject,
-                    category=category,
-                    action=action_taken,
-                    sender_domain=sender_domain,
-                    was_pre_categorized=pre_categorized
-                )
-                
-                # Record email outcome for repeat offender tracking
-                if (not category.endswith("-RepeatOffender") and  # Don't track repeat offenders to avoid recursion
-                    hasattr(fetcher, 'summary_service') and fetcher.summary_service and fetcher.summary_service.db_service):
-                    try:
-                        from services.repeat_offender_service import RepeatOffenderService
-                        with fetcher.summary_service.db_service.Session() as session:
-                            repeat_offender_service = RepeatOffenderService(session, email_address)
-                            repeat_offender_service.record_email_outcome(
-                                sender_email=sender_email,
-                                sender_domain=sender_domain, 
-                                subject=subject,
-                                category=category,
-                                was_deleted=(action_taken == "deleted")
-                            )
-                    except Exception as e:
-                        logger.warning(f"Failed to record repeat offender pattern: {e}")
-
-                # Track category statistics for account service
-                if category not in category_actions:
-                    category_actions[category] = {"total": 0, "deleted": 0, "kept": 0, "archived": 0}
-
-                category_actions[category]["total"] += 1
-                if action_taken == "deleted":
-                    category_actions[category]["deleted"] += 1
-                elif action_taken == "kept":
-                    category_actions[category]["kept"] += 1
-                elif action_taken == "archived":
-                    category_actions[category]["archived"] += 1
-
-                # Collect message ID for bulk processing at the end
-                if message_id:
-                    processed_message_ids.append(message_id)
-                    logger.info(f"📝 Queued email for bulk processing: {message_id}")
-                else:
-                    logger.warning(f"⚠️ No message_id available - cannot mark as processed")
-
-                print("-" * 50)
-            except Exception as e:
-                logger.error(f"Error processing email: {e}")
-                print(f"Skipping email due to error: {e}")
-                continue
+            # Delegate processing to EmailProcessorService
+            processor.process_email(msg)
 
         # Print summary at the end
         print_summary(hours, fetcher.stats)
 
         # Bulk mark emails as processed to prevent reprocessing
+        processed_message_ids = processor.processed_message_ids
         if processed_message_ids and db_svc:
             logger.info(f"🔄 Bulk marking {len(processed_message_ids)} emails as processed...")
             try:
@@ -833,6 +645,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
             logger.warning(f"⚠️ {len(processed_message_ids)} emails processed but no database service to record them")
 
         # Record category statistics and update account last scan timestamp
+        category_actions = processor.category_actions
         if fetcher.account_service and category_actions:
             try:
                 today = date.today()

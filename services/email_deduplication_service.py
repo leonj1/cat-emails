@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from models.database import ProcessedEmailLog
+from models.processed_email_log_model import ProcessedEmailLogModel
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,20 @@ class EmailDeduplicationService:
             'logged': 0,
             'errors': 0
         }
+        # Log which database file/name is in use
+        try:
+            bind = self.session.get_bind() if hasattr(self.session, "get_bind") else getattr(self.session, "bind", None)
+            if bind is not None:
+                url = getattr(bind, "url", None)
+                backend = getattr(url, "get_backend_name", lambda: None)() if url is not None else None
+                # For SQLite, url.database is the absolute file path. For others, show database name if available.
+                if url is not None:
+                    db_desc = url.database or str(url)
+                    logger.info(f"🗄️ Using database: {db_desc} (backend={backend}) for account {self.account_email}")
+                else:
+                    logger.info(f"🗄️ Using database: <unknown url> for account {self.account_email}")
+        except Exception as e:
+            logger.debug(f"Could not determine database in EmailDeduplicationService: {e}")
     
     def is_email_processed(self, message_id: str) -> bool:
         """
@@ -81,7 +96,7 @@ class EmailDeduplicationService:
             self.stats['errors'] += 1
             return False  # Assume not processed on error to avoid missing emails
     
-    def mark_email_as_processed(self, message_id: str) -> bool:
+    def mark_email_as_processed(self, message_id: str) -> ProcessedEmailLogModel:
         """
         Mark an email as processed to prevent future reprocessing.
         
@@ -89,12 +104,17 @@ class EmailDeduplicationService:
             message_id: The Message-ID header from the email
             
         Returns:
-            True if successfully logged, False otherwise
+            ProcessedEmailLogModel representing the persisted record.
+        
+        Raises:
+            ValueError: If message_id is empty or whitespace.
+            IntegrityError: If a duplicate record violates the unique constraint.
+            Exception: Any other database error encountered will be propagated.
         """
         if not message_id or not message_id.strip():
             logger.warning(f"Empty message_id provided for logging: account={self.account_email}")
             self.stats['errors'] += 1
-            return False
+            raise ValueError("message_id must be a non-empty string")
         
         try:
             record = ProcessedEmailLog(
@@ -108,19 +128,19 @@ class EmailDeduplicationService:
             
             self.stats['logged'] += 1
             logger.info(f"✅ Marked email as processed: {self.account_email} -> {message_id}")
-            return True
+            # Return Pydantic model built from ORM record (requires from_attributes)
+            return ProcessedEmailLogModel.model_validate(record)
             
-        except IntegrityError:
-            # Already recorded (unique constraint), safe to ignore
+        except IntegrityError as e:
+            # Roll back and let caller decide how to handle duplicates
             self.session.rollback()
-            logger.debug(f"ℹ️  Email already marked as processed: {self.account_email} -> {message_id}")
-            return True  # Still considered success
-            
+            logger.debug(f"ℹ️ Email already marked as processed (duplicate): {self.account_email} -> {message_id}")
+            raise
         except Exception as e:
             self.session.rollback()
             logger.error(f"❌ Failed to mark email as processed {self.account_email} -> {message_id}: {e}")
             self.stats['errors'] += 1
-            return False
+            raise
     
     def filter_new_emails(self, emails: List[Dict]) -> List[Dict]:
         """
@@ -195,9 +215,11 @@ class EmailDeduplicationService:
             
             # Fallback to individual processing
             for message_id in message_ids:
-                if self.mark_email_as_processed(message_id):
+                try:
+                    # Will raise on error (including duplicates); count successes/errors accordingly
+                    self.mark_email_as_processed(message_id)
                     successful += 1
-                else:
+                except Exception:
                     errors += 1
         
         return successful, errors
