@@ -5,6 +5,7 @@ Handles downloading and syncing SQLite databases from remote URLs
 import os
 import logging
 import requests
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -81,7 +82,13 @@ class RemoteSQLiteHelper:
             # Move to final location (the ell library expects a directory path)
             # We'll store it as db.sqlite in the local_path directory
             db_file = os.path.join(self.local_path, 'db.sqlite')
-            os.rename(temp_path, db_file)
+
+            # Remove existing file if present (required for cross-platform compatibility)
+            if os.path.exists(db_file):
+                os.remove(db_file)
+
+            # Use shutil.move for cross-platform compatibility (works on Windows)
+            shutil.move(temp_path, db_file)
             logger.info(f"Database saved to: {db_file}")
 
         except Exception as e:
