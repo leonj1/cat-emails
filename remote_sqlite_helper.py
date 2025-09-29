@@ -149,7 +149,7 @@ class RemoteSQLiteHelper:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
                 logger.debug(f"Cleaned up temporary file: {temp_path}")
-            raise Exception(f"Failed to download remote database: {str(e)}")
+            raise Exception(f"Failed to download remote database: {e}") from e
 
     def sync_to_remote(self):
         """
