@@ -1,7 +1,13 @@
 import ell
 import openai
+import sys
+import os
 
-ell.init(verbose=True, store='./logdir')
+# Add parent directory to path to import remote_sqlite_helper
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from remote_sqlite_helper import get_ell_store_path
+
+ell.init(verbose=True, store=get_ell_store_path())
 
 client = openai.Client(
     base_url="http://10.1.1.144:11434/v1", api_key="ollama"  # required but not used

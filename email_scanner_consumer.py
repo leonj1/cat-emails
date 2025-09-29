@@ -10,6 +10,7 @@ from kafka import KafkaConsumer
 from imapclient import IMAPClient
 from email import message_from_bytes
 from bs4 import BeautifulSoup
+from remote_sqlite_helper import get_ell_store_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,7 +23,7 @@ parser.add_argument("--consumer-group", default="email-scanner-group", help="Kaf
 parser.add_argument("--delay-on-error-seconds", default=10, help="Delay on error seconds")
 args = parser.parse_args()
 
-ell.init(verbose=False, store='./logdir')
+ell.init(verbose=False, store=get_ell_store_path())
 
 client = openai.Client(
     base_url=f"http://{args.base_url}/v1", api_key="ollama"  # required but not used
