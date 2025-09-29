@@ -31,6 +31,24 @@ class DatabaseSizeExceededError(ValueError):
     pass
 
 
+class RemoteDatabaseDownloadError(Exception):
+    """
+    Exception raised when downloading a remote SQLite database fails.
+
+    This exception wraps various underlying errors that can occur during the
+    download process, including:
+    - Network errors (connection failures, timeouts, HTTP errors)
+    - File I/O errors (disk full, permission denied, etc.)
+    - Other unexpected errors during download or file operations
+
+    The original exception is preserved via exception chaining for debugging.
+
+    Attributes:
+        message: Human-readable error message describing the failure
+    """
+    pass
+
+
 class RemoteSQLiteHelper:
     """Helper class to manage remote SQLite database access"""
 
@@ -160,12 +178,24 @@ class RemoteSQLiteHelper:
             shutil.move(temp_path, db_file)
             logger.info(f"Database saved to: {db_file}")
 
-        except Exception as e:
-            # Clean up temp file on error
+        except DatabaseSizeExceededError:
+            # Re-raise size exceeded errors after cleanup
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
-                logger.debug(f"Cleaned up temporary file: {temp_path}")
-            raise Exception(f"Failed to download remote database: {e}") from e
+                logger.debug(f"Cleaned up temporary file after size limit exceeded: {temp_path}")
+            raise
+        except (requests.RequestException, OSError, IOError) as e:
+            # Handle network errors, file I/O errors, and other expected exceptions
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+                logger.debug(f"Cleaned up temporary file after error: {temp_path}")
+            raise RemoteDatabaseDownloadError(f"Failed to download remote database: {e}") from e
+        except Exception as e:
+            # Catch any other unexpected exceptions
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+                logger.debug(f"Cleaned up temporary file after unexpected error: {temp_path}")
+            raise RemoteDatabaseDownloadError(f"Failed to download remote database: {e}") from e
 
     def sync_to_remote(self):
         """
