@@ -17,6 +17,20 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_REMOTE_DB_BYTES = 100 * 1024 * 1024  # 100 MB
 
 
+class DatabaseSizeExceededError(ValueError):
+    """
+    Exception raised when a remote database download exceeds the maximum allowed size.
+
+    This exception is raised in two scenarios:
+    1. When the Content-Length header indicates the file is too large (pre-download check)
+    2. When the actual downloaded data exceeds the limit during streaming
+
+    Attributes:
+        message: Human-readable error message with size information
+    """
+    pass
+
+
 class RemoteSQLiteHelper:
     """Helper class to manage remote SQLite database access"""
 
@@ -101,16 +115,18 @@ class RemoteSQLiteHelper:
                 try:
                     content_length_int = int(content_length)
                     if content_length_int > self.max_db_bytes:
-                        raise ValueError(
+                        raise DatabaseSizeExceededError(
                             f"Remote database size ({content_length_int} bytes, "
                             f"{content_length_int / (1024*1024):.2f} MB) exceeds maximum allowed size "
                             f"({self.max_db_bytes} bytes, {self.max_db_bytes / (1024*1024):.2f} MB)"
                         )
                     logger.info(f"Remote database size: {content_length_int} bytes ({content_length_int / (1024*1024):.2f} MB)")
+                except DatabaseSizeExceededError:
+                    # Re-raise size exceeded errors immediately
+                    raise
                 except ValueError as e:
-                    if "exceeds maximum" in str(e):
-                        raise
-                    logger.warning(f"Could not parse Content-Length header: {content_length}")
+                    # Log parsing errors but continue with streaming check
+                    logger.warning(f"Could not parse Content-Length header '{content_length}': {e}")
             else:
                 logger.warning("Content-Length header not available, will check size during streaming")
 
@@ -123,7 +139,7 @@ class RemoteSQLiteHelper:
 
                         # Enforce size limit during streaming
                         if bytes_written > self.max_db_bytes:
-                            raise ValueError(
+                            raise DatabaseSizeExceededError(
                                 f"Downloaded data size ({bytes_written} bytes) exceeded maximum allowed size "
                                 f"({self.max_db_bytes} bytes, {self.max_db_bytes / (1024*1024):.2f} MB) during streaming"
                             )
