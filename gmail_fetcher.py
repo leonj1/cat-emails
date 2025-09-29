@@ -14,6 +14,7 @@ import re
 from collections import Counter
 from tabulate import tabulate
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
+from remote_sqlite_helper import get_ell_store_path
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--base-url", default="10.1.1.74:11434", help="Base URL for the OpenAI API")
@@ -31,7 +32,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-ell.init(verbose=False, store='./logdir')
+ell.init(verbose=False, store=get_ell_store_path())
 
 client = openai.Client(
     base_url=f"http://{args.base_url}/v1", api_key="ollama"  # required but not used
