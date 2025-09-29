@@ -24,7 +24,7 @@ class RemoteSQLiteHelper:
             remote_url: URL to the remote SQLite database file
             local_path: Local path to store the database (default: './logdir')
         """
-        self.remote_url = remote_url or os.getenv('SQLITE_URL')
+        self.remote_url = remote_url if remote_url is not None else os.getenv('SQLITE_URL')
         self.local_path = local_path
         self._ensure_local_dir()
 
