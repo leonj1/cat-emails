@@ -1646,8 +1646,9 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     
     # Get configuration from environment
+    # Railway sets PORT environment variable, fallback to API_PORT then 8001
     host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("API_PORT", "8001"))
+    port = int(os.getenv("PORT", os.getenv("API_PORT", "8001")))
     
     logger.info(f"Starting Cat Emails Summary API on {host}:{port}")
     if API_KEY:
