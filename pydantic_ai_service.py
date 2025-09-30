@@ -74,21 +74,15 @@ class PydanticAIService(ILLMService):
 
             # Try to parse the response into the expected Pydantic model
             try:
-                # If the response is JSON, parse it directly
+                # Parse the JSON response directly
                 parsed_response = response_model.model_validate_json(content)
                 return parsed_response
             except ValidationError as ve:
-                # If direct JSON parsing fails, try to extract structured data
-                # This handles cases where LLM returns text instead of pure JSON
-                try:
-                    # Attempt to create model from the text content
-                    parsed_response = response_model(contents=content)
-                    return parsed_response
-                except Exception:
-                    return ErrorResponse(
-                        error=f"Failed to validate response: {str(ve)}",
-                        error_type="ValidationError"
-                    )
+                # Return detailed validation error
+                return ErrorResponse(
+                    error=f"Failed to validate LLM response against model {response_model.__name__}: {str(ve)}",
+                    error_type="ValidationError"
+                )
 
         except openai.APIError as e:
             return ErrorResponse(

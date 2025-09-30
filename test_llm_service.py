@@ -275,6 +275,74 @@ class TestPydanticAIServiceErrorHandling(unittest.TestCase):
         self.assertIsInstance(response, ErrorResponse)
         self.assertEqual(response.error_type, "EmptyContentError")
 
+    def test_invalid_json_response(self):
+        """Test handling when LLM returns invalid JSON"""
+        service = PydanticAIService(
+            model="test-model",
+            api_token="test-token",
+            base_url="http://test.local"
+        )
+
+        # Mock the client to return non-JSON content
+        mock_message = Mock()
+        mock_message.content = "This is plain text, not JSON"
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+        mock_response = Mock()
+        mock_response.choices = [mock_choice]
+        service.client.chat.completions.create = Mock(return_value=mock_response)
+
+        response = service.query("test message", SimpleResponse)
+
+        self.assertIsInstance(response, ErrorResponse)
+        self.assertEqual(response.error_type, "ValidationError")
+        self.assertIn("Failed to validate", response.error)
+
+    def test_malformed_json_response(self):
+        """Test handling when LLM returns malformed JSON"""
+        service = PydanticAIService(
+            model="test-model",
+            api_token="test-token",
+            base_url="http://test.local"
+        )
+
+        # Mock the client to return malformed JSON
+        mock_message = Mock()
+        mock_message.content = '{"message": "incomplete'
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+        mock_response = Mock()
+        mock_response.choices = [mock_choice]
+        service.client.chat.completions.create = Mock(return_value=mock_response)
+
+        response = service.query("test message", SimpleResponse)
+
+        self.assertIsInstance(response, ErrorResponse)
+        self.assertEqual(response.error_type, "ValidationError")
+
+    def test_json_missing_required_fields(self):
+        """Test handling when JSON is valid but missing required fields"""
+        service = PydanticAIService(
+            model="test-model",
+            api_token="test-token",
+            base_url="http://test.local"
+        )
+
+        # Mock the client to return JSON with missing required field
+        mock_message = Mock()
+        mock_message.content = '{"wrong_field": "value"}'
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+        mock_response = Mock()
+        mock_response.choices = [mock_choice]
+        service.client.chat.completions.create = Mock(return_value=mock_response)
+
+        response = service.query("test message", SimpleResponse)
+
+        self.assertIsInstance(response, ErrorResponse)
+        self.assertEqual(response.error_type, "ValidationError")
+        self.assertIn("SimpleResponse", response.error)
+
 
 if __name__ == "__main__":
     unittest.main()
