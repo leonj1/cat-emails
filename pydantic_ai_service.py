@@ -1,15 +1,10 @@
 from typing import Union
 import openai
 from pydantic import BaseModel, Field, ValidationError
+from llm_service_interface import ILLMService, ErrorResponse
 
 
-class ErrorResponse(BaseModel):
-    """Response model for errors"""
-    error: str = Field(description="Error message describing what went wrong")
-    error_type: str = Field(description="Type of error that occurred")
-
-
-class PydanticAIService:
+class PydanticAIService(ILLMService):
     """
     Service class for interacting with LLM providers using OpenAI-compatible API.
     Uses Pydantic models for structured responses and typed error handling.
