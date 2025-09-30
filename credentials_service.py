@@ -1,6 +1,7 @@
 """
 Credentials Service Module
 Handles storing and retrieving Gmail credentials from SQLite database
+Supports both local SQLite and SQLiteCloud
 """
 import sqlite3
 import os
@@ -19,16 +20,38 @@ class CredentialsService:
         Initialize the credentials service
 
         Args:
-            db_path: Path to the SQLite database file. If None, uses './credentials.db'
+            db_path: Path to the SQLite database file or SQLiteCloud URL.
+                     If None, checks SQLITE_URL env var, then falls back to './credentials.db'
         """
-        self.db_path = db_path or os.getenv('CREDENTIALS_DB_PATH', './credentials.db')
+        # Priority: explicit db_path > SQLITE_URL > CREDENTIALS_DB_PATH > default local path
+        self.db_path = db_path or os.getenv('SQLITE_URL') or os.getenv('CREDENTIALS_DB_PATH', './credentials.db')
+        self.is_cloud = self.db_path.startswith('sqlitecloud://')
+
+        if self.is_cloud:
+            # Import sqlitecloud only if needed
+            try:
+                import sqlitecloud
+                self.sqlitecloud = sqlitecloud
+            except ImportError:
+                logger.error("sqlitecloud library not found. Install it with: pip install sqlitecloud")
+                raise ImportError("sqlitecloud library required for SQLiteCloud connections")
+
         self._ensure_db_exists()
+
+    def _get_connection(self):
+        """Get database connection (local or cloud)"""
+        if self.is_cloud:
+            return self.sqlitecloud.connect(self.db_path)
+        else:
+            return sqlite3.connect(self.db_path)
 
     def _ensure_db_exists(self):
         """Ensure the database and table exist"""
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+        if not self.is_cloud:
+            # Only create directory for local databases
+            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
 
         # Create credentials table if it doesn't exist
@@ -58,7 +81,7 @@ class CredentialsService:
             bool: True if successful, False otherwise
         """
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
 
             # Use INSERT OR REPLACE to handle both insert and update
@@ -86,7 +109,7 @@ class CredentialsService:
             Tuple[str, str]: (email, password) if found, None otherwise
         """
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
 
             if email:
@@ -127,7 +150,7 @@ class CredentialsService:
             bool: True if successful, False otherwise
         """
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
 
             cursor.execute('''
@@ -157,7 +180,7 @@ class CredentialsService:
             list: List of email addresses
         """
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
 
             cursor.execute('''
