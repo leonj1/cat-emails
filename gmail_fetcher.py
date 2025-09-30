@@ -19,6 +19,8 @@ from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
 from services.categorize_emails_interface import SimpleEmailCategory
 from services.categorize_emails_llm import LLMCategorizeEmails
 from services.email_processor_service import EmailProcessorService
+from services.llm_service_interface import LLMServiceInterface
+from services.openai_llm_service import OpenAILLMService
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--primary-host", default=os.environ.get('OLLAMA_HOST_PRIMARY', '10.1.1.247:11434'),
@@ -46,8 +48,8 @@ if args.base_url:
     args.primary_host = args.base_url
 
 
-def _make_llm_categorizer(model: str) -> LLMCategorizeEmails:
-    """Construct LLMCategorizeEmails for RequestYAI (OpenAI-compatible) using env for base_url and api key.
+def _make_llm_service(model: str) -> LLMServiceInterface:
+    """Construct an LLM service for RequestYAI (OpenAI-compatible) using env for base_url and api key.
     Provide full OpenAI-compatible root (may include version), e.g. https://api.requesty.ai/openai/v1
     """
     base_url = (
@@ -60,7 +62,19 @@ def _make_llm_categorizer(model: str) -> LLMCategorizeEmails:
         or os.environ.get("REQUESTY_API_KEY")
         or os.environ.get("OPENAI_API_KEY", "")
     )
-    return LLMCategorizeEmails(provider="requestyai", api_token=api_key, model=model, base_url=base_url)
+    return OpenAILLMService(
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+        provider_name="requestyai"
+    )
+
+def _make_llm_categorizer(model: str) -> LLMCategorizeEmails:
+    """Construct LLMCategorizeEmails using the injected LLM service interface.
+    This allows swapping LLM providers without changing the categorization logic.
+    """
+    llm_service = _make_llm_service(model)
+    return LLMCategorizeEmails(llm_service=llm_service)
 
 def categorize_email_with_resilient_client(contents: str, model: str) -> str:
     """
@@ -84,7 +98,9 @@ def categorize_email_with_resilient_client(contents: str, model: str) -> str:
 def categorize_email_ell_marketing(contents: str):
     """Categorize email using LLMCategorizeEmails with the primary model."""
     try:
-        result = _make_llm_categorizer().category(contents)
+        # Use a default model for backward compatibility
+        model = os.environ.get("PRIMARY_MODEL", "vertex/google/gemini-2.5-flash")
+        result = _make_llm_categorizer(model).category(contents)
         return result.value if isinstance(result, SimpleEmailCategory) else "Other"
     except Exception as e:
         logger.error(f"categorize_email_ell_marketing failed: {e}")
@@ -94,7 +110,9 @@ def categorize_email_ell_marketing(contents: str):
 def categorize_email_ell_marketing2(contents: str):
     """Categorize email using LLMCategorizeEmails with the secondary model."""
     try:
-        result = _make_llm_categorizer().category(contents)
+        # Use a default model for backward compatibility
+        model = os.environ.get("SECONDARY_MODEL", "vertex/google/gemini-2.5-flash")
+        result = _make_llm_categorizer(model).category(contents)
         return result.value if isinstance(result, SimpleEmailCategory) else "Other"
     except Exception as e:
         logger.error(f"categorize_email_ell_marketing2 failed: {e}")
