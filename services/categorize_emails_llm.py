@@ -11,34 +11,53 @@ from services.categorize_emails_interface import (
     CategoryResult,
     CategoryError,
 )
+from services.llm_service_interface import LLMServiceInterface
 
 logger = logging.getLogger(__name__)
 
 
 class LLMCategorizeEmails(CategorizeEmails):
     """
-    Concrete implementation of CategorizeEmails using an LLM provider.
+    Concrete implementation of CategorizeEmails using an LLM service.
 
-    Construction requires:
-      - provider: one of {'openai', 'anthropic', 'google', 'requestyai', 'ollama'}
-      - api_token: API token for the LLM provider
-      - model: model name to use for categorization
+    This class now accepts an LLMServiceInterface implementation, allowing
+    any LLM provider to be used without modifying this class.
 
-    Optionally, base_url can be provided to target non-default OpenAI-compatible endpoints
-    (e.g., an Ollama/OpenAI-compatible gateway). Provide the full API root as required by
-    your provider (often includes a version path), for example:
-      - http://localhost:11434/v1 (Ollama)
-      - https://api.requesty.ai/openai/v1 (RequestYAI)
-    If not provided, defaults to the provider's SDK default where applicable.
+    Construction options:
+      1. Pass an llm_service instance directly (recommended)
+      2. Legacy: Pass provider, api_token, model, and base_url (for backward compatibility)
     """
 
-    def __init__(self, provider: str, api_token: str, model: str, *, base_url: Optional[str] = None):
+    def __init__(
+        self,
+        provider: Optional[str] = None,
+        api_token: Optional[str] = None,
+        model: Optional[str] = None,
+        *,
+        base_url: Optional[str] = None,
+        llm_service: Optional[LLMServiceInterface] = None
+    ):
+        # New approach: use injected LLM service
+        if llm_service is not None:
+            self.llm_service = llm_service
+            self.model = llm_service.get_model_name()
+            self.provider = llm_service.get_provider_name()
+            logger.info(
+                f"LLM categorizer initialized with injected service: "
+                f"provider={self.provider}, model={self.model}"
+            )
+            # Legacy attributes for backward compatibility
+            self.client = None
+            self.agent = None
+            return
+
+        # Legacy approach: construct OpenAI client directly (for backward compatibility)
         if not isinstance(provider, str) or not provider.strip():
-            raise ValueError("provider is required and must be a non-empty string")
+            raise ValueError("provider is required and must be a non-empty string (or pass llm_service)")
         if not isinstance(api_token, str) or not api_token.strip():
-            raise ValueError("api_token is required and must be a non-empty string")
+            raise ValueError("api_token is required and must be a non-empty string (or pass llm_service)")
         if not isinstance(model, str) or not model.strip():
-            raise ValueError("model is required and must be a non-empty string")
+            raise ValueError("model is required and must be a non-empty string (or pass llm_service)")
 
         provider_norm = provider.strip().lower()
         supported = {"openai", "anthropic", "google", "requestyai", "ollama"}
@@ -47,6 +66,7 @@ class LLMCategorizeEmails(CategorizeEmails):
 
         self.provider = provider_norm
         self.model = model
+        self.llm_service = None  # Not using injected service
 
         logger.info(f"LLM configuration: provider={self.provider}, model={self.model}, base_url={'(default SDK)' if not base_url else base_url}")
 
@@ -93,16 +113,6 @@ class LLMCategorizeEmails(CategorizeEmails):
         if not isinstance(email_contents, str) or not email_contents.strip():
             return CategoryError(error="InvalidInput", detail="email_contents must be a non-empty string")
 
-        # If we don't have an OpenAI-compatible client wired, indicate unsupported provider for now
-        if self.client is None:
-            return CategoryError(
-                error="UnsupportedProvider",
-                detail=(
-                    f"Provider '{self.provider}' is recognized but not yet wired to category(); "
-                    "install and configure 'pydantic-ai' or use an OpenAI-compatible provider (openai/ollama)."
-                ),
-            )
-
         # Prompt design: force a single token from the allowed set
         system_prompt = (
             "You categorize emails into commercial-intent classes. "
@@ -116,15 +126,35 @@ class LLMCategorizeEmails(CategorizeEmails):
         )
 
         try:
-            resp = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0,
-            )
-            content = (resp.choices[0].message.content or "").strip().strip('"\'')
+            # Use LLM service if available (new approach)
+            if self.llm_service is not None:
+                content = self.llm_service.call(
+                    prompt=user_prompt,
+                    system_prompt=system_prompt,
+                    temperature=0
+                )
+            # Fall back to legacy OpenAI client (backward compatibility)
+            elif self.client is not None:
+                resp = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0,
+                )
+                content = (resp.choices[0].message.content or "").strip()
+            else:
+                return CategoryError(
+                    error="UnsupportedProvider",
+                    detail=(
+                        f"Provider '{self.provider}' is recognized but not yet wired to category(); "
+                        "install and configure 'pydantic-ai' or use an OpenAI-compatible provider (openai/ollama)."
+                    ),
+                )
+
+            # Clean up the response
+            content = content.strip().strip('"\'')
 
             # Normalize and map to enum
             normalized = content.lower().replace(" ", "").replace("-", "")

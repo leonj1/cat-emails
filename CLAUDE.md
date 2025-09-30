@@ -163,11 +163,57 @@ API endpoints:
 
 ## AI Model Configuration
 
-The system uses Ollama with multiple models for categorization:
-- Primary: `llama3.2` (fast, accurate)
-- Secondary: `gemma2` (fallback)
+The system uses a flexible LLM service architecture that allows swapping between different AI providers:
 
-Models are accessed via the Ollama API at the configured OLLAMA_HOST. The `ell` framework is used for LLM orchestration with logging stored in `./logdir`.
+### LLM Service Interface
+
+The project now uses an abstraction layer (`LLMServiceInterface`) that allows the email categorization system to work with any LLM provider without changing core logic:
+
+**Available Implementations:**
+- `OpenAILLMService` - Works with OpenAI, Ollama, RequestYAI, or any OpenAI-compatible API
+- Custom implementations - Easily create your own by extending `LLMServiceInterface`
+
+**Default Configuration:**
+- Provider: RequestYAI (OpenAI-compatible gateway)
+- Model: `vertex/google/gemini-2.5-flash`
+- Configurable via environment variables
+
+### Using Custom LLM Implementations
+
+You can swap LLM providers by implementing `LLMServiceInterface`:
+
+```python
+from services.llm_service_interface import LLMServiceInterface
+from services.categorize_emails_llm import LLMCategorizeEmails
+
+# Create your custom LLM service
+class CustomLLMService(LLMServiceInterface):
+    def call(self, prompt, system_prompt=None, **kwargs):
+        # Your LLM logic here
+        return "Marketing"
+
+    def is_available(self):
+        return True
+
+    def get_model_name(self):
+        return "my-custom-model"
+
+    def get_provider_name(self):
+        return "custom-provider"
+
+# Use it with the categorizer
+llm_service = CustomLLMService()
+categorizer = LLMCategorizeEmails(llm_service=llm_service)
+```
+
+See `examples/custom_llm_example.py` for complete examples including:
+- Mock LLM for testing
+- Rule-based categorization
+- Runtime provider swapping
+
+### Legacy Support
+
+The system maintains backward compatibility with the original `ell` framework approach, but new code should use the `LLMServiceInterface` for better flexibility.
 
 ### Ollama Host Failover
 
