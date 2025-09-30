@@ -48,13 +48,28 @@ class PydanticAIService(ILLMService):
                 temperature=0.1,
             )
 
+            # Guard against empty choices list
+            if not response.choices or len(response.choices) == 0:
+                return ErrorResponse(
+                    error="LLM returned empty choices list in response",
+                    error_type="EmptyChoicesError"
+                )
+
+            # Guard against missing message or content
+            choice = response.choices[0]
+            if not hasattr(choice, 'message') or not choice.message:
+                return ErrorResponse(
+                    error="LLM response choice is missing message field",
+                    error_type="MissingMessageError"
+                )
+
             # Extract the content from response
-            content = response.choices[0].message.content
+            content = choice.message.content
 
             if not content:
                 return ErrorResponse(
-                    error="Empty response received from LLM",
-                    error_type="EmptyResponseError"
+                    error="Empty content received from LLM",
+                    error_type="EmptyContentError"
                 )
 
             # Try to parse the response into the expected Pydantic model

@@ -4,9 +4,11 @@ real and mock implementations.
 """
 
 import unittest
+from unittest.mock import Mock, MagicMock
 from pydantic import BaseModel, Field
 from llm_service_interface import ILLMService, ErrorResponse
 from mock_llm_service import MockLLMService
+from pydantic_ai_service import PydanticAIService
 from models.email_category import EmailCategory
 from models.categorized_email import CategorizedEmail
 
@@ -167,6 +169,111 @@ class TestInterfacePolymorphism(unittest.TestCase):
         # Both should work with the same helper function
         result = self.process_with_service(mock_service, "test message")
         self.assertEqual(result, "Mock response")
+
+
+class TestPydanticAIServiceErrorHandling(unittest.TestCase):
+    """Test error handling in PydanticAIService"""
+
+    def test_empty_choices_list(self):
+        """Test handling when response.choices is empty"""
+        service = PydanticAIService(
+            model="test-model",
+            api_token="test-token",
+            base_url="http://test.local"
+        )
+
+        # Mock the client to return empty choices
+        mock_response = Mock()
+        mock_response.choices = []
+        service.client.chat.completions.create = Mock(return_value=mock_response)
+
+        response = service.query("test message", SimpleResponse)
+
+        self.assertIsInstance(response, ErrorResponse)
+        self.assertEqual(response.error_type, "EmptyChoicesError")
+        self.assertIn("empty choices list", response.error.lower())
+
+    def test_none_choices(self):
+        """Test handling when response.choices is None"""
+        service = PydanticAIService(
+            model="test-model",
+            api_token="test-token",
+            base_url="http://test.local"
+        )
+
+        # Mock the client to return None choices
+        mock_response = Mock()
+        mock_response.choices = None
+        service.client.chat.completions.create = Mock(return_value=mock_response)
+
+        response = service.query("test message", SimpleResponse)
+
+        self.assertIsInstance(response, ErrorResponse)
+        self.assertEqual(response.error_type, "EmptyChoicesError")
+
+    def test_missing_message_field(self):
+        """Test handling when choice is missing message field"""
+        service = PydanticAIService(
+            model="test-model",
+            api_token="test-token",
+            base_url="http://test.local"
+        )
+
+        # Mock the client to return choice without message
+        mock_choice = Mock()
+        mock_choice.message = None
+        mock_response = Mock()
+        mock_response.choices = [mock_choice]
+        service.client.chat.completions.create = Mock(return_value=mock_response)
+
+        response = service.query("test message", SimpleResponse)
+
+        self.assertIsInstance(response, ErrorResponse)
+        self.assertEqual(response.error_type, "MissingMessageError")
+
+    def test_empty_content(self):
+        """Test handling when message content is empty"""
+        service = PydanticAIService(
+            model="test-model",
+            api_token="test-token",
+            base_url="http://test.local"
+        )
+
+        # Mock the client to return empty content
+        mock_message = Mock()
+        mock_message.content = ""
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+        mock_response = Mock()
+        mock_response.choices = [mock_choice]
+        service.client.chat.completions.create = Mock(return_value=mock_response)
+
+        response = service.query("test message", SimpleResponse)
+
+        self.assertIsInstance(response, ErrorResponse)
+        self.assertEqual(response.error_type, "EmptyContentError")
+
+    def test_none_content(self):
+        """Test handling when message content is None"""
+        service = PydanticAIService(
+            model="test-model",
+            api_token="test-token",
+            base_url="http://test.local"
+        )
+
+        # Mock the client to return None content
+        mock_message = Mock()
+        mock_message.content = None
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+        mock_response = Mock()
+        mock_response.choices = [mock_choice]
+        service.client.chat.completions.create = Mock(return_value=mock_response)
+
+        response = service.query("test message", SimpleResponse)
+
+        self.assertIsInstance(response, ErrorResponse)
+        self.assertEqual(response.error_type, "EmptyContentError")
 
 
 if __name__ == "__main__":
