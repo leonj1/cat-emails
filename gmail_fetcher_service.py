@@ -11,6 +11,7 @@ import signal
 import logging
 from datetime import datetime
 from gmail_fetcher import main as gmail_fetcher_main
+from credentials_service import CredentialsService
 
 # Configure logging
 logging.basicConfig(
@@ -33,18 +34,29 @@ def signal_handler(signum, frame):
 
 def run_service():
     """Main service loop"""
-    # Get configuration from environment
-    email_address = os.getenv("GMAIL_EMAIL")
-    app_password = os.getenv("GMAIL_PASSWORD")
+    # Get credentials from SQLite database first, fallback to environment variables
+    credentials_service = CredentialsService()
+    credentials = credentials_service.get_credentials()
+
+    if credentials:
+        email_address, app_password = credentials
+        logger.info("Using Gmail credentials from SQLite database")
+    else:
+        # Fallback to environment variables if not in database
+        email_address = os.getenv("GMAIL_EMAIL")
+        app_password = os.getenv("GMAIL_PASSWORD")
+
+        if email_address and app_password:
+            logger.info("Using Gmail credentials from environment variables")
+        else:
+            logger.error("Please provide GMAIL_EMAIL and GMAIL_PASSWORD either in SQLite database or as environment variables")
+            sys.exit(1)
+
+    # Get other configuration from environment
     api_token = os.getenv("CONTROL_API_TOKEN")
     hours = int(os.getenv("HOURS", "2"))
     scan_interval = int(os.getenv("SCAN_INTERVAL", "2"))  # minutes
-    
-    # Validate required environment variables
-    if not email_address or not app_password:
-        logger.error("GMAIL_EMAIL and GMAIL_PASSWORD environment variables are required")
-        sys.exit(1)
-    
+
     if not api_token:
         logger.error("CONTROL_API_TOKEN environment variable is required")
         sys.exit(1)

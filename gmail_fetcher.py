@@ -15,6 +15,7 @@ from collections import Counter
 from tabulate import tabulate
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 from remote_sqlite_helper import get_ell_store_path
+from credentials_service import CredentialsService
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--base-url", default="10.1.1.74:11434", help="Base URL for the OpenAI API")
@@ -609,15 +610,28 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         fetcher.disconnect()
 
 if __name__ == "__main__":
-    # Get credentials from environment variables
-    email_address = os.getenv("GMAIL_EMAIL")
-    app_password = os.getenv("GMAIL_PASSWORD")
+    # Get credentials from SQLite database first, fallback to environment variables
+    credentials_service = CredentialsService()
+
+    # Try to get from database first
+    credentials = credentials_service.get_credentials()
+
+    if credentials:
+        email_address, app_password = credentials
+        logger.info("Using Gmail credentials from SQLite database")
+    else:
+        # Fallback to environment variables if not in database
+        email_address = os.getenv("GMAIL_EMAIL")
+        app_password = os.getenv("GMAIL_PASSWORD")
+
+        if email_address and app_password:
+            logger.info("Using Gmail credentials from environment variables")
+        else:
+            raise ValueError("Please provide GMAIL_EMAIL and GMAIL_PASSWORD either in SQLite database or as environment variables")
+
+    # Control API token still from environment variable
     api_token = os.getenv("CONTROL_API_TOKEN")
-
-    if not email_address or not app_password:
-        raise ValueError("Please set GMAIL_EMAIL and GMAIL_PASSWORD environment variables")
-
     if not api_token:
         raise ValueError("Please set CONTROL_API_TOKEN environment variable")
-    
+
     main(email_address, app_password, api_token, args.hours)
