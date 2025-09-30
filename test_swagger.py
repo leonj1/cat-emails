@@ -40,13 +40,13 @@ def test_swagger_endpoints():
                 all_passed = False
         except requests.exceptions.ConnectionError:
             print(f"⚠️  {name}: {url}")
-            print(f"   Error: Could not connect. Is the API server running?")
-            print(f"   Start the server with: python api_service.py")
+            print("   Error: Could not connect. Is the API server running?")
+            print("   Start the server with: python api_service.py")
             print()
             all_passed = False
         except Exception as e:
             print(f"❌ {name}: {url}")
-            print(f"   Error: {str(e)}")
+            print(f"   Error: {e!s}")
             print()
             all_passed = False
 
