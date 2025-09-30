@@ -4,4 +4,7 @@ nohup.out
 ollama.txt
 logdir
 __pycache__/
+credentials.db
+*.db
+*.log
 

@@ -60,10 +60,11 @@ python email_scanner_consumer.py
 ### Core Components
 
 1. **gmail_fetcher.py** - Main entry point that connects to Gmail via IMAP and processes emails directly
-2. **domain_service.py** - Manages allowed/blocked domains and categories via external Control API
-3. **email_scanner_producer.py** / **email_scanner_consumer.py** - Kafka-based distributed processing
-4. **gmail_fetcher_service.py** - Service mode for continuous scanning at intervals
-5. **models/** - Pydantic models for email categorization and API responses
+2. **credentials_service.py** - Manages Gmail credentials stored in SQLite database
+3. **domain_service.py** - Manages allowed/blocked domains and categories via external Control API
+4. **email_scanner_producer.py** / **email_scanner_consumer.py** - Kafka-based distributed processing
+5. **gmail_fetcher_service.py** - Service mode for continuous scanning at intervals
+6. **models/** - Pydantic models for email categorization and API responses
 
 ### Email Processing Flow
 
@@ -90,10 +91,39 @@ Emails are classified into:
 
 ## Configuration
 
-### Required Environment Variables
+### Gmail Credentials
+
+Gmail credentials can be stored in either **SQLite database** (recommended) or **environment variables** (fallback).
+
+#### Option 1: SQLite Database (Recommended)
+```bash
+# Store credentials in SQLite database
+python3 setup_credentials.py --email your-email@gmail.com --password your-app-password
+
+# List stored credentials
+python3 setup_credentials.py --list
+
+# Delete credentials
+python3 setup_credentials.py --delete your-email@gmail.com
+```
+
+The credentials are stored in `./credentials.db` by default. You can specify a custom location:
+```bash
+python3 setup_credentials.py --email EMAIL --password PASSWORD --db-path /path/to/credentials.db
+
+# Or use environment variable
+export CREDENTIALS_DB_PATH=/path/to/credentials.db
+```
+
+#### Option 2: Environment Variables (Fallback)
 ```bash
 GMAIL_EMAIL=your-email@gmail.com
 GMAIL_PASSWORD=your-app-password  # Gmail app-specific password
+CONTROL_API_TOKEN=your-api-token  # For domain service API
+```
+
+### Required Environment Variables
+```bash
 CONTROL_API_TOKEN=your-api-token  # For domain service API
 ```
 
@@ -102,12 +132,13 @@ CONTROL_API_TOKEN=your-api-token  # For domain service API
 HOURS=2  # Hours to look back for emails (default: 2)
 SCAN_INTERVAL=2  # Minutes between scans in service mode (default: 2)
 OLLAMA_HOST=http://localhost:11434  # Custom Ollama server
+CREDENTIALS_DB_PATH=./credentials.db  # Path to credentials database (default: ./credentials.db)
 ```
 
 ### Setting Up Gmail Access
 1. Enable 2-factor authentication in Gmail
 2. Generate an app-specific password at https://myaccount.google.com/apppasswords
-3. Use this password as GMAIL_PASSWORD
+3. Store credentials using `setup_credentials.py` or set as environment variables
 
 ## Testing
 
