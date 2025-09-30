@@ -507,10 +507,34 @@ def test_api_connection(api_token: str) -> None:
     except Exception as e:
         raise Exception(f"Failed to connect to control API: {str(e)}")
 
-def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
+def main(email_address: str = None, app_password: str = None, api_token: str = None, hours: int = 2):
     logger.info("Starting email processing")
     logger.info(f"Processing emails from the last {hours} hours")
-    
+
+    # Get credentials if not provided
+    if not email_address or not app_password:
+        credentials_service = CredentialsService()
+        credentials = credentials_service.get_credentials()
+
+        if credentials:
+            email_address, app_password = credentials
+            logger.info("Using Gmail credentials from SQLite database")
+        else:
+            # Fallback to environment variables if not in database
+            email_address = os.getenv("GMAIL_EMAIL")
+            app_password = os.getenv("GMAIL_PASSWORD")
+
+            if email_address and app_password:
+                logger.info("Using Gmail credentials from environment variables")
+            else:
+                raise ValueError("Please provide GMAIL_EMAIL and GMAIL_PASSWORD either in SQLite database or as environment variables")
+
+    # Get API token if not provided
+    if not api_token:
+        api_token = os.getenv("CONTROL_API_TOKEN")
+        if not api_token:
+            raise ValueError("Please set CONTROL_API_TOKEN environment variable")
+
     # Test API connection first
     logger.info("Testing API connection")
     test_api_connection(api_token)
@@ -610,28 +634,5 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         fetcher.disconnect()
 
 if __name__ == "__main__":
-    # Get credentials from SQLite database first, fallback to environment variables
-    credentials_service = CredentialsService()
-
-    # Try to get from database first
-    credentials = credentials_service.get_credentials()
-
-    if credentials:
-        email_address, app_password = credentials
-        logger.info("Using Gmail credentials from SQLite database")
-    else:
-        # Fallback to environment variables if not in database
-        email_address = os.getenv("GMAIL_EMAIL")
-        app_password = os.getenv("GMAIL_PASSWORD")
-
-        if email_address and app_password:
-            logger.info("Using Gmail credentials from environment variables")
-        else:
-            raise ValueError("Please provide GMAIL_EMAIL and GMAIL_PASSWORD either in SQLite database or as environment variables")
-
-    # Control API token still from environment variable
-    api_token = os.getenv("CONTROL_API_TOKEN")
-    if not api_token:
-        raise ValueError("Please set CONTROL_API_TOKEN environment variable")
-
-    main(email_address, app_password, api_token, args.hours)
+    # Credentials will be loaded inside main() function
+    main(hours=args.hours)
