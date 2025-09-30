@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python gmail_fetcher.py --hours ${HOURS:-2}"
+restartPolicyType = "ON_FAILURE"
+healthcheckTimeout = 300
