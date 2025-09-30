@@ -36,11 +36,77 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app with comprehensive OpenAPI/Swagger configuration
 app = FastAPI(
     title="Cat Emails API",
-    description="API for email summary reports and account category management",
-    version="1.1.0"
+    description="""
+# Cat Emails API
+
+An AI-powered Gmail email categorizer API that automatically classifies, labels, and filters emails using machine learning models.
+
+## Features
+
+* **Email Categorization**: Automatically categorize emails into types (Marketing, Advertising, Personal, Work-related, etc.)
+* **Background Processing**: Continuous Gmail account scanning and processing
+* **Real-time Status**: WebSocket-based real-time processing status updates
+* **Summary Reports**: Generate morning, evening, weekly, and monthly email summary reports
+* **Account Management**: Track multiple Gmail accounts with category statistics
+* **Category Analytics**: Get top email categories and statistics for any time period
+
+## Authentication
+
+Most endpoints require authentication via `X-API-Key` header when API_KEY is configured.
+
+Example:
+```
+X-API-Key: your-api-key-here
+```
+
+## Real-time Updates
+
+Connect to the WebSocket endpoint at `/ws/status` for real-time processing updates.
+    """,
+    version="1.1.0",
+    contact={
+        "name": "Terragon Labs",
+        "url": "https://github.com/leonj1/cat-emails",
+    },
+    license_info={
+        "name": "MIT",
+    },
+    openapi_tags=[
+        {
+            "name": "health",
+            "description": "Health check and service status endpoints"
+        },
+        {
+            "name": "background-processing",
+            "description": "Background Gmail processing management endpoints"
+        },
+        {
+            "name": "processing-status",
+            "description": "Real-time email processing status and monitoring"
+        },
+        {
+            "name": "summaries",
+            "description": "Email summary report generation endpoints"
+        },
+        {
+            "name": "accounts",
+            "description": "Gmail account management and analytics"
+        },
+        {
+            "name": "testing",
+            "description": "Testing and development utilities"
+        },
+        {
+            "name": "websocket",
+            "description": "WebSocket endpoints for real-time updates"
+        }
+    ],
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
 # Configure CORS
@@ -462,9 +528,13 @@ def stop_background_processor():
         next_execution_time = None
 
 
-@app.get("/")
+@app.get("/", tags=["health"])
 async def root():
-    """Root endpoint with API information"""
+    """
+    Root endpoint with API information
+
+    Returns basic API information including version, available endpoints, and configuration details.
+    """
     return {
         "service": "Cat Emails Summary API with Background Gmail Processing",
         "version": "1.1.0",
@@ -502,9 +572,13 @@ async def root():
     }
 
 
-@app.get("/api/health")
+@app.get("/api/health", tags=["health"])
 async def health_check():
-    """Health check endpoint with background processor status"""
+    """
+    Health check endpoint
+
+    Returns the health status of the API service and background processor information.
+    """
     global background_thread, background_thread_running
     
     background_status = "disabled"
@@ -527,9 +601,14 @@ async def health_check():
     }
 
 
-@app.post("/api/background/start")
+@app.post("/api/background/start", tags=["background-processing"])
 async def start_background_processing(x_api_key: Optional[str] = Header(None)):
-    """Start the background Gmail processor"""
+    """
+    Start the background Gmail processor
+
+    Starts the background processing thread that continuously scans and processes Gmail accounts.
+    Requires API key authentication if configured.
+    """
     verify_api_key(x_api_key)
     
     global background_thread, background_thread_running
@@ -557,9 +636,13 @@ async def start_background_processing(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.post("/api/background/stop")
+@app.post("/api/background/stop", tags=["background-processing"])
 async def stop_background_processing(x_api_key: Optional[str] = Header(None)):
-    """Stop the background Gmail processor"""
+    """
+    Stop the background Gmail processor
+
+    Stops the background processing thread gracefully. Requires API key authentication if configured.
+    """
     verify_api_key(x_api_key)
     
     global background_thread
@@ -579,9 +662,13 @@ async def stop_background_processing(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.get("/api/background/status")
+@app.get("/api/background/status", tags=["background-processing"])
 async def get_background_status(x_api_key: Optional[str] = Header(None)):
-    """Get detailed background processor status"""
+    """
+    Get detailed background processor status
+
+    Returns comprehensive status information about the background Gmail processor thread.
+    """
     verify_api_key(x_api_key)
     
     global background_thread, background_thread_running
@@ -607,9 +694,13 @@ async def get_background_status(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.get("/api/background/next-execution")
+@app.get("/api/background/next-execution", tags=["background-processing"])
 async def get_next_execution_time(x_api_key: Optional[str] = Header(None)):
-    """Get the next scheduled execution time of the background service"""
+    """
+    Get the next scheduled execution time
+
+    Returns when the background service will execute its next processing cycle.
+    """
     verify_api_key(x_api_key)
     
     global next_execution_time, background_thread_running
@@ -641,9 +732,13 @@ async def get_next_execution_time(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.get("/api/processing/status")
+@app.get("/api/processing/status", tags=["processing-status"])
 async def get_processing_status(x_api_key: Optional[str] = Header(None)):
-    """Get current email processing status"""
+    """
+    Get current email processing status
+
+    Returns the current processing status including active state and current processing details.
+    """
     verify_api_key(x_api_key)
     
     global processing_status_manager
@@ -658,12 +753,16 @@ async def get_processing_status(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.get("/api/processing/history")
+@app.get("/api/processing/history", tags=["processing-status"])
 async def get_processing_history(
     limit: int = Query(10, ge=1, le=100, description="Number of recent runs to retrieve (1-100)"),
     x_api_key: Optional[str] = Header(None)
 ):
-    """Get recent processing history"""
+    """
+    Get recent processing history
+
+    Returns a list of recent email processing runs with their details and results.
+    """
     verify_api_key(x_api_key)
     
     global processing_status_manager
@@ -677,9 +776,13 @@ async def get_processing_history(
     }
 
 
-@app.get("/api/processing/statistics")
+@app.get("/api/processing/statistics", tags=["processing-status"])
 async def get_processing_statistics(x_api_key: Optional[str] = Header(None)):
-    """Get processing statistics"""
+    """
+    Get processing statistics
+
+    Returns aggregate statistics about email processing including success rates and performance metrics.
+    """
     verify_api_key(x_api_key)
     
     global processing_status_manager
@@ -692,7 +795,7 @@ async def get_processing_statistics(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.get("/api/processing/current-status", response_model=ProcessingCurrentStatusResponse)
+@app.get("/api/processing/current-status", response_model=ProcessingCurrentStatusResponse, tags=["processing-status"])
 async def get_current_processing_status(
     include_recent: bool = Query(True, description="Include recent processing runs"),
     recent_limit: int = Query(5, ge=1, le=50, description="Number of recent runs to return (1-50)"),
@@ -700,7 +803,9 @@ async def get_current_processing_status(
     x_api_key: Optional[str] = Header(None)
 ):
     """
-    Get comprehensive current processing status as a REST API fallback for WebSocket functionality.
+    Get comprehensive current processing status
+
+    REST API fallback for WebSocket functionality. Provides comprehensive processing status suitable for polling-based clients.
     
     This endpoint provides the same real-time processing information available via WebSocket
     in a traditional REST API format, suitable for polling-based clients that cannot use WebSockets.
@@ -822,10 +927,12 @@ async def get_current_processing_status(
         )
 
 
-@app.websocket("/ws/status")
+@app.websocket("/ws/status", name="WebSocket Status Updates")
 async def websocket_status_endpoint(websocket: WebSocket):
     """
-    WebSocket endpoint for real-time processing status updates.
+    WebSocket endpoint for real-time processing status updates
+
+    Provides real-time updates about email processing status via WebSocket connection.
     
     This endpoint provides real-time updates about email processing status,
     including current processing state, recent runs, and statistics.
@@ -881,11 +988,12 @@ async def websocket_status_alias(websocket: WebSocket):
     await websocket_status_endpoint(websocket)
 
 
-@app.post("/api/test/create-sample-data")
+@app.post("/api/test/create-sample-data", tags=["testing"])
 async def create_sample_data(x_api_key: Optional[str] = Header(None), report_type: Optional[str] = "Daily"):
     """
-    Create sample tracking data for testing purposes.
-    This endpoint creates dummy email data to test the summary functionality.
+    Create sample tracking data for testing
+
+    Creates dummy email data to test the summary functionality. Useful for development and testing.
     
     Args:
         report_type: Type of report to generate data for (Daily/Weekly/Monthly)
@@ -996,13 +1104,12 @@ async def create_sample_data(x_api_key: Optional[str] = Header(None), report_typ
         )
 
 
-@app.post("/api/summaries/morning", response_model=SummaryResponse)
+@app.post("/api/summaries/morning", response_model=SummaryResponse, tags=["summaries"])
 async def trigger_morning_summary(x_api_key: Optional[str] = Header(None)):
     """
-    Trigger a morning (8am) summary report.
-    
-    This endpoint forces the generation and sending of a morning summary report
-    regardless of the current time.
+    Trigger a morning summary report
+
+    Forces the generation and sending of a morning summary report regardless of the current time.
     """
     verify_api_key(x_api_key)
     
@@ -1037,13 +1144,12 @@ async def trigger_morning_summary(x_api_key: Optional[str] = Header(None)):
         )
 
 
-@app.post("/api/summaries/evening", response_model=SummaryResponse)
+@app.post("/api/summaries/evening", response_model=SummaryResponse, tags=["summaries"])
 async def trigger_evening_summary(x_api_key: Optional[str] = Header(None)):
     """
-    Trigger an evening (8pm) summary report.
-    
-    This endpoint forces the generation and sending of an evening summary report
-    regardless of the current time.
+    Trigger an evening summary report
+
+    Forces the generation and sending of an evening summary report regardless of the current time.
     """
     verify_api_key(x_api_key)
     
@@ -1078,13 +1184,12 @@ async def trigger_evening_summary(x_api_key: Optional[str] = Header(None)):
         )
 
 
-@app.post("/api/summaries/weekly", response_model=SummaryResponse)
+@app.post("/api/summaries/weekly", response_model=SummaryResponse, tags=["summaries"])
 async def trigger_weekly_summary(x_api_key: Optional[str] = Header(None)):
     """
-    Trigger a weekly summary report.
-    
-    This endpoint forces the generation and sending of a weekly summary report
-    regardless of the current day or time.
+    Trigger a weekly summary report
+
+    Forces the generation and sending of a weekly summary report regardless of the current day or time.
     """
     verify_api_key(x_api_key)
     
@@ -1119,13 +1224,12 @@ async def trigger_weekly_summary(x_api_key: Optional[str] = Header(None)):
         )
 
 
-@app.post("/api/summaries/monthly", response_model=SummaryResponse)
+@app.post("/api/summaries/monthly", response_model=SummaryResponse, tags=["summaries"])
 async def trigger_monthly_summary(x_api_key: Optional[str] = Header(None)):
     """
-    Trigger a monthly summary report.
-    
-    This endpoint forces the generation and sending of a monthly summary report
-    with data from the last 30 days.
+    Trigger a monthly summary report
+
+    Forces the generation and sending of a monthly summary report with data from the last 30 days.
     """
     verify_api_key(x_api_key)
     
@@ -1160,7 +1264,7 @@ async def trigger_monthly_summary(x_api_key: Optional[str] = Header(None)):
         )
 
 
-@app.get("/api/accounts/{email_address}/categories/top", response_model=TopCategoriesResponse)
+@app.get("/api/accounts/{email_address}/categories/top", response_model=TopCategoriesResponse, tags=["accounts"])
 async def get_top_categories(
     email_address: str = Path(..., description="Gmail email address"),
     days: int = Query(..., ge=1, le=365, description="Number of days to look back (1-365)"),
@@ -1170,7 +1274,9 @@ async def get_top_categories(
     service: AccountCategoryService = Depends(get_account_service)
 ):
     """
-    Get top email categories for a specific account over a specified time period.
+    Get top email categories for a specific account
+
+    Returns the most frequent email categories for an account over a specified time period.
     
     Returns the most frequent email categories processed for the given account,
     ranked by email volume. Supports filtering by time range and category count limits.
@@ -1253,14 +1359,16 @@ async def get_top_categories(
         )
 
 
-@app.get("/api/accounts", response_model=AccountListResponse)
+@app.get("/api/accounts", response_model=AccountListResponse, tags=["accounts"])
 async def get_all_accounts(
     active_only: bool = Query(True, description="Filter to only active accounts"),
     x_api_key: Optional[str] = Header(None),
     service: AccountCategoryService = Depends(get_account_service)
 ):
     """
-    List all tracked email accounts.
+    List all tracked email accounts
+
+    Returns a list of all Gmail accounts being tracked by the system.
     
     Returns a list of all Gmail accounts being tracked by the system,
     with optional filtering to show only active accounts.
@@ -1317,14 +1425,16 @@ async def get_all_accounts(
         )
 
 
-@app.post("/api/accounts", response_model=StandardResponse)
+@app.post("/api/accounts", response_model=StandardResponse, tags=["accounts"])
 async def create_account(
     request: CreateAccountRequest,
     x_api_key: Optional[str] = Header(None),
     service: AccountCategoryService = Depends(get_account_service)
 ):
     """
-    Register a new email account for tracking.
+    Register a new email account for tracking
+
+    Creates a new account entry in the system for email category tracking.
     
     Creates a new account entry in the system for email category tracking.
     If the account already exists, it will be reactivated and updated.
@@ -1394,14 +1504,16 @@ async def create_account(
         )
 
 
-@app.put("/api/accounts/{email_address}/deactivate", response_model=StandardResponse)
+@app.put("/api/accounts/{email_address}/deactivate", response_model=StandardResponse, tags=["accounts"])
 async def deactivate_account(
     email_address: str = Path(..., description="Gmail email address to deactivate"),
     x_api_key: Optional[str] = Header(None),
     service: AccountCategoryService = Depends(get_account_service)
 ):
     """
-    Deactivate an email account.
+    Deactivate an email account
+
+    Marks an account as inactive, excluding it from active scanning but preserving historical data.
     
     Marks an account as inactive, which will exclude it from active scanning
     but preserve historical data. The account can be reactivated later.
@@ -1468,14 +1580,16 @@ async def deactivate_account(
         )
 
 
-@app.delete("/api/accounts/{email_address}", response_model=StandardResponse)
+@app.delete("/api/accounts/{email_address}", response_model=StandardResponse, tags=["accounts"])
 async def delete_account(
     email_address: str = Path(..., description="Gmail email address to delete"),
     x_api_key: Optional[str] = Header(None),
     service: AccountCategoryService = Depends(get_account_service)
 ):
     """
-    Delete an email account and all associated data.
+    Delete an email account and all associated data
+
+    Permanently removes an account and all its associated data. This operation cannot be undone.
     
     Permanently removes an account and all its associated category statistics
     from the system. This operation cannot be undone.
