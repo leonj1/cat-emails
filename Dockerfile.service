@@ -17,6 +17,8 @@ RUN pip install -U "ell-ai[all]"
 COPY gmail_fetcher.py .
 COPY gmail_fetcher_service.py .
 COPY domain_service.py .
+COPY credentials_service.py .
+COPY remote_sqlite_helper.py .
 COPY models/ ./models/
 
 # Set environment variables
