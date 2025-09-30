@@ -11,10 +11,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install -U "ell-ai[all]"
 
-COPY gmail_fetcher.py domain_service.py ./
+# Copy the entire application
+COPY . .
 
 ENV GMAIL_EMAIL=""
 ENV GMAIL_PASSWORD=""
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["python", "gmail_fetcher.py"]
+# Default to running the API service
+CMD ["python", "api_service.py"]
