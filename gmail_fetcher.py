@@ -17,10 +17,19 @@ from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedC
 from remote_sqlite_helper import get_ell_store_path
 from credentials_service import CredentialsService
 
-parser = argparse.ArgumentParser(description="Email Fetcher")
-parser.add_argument("--base-url", default="10.1.1.74:11434", help="Base URL for the OpenAI API")
-parser.add_argument("--hours", type=int, default=2, help="The hours to fetch emails")
-args = parser.parse_args()
+# Only parse arguments if running as main script
+# This prevents argparse errors when importing as a module
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Email Fetcher")
+    parser.add_argument("--base-url", default="10.1.1.74:11434", help="Base URL for the OpenAI API")
+    parser.add_argument("--hours", type=int, default=2, help="The hours to fetch emails")
+    args = parser.parse_args()
+else:
+    # Default values when imported as a module
+    class Args:
+        base_url = "10.1.1.74:11434"
+        hours = 2
+    args = Args()
 
 # Configure logging
 logging.basicConfig(
