@@ -115,6 +115,7 @@ origins = [
     "http://localhost:5000",
     "http://127.0.0.1:5000",
     "http://192.168.1.162:5000",  # Allow your frontend's origin
+    "https://cat-emails.netlify.app",  # Production frontend on Netlify
 ]
 
 app.add_middleware(
