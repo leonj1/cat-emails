@@ -343,7 +343,7 @@ def process_account_emails(email_address: str) -> Dict:
 
         # Get account service to check if account exists in database
         service = AccountCategoryService()
-        account = service.get_account(email_address)
+        account = service.get_account_by_email(email_address)
 
         if not account:
             error_msg = f"Account {email_address} not found in database"
