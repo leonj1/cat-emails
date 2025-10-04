@@ -38,7 +38,7 @@ class TestLabelConsolidation(unittest.TestCase):
         ("newsletter", "news letter", 0.7, 0.95, "Space variation"),
         ("receipts", "receipt", 0.8, 1.0, "Singular/plural"),
         ("todo", "to do", 0.4, 0.8, "Space separation"),
-        ("email", "e-mail", 0.6, 0.9, "Hyphen variation"),
+        ("email", "e-mail", 0.9, 1.0, "Hyphen variation"),  # With aggressive normalization, these normalize to same word
         ("completely different", "another label", 0.0, 0.3, "Unrelated labels"),
     ]
     

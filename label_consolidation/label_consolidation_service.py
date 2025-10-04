@@ -37,23 +37,25 @@ class LabelConsolidationService:
         """
         if not label:
             return ""
-            
+
         # Convert to lowercase
         normalized = label.lower()
-        
+
         # Remove leading/trailing whitespace
         normalized = normalized.strip()
-        
+
         # Remove trailing punctuation
         normalized = re.sub(r'[.,;:!?\-_\s]+$', '', normalized)
-        
+
         # Replace multiple spaces with single space
         normalized = re.sub(r'\s+', ' ', normalized)
-        
+
         if self.config.normalization_aggressive:
             # Remove all special characters, keep only alphanumeric and spaces
             normalized = re.sub(r'[^a-z0-9\s]', '', normalized)
-            
+            # Collapse multiple spaces again (removing chars can create new double spaces)
+            normalized = re.sub(r'\s+', ' ', normalized)
+
         return normalized.strip()
     
     def calculate_levenshtein_similarity(self, str1: str, str2: str) -> float:
@@ -119,22 +121,45 @@ class LabelConsolidationService:
                 
         return matrix
     
+    def _extract_common_terms(self, label: str) -> Set[str]:
+        """Extract all significant terms from a label (words >= 3 chars)"""
+        normalized = self.normalize_label(label)
+        words = normalized.split()
+        # Return all words that are at least 3 characters
+        return set(w for w in words if len(w) >= 3)
+
+    def _extract_common_term(self, label: str) -> str:
+        """Extract the most significant term from a label"""
+        normalized = self.normalize_label(label)
+        words = normalized.split()
+
+        if not words:
+            return normalized
+
+        # Return the longest meaningful word (>= 3 chars)
+        meaningful_words = [w for w in words if len(w) >= 3]
+        if meaningful_words:
+            return max(meaningful_words, key=len)
+
+        # Fallback to longest word or normalized label
+        return max(words, key=len) if words else normalized
+
     def group_similar_labels(self, labels: List[str]) -> List[LabelGroup]:
         """Group labels based on string similarity using graph-based clustering"""
         if not labels:
             return []
-        
+
         normalized_map = {label: self.normalize_label(label) for label in labels}
-        
+
         # Group by exact normalized match first
         exact_groups = defaultdict(list)
         for label, normalized in normalized_map.items():
             exact_groups[normalized].append(label)
-        
+
         # Create initial groups from exact matches
         groups = []
         group_id = 0
-        
+
         for normalized, original_labels in exact_groups.items():
             if len(original_labels) > 1:
                 # Multiple labels normalize to the same thing
@@ -149,18 +174,43 @@ class LabelConsolidationService:
             else:
                 # Single label, check for fuzzy matches with other singles
                 label = original_labels[0]
-                
-                # Check similarity with existing group canonical names
+
+                # Extract all significant terms from this label
+                label_terms = self._extract_common_terms(label)
+
+                # Check similarity with existing groups
                 best_match = None
                 best_score = 0.0
-                
+
                 for group in groups:
+                    # Check similarity against group's canonical name
                     metrics = self.calculate_similarity(label, group.canonical_name)
                     score = metrics.combined_score
+
+                    # Also check if labels share any common terms
+                    group_terms = self._extract_common_terms(group.canonical_name)
+                    common_terms = label_terms.intersection(group_terms)
+
+                    # Also check for substring/containment matches
+                    # (e.g., "work" in "workrelated" or vice versa)
+                    contains_match = False
+                    for label_term in label_terms:
+                        for group_term in group_terms:
+                            if len(label_term) >= 4 and len(group_term) >= 4:
+                                if label_term in group_term or group_term in label_term:
+                                    contains_match = True
+                                    break
+                        if contains_match:
+                            break
+
+                    if common_terms or contains_match:
+                        # Strong match if they share any significant term or have substring match
+                        score = max(score, 0.9)
+
                     if score >= self.config.similarity_threshold and score > best_score:
                         best_match = group
                         best_score = score
-                
+
                 if best_match:
                     best_match.add_label(Label(original_name=label))
                 else:
@@ -173,7 +223,7 @@ class LabelConsolidationService:
                     )
                     groups.append(group)
                     group_id += 1
-        
+
         return groups
     
     def _select_canonical_name(self, labels: List[str]) -> str:

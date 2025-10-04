@@ -7,8 +7,8 @@ from typing import Optional
 from queue import Queue, Empty, Full
 from threading import Thread, Event
 import atexit
-import requests
 from models.log_models import LogPayload, LogLevel, LogResponse
+from clients.logs_collector_client import LogsCollectorClient, LogEntry
 
 
 class CentralLoggingService:
@@ -17,11 +17,9 @@ class CentralLoggingService:
 
     This service provides a unified logging interface that:
     1. Logs messages to stdout using Python's standard logging
-    2. Asynchronously sends log messages to a central logging API
+    2. Asynchronously sends log messages to a central logging API via LogsCollectorClient
 
     Environment Variables:
-        LOGS_COLLECTOR_API: Base URL of the central logging API (required)
-        LOGS_COLLECTOR_TOKEN: Bearer token for authentication (required)
         APP_NAME: Application name (default: "cat-emails")
         APP_VERSION: Application version (default: "1.0.0")
         APP_ENVIRONMENT: Environment name (default: "production")
@@ -29,6 +27,7 @@ class CentralLoggingService:
 
     def __init__(
         self,
+        logs_collector_client: LogsCollectorClient,
         logger_name: str = "cat-emails",
         log_level: int = logging.INFO,
         enable_remote: bool = True,
@@ -38,11 +37,13 @@ class CentralLoggingService:
         Initialize the central logging service.
 
         Args:
+            logs_collector_client: Client for sending logs to remote collector (required)
             logger_name: Name for the local logger
             log_level: Logging level for local logger
             enable_remote: Whether to send logs to remote collector
             queue_maxsize: Maximum size of the remote logging queue (default: 1000)
         """
+        self.logs_collector_client = logs_collector_client
         # Initialize local logger
         self.logger = logging.getLogger(logger_name)
         self.logger.setLevel(log_level)
@@ -58,25 +59,10 @@ class CentralLoggingService:
 
         # Remote logging configuration
         self.enable_remote = enable_remote
-        self.api_base_url = os.getenv("LOGS_COLLECTOR_API", "").rstrip("/")
-        self.api_token = os.getenv("LOGS_COLLECTOR_TOKEN", "")
         self.app_name = os.getenv("APP_NAME", "cat-emails")
         self.app_version = os.getenv("APP_VERSION", "1.0.0")
         self.app_environment = os.getenv("APP_ENVIRONMENT", "production")
         self.hostname = socket.gethostname()
-
-        # Validate remote logging configuration
-        if self.enable_remote:
-            if not self.api_base_url:
-                self.logger.warning(
-                    "LOGS_COLLECTOR_API not set. Remote logging disabled."
-                )
-                self.enable_remote = False
-            elif not self.api_token:
-                self.logger.warning(
-                    "LOGS_COLLECTOR_TOKEN not set. Remote logging disabled."
-                )
-                self.enable_remote = False
 
         # Background thread for async remote logging
         self.log_queue: Optional[Queue] = None
@@ -139,7 +125,7 @@ class CentralLoggingService:
         trace_id: Optional[str] = None
     ) -> bool:
         """
-        Synchronously send log to central logging service.
+        Synchronously send log to central logging service via LogsCollectorClient.
         This method is called by the background worker thread.
 
         Args:
@@ -155,48 +141,21 @@ class CentralLoggingService:
             if trace_id is None:
                 trace_id = str(uuid.uuid4())
 
-            # Create log payload
-            payload = LogPayload(
+            # Create log entry using LogEntry model from client
+            log_entry = LogEntry(
                 application_name=self.app_name,
+                message=message,
                 environment=self.app_environment,
                 hostname=self.hostname,
-                level=level,
-                message=message,
+                level=level.value,
                 timestamp=datetime.now(timezone.utc).isoformat(),
                 trace_id=trace_id,
                 version=self.app_version
             )
 
-            # Send to API
-            url = f"{self.api_base_url}/logs"
-            headers = {
-                "Authorization": f"Bearer {self.api_token}",
-                "Content-Type": "application/json"
-            }
+            # Send via client interface
+            return self.logs_collector_client.send(log_entry)
 
-            response = requests.post(
-                url,
-                json=payload.model_dump(),
-                headers=headers,
-                timeout=5  # 5 second timeout
-            )
-
-            # Check response
-            if response.status_code == 202:
-                return True
-            else:
-                self.logger.warning(
-                    f"Failed to send log to remote collector: "
-                    f"HTTP {response.status_code}"
-                )
-                return False
-
-        except requests.exceptions.Timeout:
-            self.logger.warning("Timeout sending log to remote collector")
-            return False
-        except requests.exceptions.RequestException as e:
-            self.logger.warning(f"Error sending log to remote collector: {e}")
-            return False
         except Exception as e:
             self.logger.exception(f"Unexpected error in remote logging: {e}")
             return False

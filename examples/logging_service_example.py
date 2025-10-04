@@ -20,15 +20,15 @@ import logging
 # Add parent directory to path to import modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from services.logging_service import CentralLoggingService
+from services.logging_factory import create_logging_service
 
 
 def example_basic_logging():
     """Example: Basic logging at different levels."""
     print("\n=== Example 1: Basic Logging ===\n")
 
-    # Initialize the logging service
-    log_service = CentralLoggingService(
+    # Initialize the logging service using factory
+    log_service = create_logging_service(
         logger_name="example-app",
         log_level=logging.DEBUG
     )
@@ -45,7 +45,7 @@ def example_with_trace_id():
     """Example: Logging with trace IDs for distributed tracing."""
     print("\n=== Example 2: Logging with Trace IDs ===\n")
 
-    log_service = CentralLoggingService(logger_name="traced-app")
+    log_service = create_logging_service(logger_name="traced-app")
 
     # Simulate processing a request with a trace ID
     request_trace_id = "req-12345-abcde"
@@ -68,7 +68,7 @@ def example_email_processing():
     """Example: Using logging service in email processing context."""
     print("\n=== Example 3: Email Processing Logging ===\n")
 
-    log_service = CentralLoggingService(logger_name="email-processor")
+    log_service = create_logging_service(logger_name="email-processor")
 
     # Simulate email processing workflow
     email_id = "msg_67890"
@@ -85,7 +85,7 @@ def example_error_handling():
     """Example: Logging errors with context."""
     print("\n=== Example 4: Error Handling ===\n")
 
-    log_service = CentralLoggingService(logger_name="error-handler")
+    log_service = create_logging_service(logger_name="error-handler")
 
     try:
         # Simulate an error
@@ -103,7 +103,7 @@ def example_remote_disabled():
     print("\n=== Example 5: Local-only Logging ===\n")
 
     # This is useful for development or when you want only stdout logging
-    log_service = CentralLoggingService(
+    log_service = create_logging_service(
         logger_name="local-only",
         enable_remote=False
     )
@@ -116,7 +116,7 @@ def example_custom_log_level():
     """Example: Using the generic log() method with custom levels."""
     print("\n=== Example 6: Custom Log Levels ===\n")
 
-    log_service = CentralLoggingService(logger_name="custom-logger")
+    log_service = create_logging_service(logger_name="custom-logger")
 
     # Using the generic log() method
     log_service.log(logging.INFO, "Info via log() method")
