@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch, Mock, MagicMock
 import logging
 import os
+import time
 from services.logging_service import CentralLoggingService
 from models.log_models import LogLevel
 
@@ -28,6 +29,10 @@ class TestCentralLoggingService(unittest.TestCase):
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+        # Clean up any service instances that may have background threads
+        if hasattr(self, 'service') and self.service is not None:
+            self.service.shutdown(timeout=2.0)
 
     def test_init_with_remote_disabled(self):
         """Test initialization with remote logging disabled."""
@@ -69,6 +74,10 @@ class TestCentralLoggingService(unittest.TestCase):
         self.assertEqual(service.app_name, 'test-app')
         self.assertEqual(service.app_version, '2.0.0')
         self.assertEqual(service.app_environment, 'testing')
+        # Verify background thread was started
+        self.assertIsNotNone(service.worker_thread)
+        self.assertTrue(service.worker_thread.is_alive())
+        service.shutdown()
 
     def test_map_log_level(self):
         """Test log level mapping."""
@@ -97,7 +106,7 @@ class TestCentralLoggingService(unittest.TestCase):
 
     @patch('requests.post')
     def test_send_to_remote_success(self, mock_post):
-        """Test successful remote log sending."""
+        """Test successful remote log sending (async via queue)."""
         os.environ['LOGS_COLLECTOR_API'] = 'http://test.example.com'
         os.environ['LOGS_COLLECTOR_TOKEN'] = 'test-token'
 
@@ -107,24 +116,30 @@ class TestCentralLoggingService(unittest.TestCase):
         mock_post.return_value = mock_response
 
         service = CentralLoggingService(enable_remote=True)
-        result = service._send_to_remote(
+
+        # Send log via queue (non-blocking)
+        service._send_to_remote(
             LogLevel.INFO,
             "Test message",
             "trace-123"
         )
 
-        self.assertTrue(result)
+        # Wait for background worker to process
+        service.log_queue.join()
+        time.sleep(0.1)  # Brief wait for worker processing
+
+        # Verify request was made
         mock_post.assert_called_once()
 
         # Verify the call arguments
         call_args = mock_post.call_args
-        # URL is the first positional argument
         self.assertEqual(call_args[0][0], 'http://test.example.com/logs')
         self.assertIn('Authorization', call_args[1]['headers'])
         self.assertEqual(
             call_args[1]['headers']['Authorization'],
             'Bearer test-token'
         )
+        service.shutdown()
 
     @patch('requests.post')
     def test_send_to_remote_http_error(self, mock_post):
@@ -138,13 +153,21 @@ class TestCentralLoggingService(unittest.TestCase):
         mock_post.return_value = mock_response
 
         service = CentralLoggingService(enable_remote=True)
-        result = service._send_to_remote(
+
+        # Queue the log
+        service._send_to_remote(
             LogLevel.INFO,
             "Test message",
             "trace-123"
         )
 
-        self.assertFalse(result)
+        # Wait for processing
+        service.log_queue.join()
+        time.sleep(0.1)
+
+        # Verify request was made (even though it failed)
+        mock_post.assert_called_once()
+        service.shutdown()
 
     @patch('requests.post')
     def test_send_to_remote_timeout(self, mock_post):
@@ -156,13 +179,21 @@ class TestCentralLoggingService(unittest.TestCase):
         mock_post.side_effect = Exception("Timeout")
 
         service = CentralLoggingService(enable_remote=True)
-        result = service._send_to_remote(
+
+        # Queue the log
+        service._send_to_remote(
             LogLevel.INFO,
             "Test message",
             "trace-123"
         )
 
-        self.assertFalse(result)
+        # Wait for processing
+        service.log_queue.join()
+        time.sleep(0.1)
+
+        # Verify request was attempted
+        mock_post.assert_called_once()
+        service.shutdown()
 
     @patch('services.logging_service.CentralLoggingService._send_to_remote')
     def test_info_logging(self, mock_send):
@@ -247,6 +278,36 @@ class TestCentralLoggingService(unittest.TestCase):
             service.info("Test message")
             mock_post.assert_not_called()
 
+    def test_non_blocking_behavior(self):
+        """Test that logging returns immediately without blocking on HTTP requests."""
+        os.environ['LOGS_COLLECTOR_API'] = 'http://test.example.com'
+        os.environ['LOGS_COLLECTOR_TOKEN'] = 'test-token'
+
+        # Create a slow mock that would block if called synchronously
+        slow_response = Mock()
+        slow_response.status_code = 202
+
+        def slow_post(*args, **kwargs):
+            time.sleep(2)  # Simulate slow network
+            return slow_response
+
+        with patch('requests.post', side_effect=slow_post) as mock_post:
+            service = CentralLoggingService(enable_remote=True)
+
+            # Measure time for log call (should be instant, not wait for HTTP)
+            start = time.time()
+            service.info("Test message")
+            elapsed = time.time() - start
+
+            # Should return in < 100ms (not 2 seconds)
+            self.assertLess(elapsed, 0.1,
+                "Log call blocked on HTTP request instead of returning immediately")
+
+            # Wait for background processing and verify request was made
+            service.log_queue.join()
+            mock_post.assert_called_once()
+            service.shutdown()
+
     @patch('requests.post')
     def test_auto_trace_id_generation(self, mock_post):
         """Test automatic trace ID generation when not provided."""
@@ -260,11 +321,16 @@ class TestCentralLoggingService(unittest.TestCase):
         service = CentralLoggingService(enable_remote=True)
         service.info("Test without trace ID")
 
+        # Wait for background processing
+        service.log_queue.join()
+        time.sleep(0.1)
+
         # Verify that a trace ID was generated
         call_args = mock_post.call_args
         payload = call_args[1]['json']
         self.assertIn('trace_id', payload)
         self.assertIsNotNone(payload['trace_id'])
+        service.shutdown()
 
     @patch('requests.post')
     def test_payload_structure_matches_api_spec(self, mock_post):
@@ -284,6 +350,10 @@ class TestCentralLoggingService(unittest.TestCase):
 
         # Send a log message
         service.info("User logged in successfully", trace_id="abc123xyz")
+
+        # Wait for background processing
+        service.log_queue.join()
+        time.sleep(0.1)
 
         # Get the payload that was sent
         mock_post.assert_called_once()
@@ -332,6 +402,7 @@ class TestCentralLoggingService(unittest.TestCase):
         self.assertIsInstance(payload['timestamp'], str)
         self.assertIsInstance(payload['trace_id'], str)
         self.assertIsInstance(payload['version'], str)
+        service.shutdown()
 
     @patch('requests.post')
     def test_payload_matches_example_structure(self, mock_post):
@@ -363,6 +434,10 @@ class TestCentralLoggingService(unittest.TestCase):
             # Send log at specific level
             getattr(service, level_name)(message, trace_id="test-trace-id")
 
+            # Wait for background processing
+            service.log_queue.join()
+            time.sleep(0.05)
+
             # Verify payload structure
             call_args = mock_post.call_args
             payload = call_args[1]['json']
@@ -381,6 +456,8 @@ class TestCentralLoggingService(unittest.TestCase):
             self.assertEqual(payload['level'], level_name)
             self.assertEqual(payload['message'], message)
 
+        service.shutdown()
+
     @patch('requests.post')
     def test_payload_serialization_to_json(self, mock_post):
         """Test that Pydantic model serializes correctly to JSON for API."""
@@ -393,6 +470,10 @@ class TestCentralLoggingService(unittest.TestCase):
 
         service = CentralLoggingService(enable_remote=True)
         service.info("Test message", trace_id="trace-123")
+
+        # Wait for background processing
+        service.log_queue.join()
+        time.sleep(0.1)
 
         # Verify the payload is JSON-serializable dict
         call_args = mock_post.call_args
@@ -410,6 +491,8 @@ class TestCentralLoggingService(unittest.TestCase):
             self.assertEqual(payload, deserialized)
         except (TypeError, ValueError) as e:
             self.fail(f"Payload is not JSON-serializable: {e}")
+
+        service.shutdown()
 
 
 if __name__ == '__main__':

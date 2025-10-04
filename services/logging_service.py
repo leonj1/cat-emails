@@ -4,6 +4,9 @@ import socket
 import uuid
 from datetime import datetime
 from typing import Optional
+from queue import Queue
+from threading import Thread, Event
+import atexit
 import requests
 from models.log_models import LogPayload, LogLevel, LogResponse
 
@@ -73,6 +76,23 @@ class CentralLoggingService:
                 )
                 self.enable_remote = False
 
+        # Background thread for async remote logging
+        self.log_queue: Optional[Queue] = None
+        self.worker_thread: Optional[Thread] = None
+        self.shutdown_event: Optional[Event] = None
+
+        if self.enable_remote:
+            self.log_queue = Queue()
+            self.shutdown_event = Event()
+            self.worker_thread = Thread(
+                target=self._remote_logging_worker,
+                daemon=True,
+                name="RemoteLoggingWorker"
+            )
+            self.worker_thread.start()
+            # Register cleanup handler
+            atexit.register(self.shutdown)
+
     def _map_log_level(self, level: int) -> LogLevel:
         """Map Python logging level to LogLevel enum."""
         if level >= logging.CRITICAL:
@@ -86,14 +106,35 @@ class CentralLoggingService:
         else:
             return LogLevel.DEBUG
 
-    def _send_to_remote(
+    def _remote_logging_worker(self):
+        """
+        Background worker thread that processes the log queue.
+        Runs continuously until shutdown_event is set.
+        """
+        while not self.shutdown_event.is_set():
+            try:
+                # Get log entry from queue with timeout to check shutdown event
+                log_entry = self.log_queue.get(timeout=1.0)
+                if log_entry is None:  # Sentinel value for shutdown
+                    break
+
+                level, message, trace_id = log_entry
+                self._send_to_remote_sync(level, message, trace_id)
+                self.log_queue.task_done()
+
+            except Exception:
+                # Queue.get timeout or other errors - continue loop
+                continue
+
+    def _send_to_remote_sync(
         self,
         level: LogLevel,
         message: str,
         trace_id: Optional[str] = None
     ) -> bool:
         """
-        Send log to central logging service.
+        Synchronously send log to central logging service.
+        This method is called by the background worker thread.
 
         Args:
             level: Log level
@@ -103,9 +144,6 @@ class CentralLoggingService:
         Returns:
             True if log was sent successfully, False otherwise
         """
-        if not self.enable_remote:
-            return False
-
         try:
             # Generate trace ID if not provided
             if trace_id is None:
@@ -157,6 +195,31 @@ class CentralLoggingService:
             self.logger.error(f"Unexpected error in remote logging: {e}")
             return False
 
+    def _send_to_remote(
+        self,
+        level: LogLevel,
+        message: str,
+        trace_id: Optional[str] = None
+    ):
+        """
+        Queue log for asynchronous sending to central logging service.
+        Returns immediately without blocking.
+
+        Args:
+            level: Log level
+            message: Log message
+            trace_id: Optional trace ID for distributed tracing
+        """
+        if not self.enable_remote or self.log_queue is None:
+            return
+
+        try:
+            # Non-blocking queue put
+            self.log_queue.put_nowait((level, message, trace_id))
+        except Exception as e:
+            # Queue full or other error - log locally but don't block
+            self.logger.warning(f"Failed to queue log for remote sending: {e}")
+
     def debug(self, message: str, trace_id: Optional[str] = None):
         """Log a debug message."""
         self.logger.debug(message)
@@ -199,3 +262,34 @@ class CentralLoggingService:
         self.logger.log(level, message)
         log_level = self._map_log_level(level)
         self._send_to_remote(log_level, message, trace_id)
+
+    def shutdown(self, timeout: float = 5.0):
+        """
+        Gracefully shutdown the remote logging worker.
+        Waits for queued logs to be sent before stopping.
+
+        Args:
+            timeout: Maximum seconds to wait for queue to empty
+        """
+        if not self.enable_remote or self.worker_thread is None:
+            return
+
+        # Signal shutdown
+        self.shutdown_event.set()
+
+        # Wait for queue to empty
+        if self.log_queue is not None:
+            try:
+                self.log_queue.join()
+            except Exception:
+                pass
+
+        # Send sentinel value to wake up worker
+        try:
+            self.log_queue.put_nowait(None)
+        except Exception:
+            pass
+
+        # Wait for worker thread to finish
+        if self.worker_thread.is_alive():
+            self.worker_thread.join(timeout=timeout)

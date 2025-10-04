@@ -10,6 +10,7 @@ This test can be run independently to verify the payload format:
 import unittest
 import os
 import json
+import time
 from unittest.mock import patch, Mock
 
 
@@ -32,6 +33,10 @@ class TestExactPayloadFormat(unittest.TestCase):
         """Restore original environment."""
         os.environ.clear()
         os.environ.update(self.original_env)
+
+        # Clean up any service instances
+        if hasattr(self, 'service') and self.service is not None:
+            self.service.shutdown(timeout=2.0)
 
     @patch('socket.gethostname')
     @patch('requests.post')
@@ -67,7 +72,12 @@ class TestExactPayloadFormat(unittest.TestCase):
 
         # Create service and send log
         service = CentralLoggingService(enable_remote=True)
+        self.service = service  # Store for cleanup
         service.info("User logged in successfully", trace_id="abc123xyz")
+
+        # Wait for background processing
+        service.log_queue.join()
+        time.sleep(0.1)
 
         # Verify the API was called
         self.assertTrue(mock_post.called)
