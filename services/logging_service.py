@@ -4,7 +4,7 @@ import socket
 import uuid
 from datetime import datetime
 from typing import Optional
-from queue import Queue
+from queue import Queue, Empty
 from threading import Thread, Event
 import atexit
 import requests
@@ -111,20 +111,23 @@ class CentralLoggingService:
         Background worker thread that processes the log queue.
         Runs continuously until shutdown_event is set.
         """
-        while not self.shutdown_event.is_set():
+        while True:
             try:
-                # Get log entry from queue with timeout to check shutdown event
                 log_entry = self.log_queue.get(timeout=1.0)
-                if log_entry is None:  # Sentinel value for shutdown
+            except Empty:
+                if self.shutdown_event.is_set():
                     break
-
-                level, message, trace_id = log_entry
-                self._send_to_remote_sync(level, message, trace_id)
-                self.log_queue.task_done()
-
-            except Exception:
-                # Queue.get timeout or other errors - continue loop
                 continue
+
+            if log_entry is None:  # Sentinel value for shutdown
+                self.log_queue.task_done()
+                break
+
+            level, message, trace_id = log_entry
+            try:
+                self._send_to_remote_sync(level, message, trace_id)
+            finally:
+                self.log_queue.task_done()
 
     def _send_to_remote_sync(
         self,
@@ -274,21 +277,15 @@ class CentralLoggingService:
         if not self.enable_remote or self.worker_thread is None:
             return
 
-        # Signal shutdown
+        if self.log_queue is None or self.shutdown_event is None:
+            return
+
+        # Let the worker finish everything already queued
+        self.log_queue.join()
+
+        # Tell the worker to exit and wake it with a sentinel
         self.shutdown_event.set()
-
-        # Wait for queue to empty
-        if self.log_queue is not None:
-            try:
-                self.log_queue.join()
-            except Exception:
-                pass
-
-        # Send sentinel value to wake up worker
-        try:
-            self.log_queue.put_nowait(None)
-        except Exception:
-            pass
+        self.log_queue.put_nowait(None)
 
         # Wait for worker thread to finish
         if self.worker_thread.is_alive():
