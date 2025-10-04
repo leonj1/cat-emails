@@ -230,7 +230,8 @@ class EmailSummaryService:
                 category=category,
                 action=action,
                 sender=sender,
-                processing_time=processing_time
+                processing_time=processing_time,
+                source="email-summary-service"
             )
 
             # Update statistics for database
