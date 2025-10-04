@@ -158,7 +158,8 @@ class LogsCollectorService:
                                   category: str,
                                   action: str,
                                   sender: str,
-                                  processing_time: Optional[float] = None) -> bool:
+                                  processing_time: Optional[float] = None,
+                                  source: Optional[str] = None) -> bool:
         """
         Send a log entry for a processed email.
 
@@ -168,6 +169,7 @@ class LogsCollectorService:
             action: Action taken (kept/deleted/archived)
             sender: Email sender
             processing_time: Time taken to process the email
+            source: Source of the log (defaults to "email-processor")
 
         Returns:
             bool: True if log was sent successfully
@@ -184,4 +186,4 @@ class LogsCollectorService:
 
         message = f"Email processed: {category} - {action}"
 
-        return self.send_log("INFO", message, context, "email-processor")
+        return self.send_log("INFO", message, context, source or "email-processor")
