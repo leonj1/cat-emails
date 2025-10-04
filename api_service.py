@@ -1685,16 +1685,18 @@ async def create_account(
                 detail="Failed to create account"
             )
     except SQLAlchemyError as e:
-        logger.error(f"Database error in create_account: {str(e)}")
+        error_msg = f"Database error in create_account: {str(e)}"
+        logger.error(error_msg)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error occurred"
+            detail=error_msg
         )
     except Exception as e:
-        logger.error(f"Unexpected error in create_account: {str(e)}")
+        error_msg = f"Unexpected error in create_account: {str(e)}"
+        logger.error(error_msg)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred"
+            detail=error_msg
         )
 
 
