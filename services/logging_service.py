@@ -4,7 +4,7 @@ import socket
 import uuid
 from datetime import datetime
 from typing import Optional
-from queue import Queue, Empty
+from queue import Queue, Empty, Full
 from threading import Thread, Event
 import atexit
 import requests
@@ -31,7 +31,8 @@ class CentralLoggingService:
         self,
         logger_name: str = "cat-emails",
         log_level: int = logging.INFO,
-        enable_remote: bool = True
+        enable_remote: bool = True,
+        queue_maxsize: int = 1000
     ):
         """
         Initialize the central logging service.
@@ -40,6 +41,7 @@ class CentralLoggingService:
             logger_name: Name for the local logger
             log_level: Logging level for local logger
             enable_remote: Whether to send logs to remote collector
+            queue_maxsize: Maximum size of the remote logging queue (default: 1000)
         """
         # Initialize local logger
         self.logger = logging.getLogger(logger_name)
@@ -80,9 +82,10 @@ class CentralLoggingService:
         self.log_queue: Optional[Queue] = None
         self.worker_thread: Optional[Thread] = None
         self.shutdown_event: Optional[Event] = None
+        self.queue_maxsize = queue_maxsize
 
         if self.enable_remote:
-            self.log_queue = Queue()
+            self.log_queue = Queue(maxsize=queue_maxsize)
             self.shutdown_event = Event()
             self.worker_thread = Thread(
                 target=self._remote_logging_worker,
@@ -195,7 +198,7 @@ class CentralLoggingService:
             self.logger.warning(f"Error sending log to remote collector: {e}")
             return False
         except Exception as e:
-            self.logger.error(f"Unexpected error in remote logging: {e}")
+            self.logger.exception(f"Unexpected error in remote logging: {e}")
             return False
 
     def _send_to_remote(
@@ -208,6 +211,9 @@ class CentralLoggingService:
         Queue log for asynchronous sending to central logging service.
         Returns immediately without blocking.
 
+        When the queue is full, this method will drop the oldest log entry
+        to make room for the new one, preventing memory bloat.
+
         Args:
             level: Log level
             message: Log message
@@ -219,9 +225,26 @@ class CentralLoggingService:
         try:
             # Non-blocking queue put
             self.log_queue.put_nowait((level, message, trace_id))
-        except Exception as e:
-            # Queue full or other error - log locally but don't block
-            self.logger.warning(f"Failed to queue log for remote sending: {e}")
+        except Full:
+            # Queue is full - drop the oldest entry to make room for the new one
+            # This prevents memory bloat when the remote collector is down
+            try:
+                # Remove oldest entry
+                old_entry = self.log_queue.get_nowait()
+                old_level, old_msg, old_trace = old_entry
+                self.logger.warning(
+                    f"Remote logging queue full (size={self.queue_maxsize}). "
+                    f"Dropping oldest log entry: level={old_level.value}, "
+                    f"trace_id={old_trace}, message_preview={old_msg[:50]}..."
+                )
+                # Add the new entry
+                self.log_queue.put_nowait((level, message, trace_id))
+            except (Empty, Full) as e:
+                # Rare edge case - log but don't block
+                self.logger.warning(
+                    f"Failed to apply queue saturation policy: {e}. "
+                    f"Dropping new log entry: level={level.value}, trace_id={trace_id}"
+                )
 
     def debug(self, message: str, trace_id: Optional[str] = None):
         """Log a debug message."""
