@@ -10,8 +10,8 @@ import logging
 from collections import Counter, defaultdict
 
 from models.email_summary import (
-    ProcessedEmail, 
-    EmailSummaryStats, 
+    ProcessedEmail,
+    EmailSummaryStats,
     DailySummaryReport,
     CategoryCount,
     DomainCount,
@@ -19,6 +19,7 @@ from models.email_summary import (
 )
 from services.database_service import DatabaseService
 from services.account_category_service import AccountCategoryService
+from services.logs_collector_service import LogsCollectorService
 
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,10 @@ class EmailSummaryService:
         
         # Store gmail account email for account tracking
         self.gmail_email = gmail_email
-        
+
+        # Initialize logs collector service
+        self.logs_collector = LogsCollectorService()
+
         # Initialize database service if enabled
         self.use_database = use_database
         self.db_service = None
@@ -104,6 +108,14 @@ class EmailSummaryService:
         self.performance_metrics['start_time'] = datetime.now()
         self.performance_metrics['email_processing_times'] = []
         self.performance_metrics['total_emails'] = 0
+
+        # Send log to collector
+        self.logs_collector.send_log(
+            "INFO",
+            f"Processing run started for {self.gmail_email or 'unknown'}",
+            {"scan_hours": scan_hours, "gmail_email": self.gmail_email},
+            "email-summary-service"
+        )
         
         # Get or create account if account service is available and gmail_email is set
         if self.account_service and self.gmail_email:
@@ -143,10 +155,20 @@ class EmailSummaryService:
         # Finalize performance metrics
         self.performance_metrics['end_time'] = datetime.now()
         self.performance_metrics['total_emails'] = self.run_metrics['processed']
-        
+
+        # Send log to collector
+        status = "completed" if success else "failed"
+        log_level = "INFO" if success else "ERROR"
+        self.logs_collector.send_processing_run_log(
+            run_id=str(self.current_run_id) if self.current_run_id else "unknown",
+            status=status,
+            metrics=self.run_metrics,
+            error=error_message
+        )
+
         if self.db_service and self.use_database and self.current_run_id:
             self.db_service.complete_processing_run(
-                self.current_run_id, 
+                self.current_run_id,
                 self.run_metrics,
                 success=success,
                 error_message=error_message
@@ -201,7 +223,16 @@ class EmailSummaryService:
             # Save updated data
             self._save_current_data(existing_data)
             logger.debug(f"Tracked email: {message_id}")
-            
+
+            # Send log to collector
+            self.logs_collector.send_email_processing_log(
+                message_id=message_id,
+                category=category,
+                action=action,
+                sender=sender,
+                processing_time=processing_time
+            )
+
             # Update statistics for database
             if self.use_database:
                 # Update run metrics
