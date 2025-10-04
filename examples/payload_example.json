@@ -1,0 +1,10 @@
+{
+  "application_name": "cat-emails",
+  "environment": "production",
+  "hostname": "server-01",
+  "level": "info",
+  "message": "User logged in successfully",
+  "timestamp": "2024-01-15T14:30:00Z",
+  "trace_id": "abc123xyz",
+  "version": "1.0.0"
+}

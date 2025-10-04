@@ -266,6 +266,151 @@ class TestCentralLoggingService(unittest.TestCase):
         self.assertIn('trace_id', payload)
         self.assertIsNotNone(payload['trace_id'])
 
+    @patch('requests.post')
+    def test_payload_structure_matches_api_spec(self, mock_post):
+        """Test that the payload sent to API exactly matches the expected structure."""
+        os.environ['LOGS_COLLECTOR_API'] = 'https://logs-collector-production.up.railway.app'
+        os.environ['LOGS_COLLECTOR_TOKEN'] = 'test-token-123'
+        os.environ['APP_NAME'] = 'my-app'
+        os.environ['APP_VERSION'] = '1.0.0'
+        os.environ['APP_ENVIRONMENT'] = 'production'
+
+        # Mock successful response
+        mock_response = Mock()
+        mock_response.status_code = 202
+        mock_post.return_value = mock_response
+
+        service = CentralLoggingService(enable_remote=True)
+
+        # Send a log message
+        service.info("User logged in successfully", trace_id="abc123xyz")
+
+        # Get the payload that was sent
+        mock_post.assert_called_once()
+        call_args = mock_post.call_args
+        payload = call_args[1]['json']
+
+        # Validate all required fields are present
+        required_fields = {
+            'application_name',
+            'environment',
+            'hostname',
+            'level',
+            'message',
+            'timestamp',
+            'trace_id',
+            'version'
+        }
+        self.assertEqual(set(payload.keys()), required_fields)
+
+        # Validate field values
+        self.assertEqual(payload['application_name'], 'my-app')
+        self.assertEqual(payload['environment'], 'production')
+        self.assertIsInstance(payload['hostname'], str)
+        self.assertGreater(len(payload['hostname']), 0)
+        self.assertEqual(payload['level'], 'info')
+        self.assertEqual(payload['message'], 'User logged in successfully')
+        self.assertEqual(payload['trace_id'], 'abc123xyz')
+        self.assertEqual(payload['version'], '1.0.0')
+
+        # Validate timestamp format (ISO 8601 with Z suffix)
+        self.assertIsInstance(payload['timestamp'], str)
+        self.assertTrue(payload['timestamp'].endswith('Z'))
+        # Validate timestamp is parseable
+        from datetime import datetime
+        try:
+            datetime.fromisoformat(payload['timestamp'].replace('Z', '+00:00'))
+        except ValueError:
+            self.fail(f"Invalid timestamp format: {payload['timestamp']}")
+
+        # Validate field types
+        self.assertIsInstance(payload['application_name'], str)
+        self.assertIsInstance(payload['environment'], str)
+        self.assertIsInstance(payload['hostname'], str)
+        self.assertIsInstance(payload['level'], str)
+        self.assertIsInstance(payload['message'], str)
+        self.assertIsInstance(payload['timestamp'], str)
+        self.assertIsInstance(payload['trace_id'], str)
+        self.assertIsInstance(payload['version'], str)
+
+    @patch('requests.post')
+    def test_payload_matches_example_structure(self, mock_post):
+        """Test that payload structure matches the exact example from API spec."""
+        os.environ['LOGS_COLLECTOR_API'] = 'https://logs-collector-production.up.railway.app'
+        os.environ['LOGS_COLLECTOR_TOKEN'] = 'test-token'
+        os.environ['APP_NAME'] = 'my-app'
+        os.environ['APP_VERSION'] = '1.0.0'
+        os.environ['APP_ENVIRONMENT'] = 'production'
+
+        mock_response = Mock()
+        mock_response.status_code = 202
+        mock_post.return_value = mock_response
+
+        service = CentralLoggingService(enable_remote=True)
+
+        # Test with different log levels
+        test_cases = [
+            ('info', 'User logged in successfully'),
+            ('debug', 'Debugging database query'),
+            ('warning', 'High memory usage detected'),
+            ('error', 'Failed to connect to database'),
+            ('critical', 'System out of memory')
+        ]
+
+        for level_name, message in test_cases:
+            mock_post.reset_mock()
+
+            # Send log at specific level
+            getattr(service, level_name)(message, trace_id="test-trace-id")
+
+            # Verify payload structure
+            call_args = mock_post.call_args
+            payload = call_args[1]['json']
+
+            # Check that it has exactly the expected shape
+            self.assertIn('application_name', payload)
+            self.assertIn('environment', payload)
+            self.assertIn('hostname', payload)
+            self.assertIn('level', payload)
+            self.assertIn('message', payload)
+            self.assertIn('timestamp', payload)
+            self.assertIn('trace_id', payload)
+            self.assertIn('version', payload)
+
+            # Verify level matches
+            self.assertEqual(payload['level'], level_name)
+            self.assertEqual(payload['message'], message)
+
+    @patch('requests.post')
+    def test_payload_serialization_to_json(self, mock_post):
+        """Test that Pydantic model serializes correctly to JSON for API."""
+        os.environ['LOGS_COLLECTOR_API'] = 'https://logs-collector-production.up.railway.app'
+        os.environ['LOGS_COLLECTOR_TOKEN'] = 'test-token'
+
+        mock_response = Mock()
+        mock_response.status_code = 202
+        mock_post.return_value = mock_response
+
+        service = CentralLoggingService(enable_remote=True)
+        service.info("Test message", trace_id="trace-123")
+
+        # Verify the payload is JSON-serializable dict
+        call_args = mock_post.call_args
+        payload = call_args[1]['json']
+
+        # Should be a dict, not a Pydantic model
+        self.assertIsInstance(payload, dict)
+
+        # Verify it can be JSON serialized (no weird objects)
+        import json
+        try:
+            json_str = json.dumps(payload)
+            # And deserialized back
+            deserialized = json.loads(json_str)
+            self.assertEqual(payload, deserialized)
+        except (TypeError, ValueError) as e:
+            self.fail(f"Payload is not JSON-serializable: {e}")
+
 
 if __name__ == '__main__':
     unittest.main()

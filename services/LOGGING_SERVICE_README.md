@@ -126,15 +126,42 @@ All errors in remote logging are logged locally but don't interrupt application 
 
 ## Testing
 
-Run the unit tests:
+The logging service includes comprehensive tests, including payload validation tests that ensure the data sent to the API exactly matches the expected structure.
+
+### Payload Validation Tests
+
+Three specific tests validate the payload structure:
+
+1. **`test_payload_structure_matches_api_spec`** - Validates that the payload contains exactly the 8 required fields with correct types and formats:
+   - `application_name` (string)
+   - `environment` (string)
+   - `hostname` (string)
+   - `level` (string: debug/info/warning/error/critical)
+   - `message` (string)
+   - `timestamp` (ISO 8601 string with Z suffix)
+   - `trace_id` (string)
+   - `version` (string)
+
+2. **`test_payload_matches_example_structure`** - Tests all log levels to ensure each produces the correct payload structure
+
+3. **`test_payload_serialization_to_json`** - Validates that the payload is JSON-serializable and contains no Pydantic model objects
+
+### Running Tests
 
 ```bash
-# Using Docker (recommended)
+# Using Docker (recommended) - runs all 19 tests
 make test
 
 # Or directly with Python
 python -m unittest tests.test_logging_service
+
+# Run only payload validation tests
+python -m unittest tests.test_logging_service.TestCentralLoggingService.test_payload_structure_matches_api_spec
+python -m unittest tests.test_logging_service.TestCentralLoggingService.test_payload_matches_example_structure
+python -m unittest tests.test_logging_service.TestCentralLoggingService.test_payload_serialization_to_json
 ```
+
+All 19 tests pass ✓
 
 Run the example script:
 
