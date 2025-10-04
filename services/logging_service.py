@@ -2,7 +2,7 @@ import logging
 import os
 import socket
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from queue import Queue, Empty, Full
 from threading import Thread, Event
@@ -162,7 +162,7 @@ class CentralLoggingService:
                 hostname=self.hostname,
                 level=level,
                 message=message,
-                timestamp=datetime.utcnow().isoformat() + "Z",
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 trace_id=trace_id,
                 version=self.app_version
             )
