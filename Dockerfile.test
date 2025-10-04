@@ -17,5 +17,5 @@ RUN pip install -e .
 # Copy source code and tests
 COPY . .
 
-# Run the tests
-CMD ["python", "-m", "unittest", "discover", "-v", "tests"]
+# Run the tests (test files are in root directory, not tests/)
+CMD ["python", "-m", "unittest", "discover", "-s", ".", "-p", "test*.py", "-v"]
