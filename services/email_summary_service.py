@@ -158,12 +158,12 @@ class EmailSummaryService:
 
         # Send log to collector
         status = "completed" if success else "failed"
-        log_level = "INFO" if success else "ERROR"
         self.logs_collector.send_processing_run_log(
             run_id=str(self.current_run_id) if self.current_run_id else "unknown",
             status=status,
             metrics=self.run_metrics,
-            error=error_message
+            error=error_message,
+            source="email-summary-service"
         )
 
         if self.db_service and self.use_database and self.current_run_id:

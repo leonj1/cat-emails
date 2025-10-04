@@ -124,7 +124,8 @@ class LogsCollectorService:
                                run_id: str,
                                status: str,
                                metrics: Optional[Dict[str, Any]] = None,
-                               error: Optional[str] = None) -> bool:
+                               error: Optional[str] = None,
+                               source: Optional[str] = None) -> bool:
         """
         Send a processing run log entry.
 
@@ -133,6 +134,7 @@ class LogsCollectorService:
             status: Status of the run (started, completed, failed)
             metrics: Processing metrics (emails processed, deleted, etc.)
             error: Error message if the run failed
+            source: Source of the log (defaults to "email-processor")
 
         Returns:
             bool: True if log was sent successfully
@@ -149,7 +151,7 @@ class LogsCollectorService:
         level = "ERROR" if error else "INFO"
         message = f"Processing run {status}: {run_id}"
 
-        return self.send_log(level, message, context, "email-processor")
+        return self.send_log(level, message, context, source or "email-processor")
 
     def send_email_processing_log(self,
                                   message_id: str,
