@@ -146,6 +146,8 @@ app.add_middleware(
 
 # Optional API key authentication
 API_KEY = os.getenv("API_KEY")
+CONTROL_API_TOKEN = os.getenv("CONTROL_API_TOKEN", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "vertex/google/gemini-2.5-flash")
 
 # Background processing configuration
 BACKGROUND_PROCESSING_ENABLED = os.getenv("BACKGROUND_PROCESSING", "true").lower() == "true"
@@ -192,7 +194,9 @@ def _initialize_account_email_processor():
             processing_status_manager=processing_status_manager,
             account_service_provider=account_service_provider,
             settings_service=settings_service,
-            email_categorizer_callback=categorize_email_with_resilient_client
+            email_categorizer_callback=categorize_email_with_resilient_client,
+            api_token=CONTROL_API_TOKEN,
+            llm_model=LLM_MODEL
         )
     return account_email_processor_service
 

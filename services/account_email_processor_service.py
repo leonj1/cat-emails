@@ -21,7 +21,9 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         processing_status_manager,
         account_service_provider,
         settings_service,
-        email_categorizer_callback: Callable[[str, str], str]
+        email_categorizer_callback: Callable[[str, str], str],
+        api_token: str,
+        llm_model: str
     ):
         """
         Initialize the account email processor service.
@@ -31,11 +33,15 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             account_service_provider: Provider for getting AccountCategoryService instances
             settings_service: Service for getting settings like lookback hours
             email_categorizer_callback: Function to categorize email content
+            api_token: Control API token for domain service authentication
+            llm_model: LLM model identifier (e.g., "vertex/google/gemini-2.5-flash")
         """
         self.processing_status_manager = processing_status_manager
         self.account_service_provider = account_service_provider
         self.settings_service = settings_service
         self.email_categorizer_callback = email_categorizer_callback
+        self.api_token = api_token
+        self.llm_model = llm_model
 
     def process_account(self, email_address: str) -> Dict:
         """
@@ -101,7 +107,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
 
             # Get credentials
             app_password = account.app_password
-            api_token = os.getenv("CONTROL_API_TOKEN", "")
+            api_token = self.api_token
 
             if not app_password:
                 error_msg = f"No app password configured for {email_address}"
@@ -133,8 +139,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
 
             # Start processing run in database
             fetcher.summary_service.start_processing_run(scan_hours=current_lookback_hours)
-
-            model = "vertex/google/gemini-2.5-flash"
 
             # Step 1: Connect to Gmail IMAP
             self.processing_status_manager.update_status(
@@ -192,7 +196,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 {"current": 0, "total": len(new_emails)}
             )
 
-            processor = EmailProcessorService(fetcher, email_address, model, self.email_categorizer_callback)
+            processor = EmailProcessorService(fetcher, email_address, self.llm_model, self.email_categorizer_callback)
 
             for i, msg in enumerate(new_emails, 1):
                 logger.info(f"    ⚡ Processing email {i}/{len(new_emails)}")
