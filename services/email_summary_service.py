@@ -18,7 +18,7 @@ from models.email_summary import (
     EmailAction
 )
 from services.database_service import DatabaseService
-from services.account_category_service import AccountCategoryService
+from clients.account_category_client import AccountCategoryClient
 from services.logs_collector_service import LogsCollectorService
 
 
@@ -28,27 +28,28 @@ logger = logging.getLogger(__name__)
 class EmailSummaryService:
     """Service for tracking processed emails and generating summaries."""
     
-    def __init__(self, data_dir: str = "./email_summaries", use_database: bool = True, 
-                 gmail_email: Optional[str] = None):
+    def __init__(self, data_dir: str = "./email_summaries", use_database: bool = True,
+                 gmail_email: Optional[str] = None, logs_collector: Optional[LogsCollectorService] = None):
         """
         Initialize the summary service.
-        
+
         Args:
             data_dir: Directory to store summary data
             use_database: Whether to persist summaries to database
             gmail_email: Gmail account email for account tracking (optional)
+            logs_collector: LogsCollectorService instance (optional, creates new if not provided)
         """
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
         self.current_file = self.data_dir / "current_tracking.json"
         self.archive_dir = self.data_dir / "archives"
         self.archive_dir.mkdir(exist_ok=True)
-        
+
         # Store gmail account email for account tracking
         self.gmail_email = gmail_email
 
         # Initialize logs collector service
-        self.logs_collector = LogsCollectorService()
+        self.logs_collector = logs_collector if logs_collector is not None else LogsCollectorService()
 
         # Initialize database service if enabled
         self.use_database = use_database
@@ -64,10 +65,10 @@ class EmailSummaryService:
                 
                 # Initialize account category service
                 try:
-                    self.account_service = AccountCategoryService(
+                    self.account_service = AccountCategoryClient(
                         db_path=os.getenv("DATABASE_PATH") or str(self.data_dir / "summaries.db")
                     )
-                    logger.info("Account category service initialized")
+                    logger.info("Account category client initialized")
                 except Exception as e:
                     logger.warning(f"Failed to initialize account service: {str(e)}")
                     # Continue without account service for backward compatibility
@@ -426,7 +427,7 @@ class EmailSummaryService:
                     # Also record account category stats if account service is available
                     if self.account_service and self.gmail_email and self.current_account_id:
                         try:
-                            # Convert category stats to the format expected by AccountCategoryService
+                            # Convert category stats to the format expected by AccountCategoryClient
                             account_category_stats = {}
                             for category, stats in self.category_stats.items():
                                 account_category_stats[category] = {

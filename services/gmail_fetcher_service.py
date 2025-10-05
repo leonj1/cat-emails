@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 
 from domain_service import DomainService
 from services.email_summary_service import EmailSummaryService
-from services.account_category_service import AccountCategoryService
+from clients.account_category_client import AccountCategoryClient
 from services.gmail_fetcher_interface import GmailFetcherInterface
 from services.gmail_connection_service import GmailConnectionService
 from services.http_link_remover_service import HttpLinkRemoverService
@@ -59,12 +59,12 @@ class GmailFetcher(GmailFetcherInterface):
         # Initialize account category service for tracking account-specific statistics
         self.account_service = None
         try:
-            self.account_service = AccountCategoryService()
+            self.account_service = AccountCategoryClient()
             # Register/activate the account (don't store the returned object to avoid session issues)
             self.account_service.get_or_create_account(self.email_address)
             logger.info(f"Account registered for category tracking: {self.email_address}")
         except Exception as e:
-            logger.error(f"Failed to initialize AccountCategoryService for {self.email_address}: {str(e)}")
+            logger.error(f"Failed to initialize AccountCategoryClient for {self.email_address}: {str(e)}")
             logger.warning("Account category tracking will be disabled for this session")
             self.account_service = None
 

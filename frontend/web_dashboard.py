@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 from services.database_service import DatabaseService
 from services.dashboard_service import DashboardService
-from services.account_category_service import AccountCategoryService
+from clients.account_category_client import AccountCategoryClient
 from services.settings_service import SettingsService
 
 # Configure logging
@@ -33,7 +33,7 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-pro
 db_path = os.getenv('DB_PATH', '../email_summaries/summaries.db')
 db_service = DatabaseService(db_path)
 dashboard_service = DashboardService(db_service)
-account_service = AccountCategoryService(db_path=db_path)
+account_service = AccountCategoryClient(db_path=db_path)
 settings_service = SettingsService(db_path=db_path)
 
 def truncate_category_name(name: str, max_length: int = 40) -> str:
@@ -247,7 +247,7 @@ def api_processing_runs():
 def api_accounts():
     """API endpoint for email accounts"""
     try:
-        # Get accounts from the AccountCategoryService
+        # Get accounts from the AccountCategoryClient
         accounts = account_service.get_all_accounts(active_only=False)
         
         # Convert to JSON-serializable format

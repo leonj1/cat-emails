@@ -1,5 +1,5 @@
 """
-Email Deduplication Service
+Gmail Deduplication Client
 
 Handles tracking and detection of previously processed emails to prevent
 duplicate processing across application restarts and container rebuilds.
@@ -11,17 +11,18 @@ from typing import List, Optional, Set, Dict, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from clients.email_deduplication_client_interface import EmailDeduplicationClientInterface
 from models.database import ProcessedEmailLog
 from models.processed_email_log_model import ProcessedEmailLogModel
 
 logger = logging.getLogger(__name__)
 
 
-class EmailDeduplicationService:
+class GmailDeduplicationClient(EmailDeduplicationClientInterface):
     """
-    Service for managing email deduplication across application restarts.
-    
-    This service tracks which emails have been processed to prevent duplicate
+    Client for managing Gmail email deduplication across application restarts.
+
+    This client tracks which emails have been processed to prevent duplicate
     processing when the application restarts or containers are rebuilt.
     """
     
@@ -55,7 +56,7 @@ class EmailDeduplicationService:
                 else:
                     logger.info(f"🗄️ Using database: <unknown url> for account {self.account_email}")
         except Exception as e:
-            logger.debug(f"Could not determine database in EmailDeduplicationService: {e}")
+            logger.debug(f"Could not determine database in GmailDeduplicationClient: {e}")
     
     def is_email_processed(self, message_id: str) -> bool:
         """

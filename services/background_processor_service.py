@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
 from services.background_processor_interface import BackgroundProcessorInterface
-from services.account_category_service import AccountCategoryService
+from clients.account_category_client import AccountCategoryClient
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,6 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
     def __init__(
         self,
         process_account_callback: Callable[[str], Dict],
-        account_service_provider,
         settings_service,
         scan_interval: int,
         background_enabled: bool
@@ -24,13 +23,11 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
 
         Args:
             process_account_callback: Function to process a single account's emails
-            account_service_provider: Provider for getting AccountCategoryService instances
             settings_service: Service for getting settings like lookback hours
             scan_interval: Seconds to wait between processing cycles
             background_enabled: Whether background processing is enabled
         """
         self.process_account_callback = process_account_callback
-        self.account_service_provider = account_service_provider
         self.settings_service = settings_service
         self.scan_interval = scan_interval
         self.background_enabled = background_enabled
@@ -83,7 +80,7 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
 
                 # Get list of active Gmail accounts from database
                 try:
-                    service = self.account_service_provider.get_service()
+                    service = AccountCategoryClient()
                     accounts = service.get_all_accounts()
 
                     if not accounts:

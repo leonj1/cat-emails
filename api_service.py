@@ -19,8 +19,8 @@ from pydantic import BaseModel, ValidationError
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from send_emails import send_summary_by_type
-from services.account_category_service import AccountCategoryService
-from services.account_service_provider import AccountServiceProvider
+from clients.account_category_client_interface import AccountCategoryClientInterface
+from clients.account_category_client import AccountCategoryClient
 from services.processing_status_manager import ProcessingStatusManager, ProcessingState
 from services.websocket_handler import StatusWebSocketManager
 from services.websocket_auth_service import WebSocketAuthService
@@ -169,9 +169,6 @@ websocket_manager: Optional[StatusWebSocketManager] = None
 # Global settings service instance
 settings_service = SettingsService()
 
-# Global account service provider instance
-account_service_provider = AccountServiceProvider()
-
 # Global LLM service factory instance
 llm_service_factory = LLMServiceFactory()
 
@@ -190,13 +187,17 @@ def _initialize_account_email_processor():
     """Initialize the account email processor service with all dependencies."""
     global account_email_processor_service
     if not account_email_processor_service:
+        from clients.account_category_client import AccountCategoryClient
+        from services.email_deduplication_factory import EmailDeduplicationFactory
         account_email_processor_service = AccountEmailProcessorService(
             processing_status_manager=processing_status_manager,
-            account_service_provider=account_service_provider,
             settings_service=settings_service,
             email_categorizer_callback=categorize_email_with_resilient_client,
             api_token=CONTROL_API_TOKEN,
-            llm_model=LLM_MODEL
+            llm_model=LLM_MODEL,
+            account_category_client=AccountCategoryClient(),
+            deduplication_factory=EmailDeduplicationFactory()
+            # create_gmail_fetcher defaults to GmailFetcher constructor
         )
     return account_email_processor_service
 
@@ -204,9 +205,16 @@ def _initialize_account_email_processor():
 # API response models are now imported from models/ directory above
 
 
-def get_account_service() -> AccountCategoryService:
-    """Dependency to provide AccountCategoryService instance."""
-    return account_service_provider.get_service()
+def get_account_service() -> AccountCategoryClientInterface:
+    """Dependency to provide AccountCategoryClient instance."""
+    try:
+        return AccountCategoryClient()
+    except Exception as e:
+        logger.error(f"Failed to create AccountCategoryClient: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database service unavailable"
+        )
 
 
 def _make_llm_service(model: str) -> LLMServiceInterface:
@@ -287,7 +295,6 @@ def start_background_processor():
         # Create background processor service instance
         background_processor_service = BackgroundProcessorService(
             process_account_callback=processor_service.process_account,
-            account_service_provider=account_service_provider,
             settings_service=settings_service,
             scan_interval=BACKGROUND_SCAN_INTERVAL,
             background_enabled=BACKGROUND_PROCESSING_ENABLED
@@ -1074,7 +1081,7 @@ async def get_top_categories(
     limit: int = Query(10, ge=1, le=50, description="Maximum number of categories to return (1-50)"),
     include_counts: bool = Query(False, description="Include detailed counts breakdown"),
     x_api_key: Optional[str] = Header(None),
-    service: AccountCategoryService = Depends(get_account_service)
+    service: AccountCategoryClientInterface = Depends(get_account_service)
 ):
     """
     Get top email categories for a specific account
@@ -1166,7 +1173,7 @@ async def get_top_categories(
 async def get_all_accounts(
     active_only: bool = Query(True, description="Filter to only active accounts"),
     x_api_key: Optional[str] = Header(None),
-    service: AccountCategoryService = Depends(get_account_service)
+    service: AccountCategoryClientInterface = Depends(get_account_service)
 ):
     """
     List all tracked email accounts
@@ -1232,7 +1239,7 @@ async def get_all_accounts(
 async def create_account(
     request: CreateAccountRequest,
     x_api_key: Optional[str] = Header(None),
-    service: AccountCategoryService = Depends(get_account_service)
+    service: AccountCategoryClientInterface = Depends(get_account_service)
 ):
     """
     Register a new email account for tracking
@@ -1313,7 +1320,7 @@ async def create_account(
 async def deactivate_account(
     email_address: str = Path(..., description="Gmail email address to deactivate"),
     x_api_key: Optional[str] = Header(None),
-    service: AccountCategoryService = Depends(get_account_service)
+    service: AccountCategoryClientInterface = Depends(get_account_service)
 ):
     """
     Deactivate an email account
@@ -1389,7 +1396,7 @@ async def deactivate_account(
 async def delete_account(
     email_address: str = Path(..., description="Gmail email address to delete"),
     x_api_key: Optional[str] = Header(None),
-    service: AccountCategoryService = Depends(get_account_service)
+    service: AccountCategoryClientInterface = Depends(get_account_service)
 ):
     """
     Delete an email account and all associated data

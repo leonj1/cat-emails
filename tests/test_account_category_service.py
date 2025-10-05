@@ -1,5 +1,5 @@
 """
-Tests for AccountCategoryService to ensure proper functionality and catch AttributeErrors.
+Tests for AccountCategoryClient to ensure proper functionality and catch AttributeErrors.
 """
 import unittest
 from unittest.mock import Mock, patch, MagicMock
@@ -9,12 +9,12 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from services.account_category_service import AccountCategoryService
+from clients.account_category_client import AccountCategoryClient
 from models.database import Base, EmailAccount, AccountCategoryStats
 
 
-class TestAccountCategoryService(unittest.TestCase):
-    """Test cases for AccountCategoryService."""
+class TestAccountCategoryClient(unittest.TestCase):
+    """Test cases for AccountCategoryClient."""
 
     def setUp(self):
         """Set up test fixtures."""
@@ -29,8 +29,8 @@ class TestAccountCategoryService(unittest.TestCase):
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
 
-        # Initialize service with test session
-        self.service = AccountCategoryService(db_session=self.session)
+        # Initialize client with test session
+        self.service = AccountCategoryClient(db_session=self.session)
 
         # Create test data
         self.test_email = "test@gmail.com"
@@ -89,7 +89,7 @@ class TestAccountCategoryService(unittest.TestCase):
         """Test that get_account method doesn't exist (to prevent regression)."""
         # This test ensures that the incorrect method name doesn't exist
         self.assertFalse(hasattr(self.service, 'get_account'),
-                        "AccountCategoryService should not have a 'get_account' method. Use 'get_account_by_email' instead.")
+                        "AccountCategoryClient should not have a 'get_account' method. Use 'get_account_by_email' instead.")
 
     def test_create_or_update_account(self):
         """Test create_or_update_account method."""
@@ -228,20 +228,20 @@ class TestAccountCategoryService(unittest.TestCase):
         self.assertIn("user3@gmail.com", emails)
 
 
-class TestAccountCategoryServiceIntegration(unittest.TestCase):
-    """Integration tests for AccountCategoryService with API service."""
+class TestAccountCategoryClientIntegration(unittest.TestCase):
+    """Integration tests for AccountCategoryClient with API service."""
 
-    @patch('services.account_category_service.init_database')
-    @patch('services.account_category_service.sessionmaker')
+    @patch('clients.account_category_client.init_database')
+    @patch('clients.account_category_client.sessionmaker')
     def test_api_service_usage(self, mock_sessionmaker, mock_init_db):
-        """Test that API service can properly use AccountCategoryService."""
+        """Test that API service can properly use AccountCategoryClient."""
         # Mock database setup
         mock_session = MagicMock()
         mock_sessionmaker.return_value = MagicMock(return_value=mock_session)
         mock_init_db.return_value = MagicMock()
 
-        # Create service
-        service = AccountCategoryService()
+        # Create client
+        service = AccountCategoryClient()
 
         # Test that the correct method exists and is callable
         self.assertTrue(hasattr(service, 'get_account_by_email'))

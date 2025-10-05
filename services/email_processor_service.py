@@ -25,6 +25,7 @@ class EmailProcessorService:
         email_address: str,
         model: str,
         categorize_fn: Callable[[str, str], str],
+        logs_collector: Optional[LogsCollectorService] = None,
     ) -> None:
         self.fetcher = fetcher
         self.email_address = email_address
@@ -32,7 +33,7 @@ class EmailProcessorService:
         self.categorize_fn = categorize_fn
 
         # Initialize logs collector service
-        self.logs_collector = LogsCollectorService()
+        self.logs_collector = logs_collector if logs_collector is not None else LogsCollectorService()
 
         # Aggregated results for the whole batch
         self.category_actions: Dict[str, Dict[str, int]] = {}

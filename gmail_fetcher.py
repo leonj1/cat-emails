@@ -13,7 +13,7 @@ from collections import Counter
 from tabulate import tabulate
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 from services.email_summary_service import EmailSummaryService
-from services.account_category_service import AccountCategoryService
+from clients.account_category_client import AccountCategoryClient
 
 from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
 from services.categorize_emails_interface import SimpleEmailCategory
@@ -148,12 +148,12 @@ class GmailFetcher:
         # Initialize account category service for tracking account-specific statistics
         self.account_service = None
         try:
-            self.account_service = AccountCategoryService()
+            self.account_service = AccountCategoryClient()
             # Register/activate the account (don't store the returned object to avoid session issues)
             self.account_service.get_or_create_account(self.email_address)
             logger.info(f"Account registered for category tracking: {self.email_address}")
         except Exception as e:
-            logger.error(f"Failed to initialize AccountCategoryService for {self.email_address}: {str(e)}")
+            logger.error(f"Failed to initialize AccountCategoryClient for {self.email_address}: {str(e)}")
             logger.warning("Account category tracking will be disabled for this session")
             self.account_service = None
 
@@ -625,7 +625,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         recent_emails = fetcher.get_recent_emails(hours)
         logger.info(f"Fetched {len(recent_emails)} records from the last {hours} hours.")
 
-        # Identify which emails are new using EmailDeduplicationService
+        # Identify which emails are new using GmailDeduplicationClient
         new_emails = []
         deduplication_service = None
         processed_message_ids = []  # Track which emails we process successfully
@@ -637,9 +637,9 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
             raise Exception("Database service not available")
 
         try:
-            from services.email_deduplication_service import EmailDeduplicationService
+            from clients.gmail_deduplication_client import GmailDeduplicationClient
             with db_svc.Session() as session:
-                deduplication_service = EmailDeduplicationService(session, email_address)
+                deduplication_service = GmailDeduplicationClient(session, email_address)
                 new_emails = deduplication_service.filter_new_emails(recent_emails)
                 
                 # Log deduplication stats
@@ -647,7 +647,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
                 logger.info(f"📊 Email deduplication stats: {stats}")
                 
         except Exception as e:
-            logger.error(f"Failed to use EmailDeduplicationService: {e}")
+            logger.error(f"Failed to use GmailDeduplicationClient: {e}")
             raise
 
         # Update fetched count
@@ -667,13 +667,13 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         if processed_message_ids and db_svc:
             logger.info(f"🔄 Bulk marking {len(processed_message_ids)} emails as processed...")
             try:
-                from services.email_deduplication_service import EmailDeduplicationService
+                from clients.gmail_deduplication_client import GmailDeduplicationClient
                 with db_svc.Session() as session:
-                    dedup_service = EmailDeduplicationService(session, email_address)
+                    dedup_service = GmailDeduplicationClient(session, email_address)
                     successful, errors = dedup_service.bulk_mark_as_processed(processed_message_ids)
                     logger.info(f"✅ Bulk processing completed: {successful} successful, {errors} errors")
             except Exception as e:
-                logger.error(f"❌ Bulk EmailDeduplicationService failed: {e}")
+                logger.error(f"❌ Bulk GmailDeduplicationClient failed: {e}")
                 raise
         elif processed_message_ids:
             logger.warning(f"⚠️ {len(processed_message_ids)} emails processed but no database service to record them")

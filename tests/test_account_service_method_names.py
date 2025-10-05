@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple test to verify that AccountCategoryService has the correct method names.
+Simple test to verify that AccountCategoryClient has the correct method names.
 This test can run without all dependencies installed.
 """
 import ast
@@ -12,10 +12,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_account_service_methods():
-    """Test that AccountCategoryService has correct method names."""
-    # Read the service file
+    """Test that AccountCategoryClient has correct method names."""
+    # Read the client file
     service_file = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                                'services', 'account_category_service.py')
+                                'clients', 'account_category_client.py')
 
     with open(service_file, 'r') as f:
         content = f.read()
@@ -23,15 +23,15 @@ def test_account_service_methods():
     # Parse the AST
     tree = ast.parse(content)
 
-    # Find the AccountCategoryService class
+    # Find the AccountCategoryClient class
     service_class = None
     for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef) and node.name == 'AccountCategoryService':
+        if isinstance(node, ast.ClassDef) and node.name == 'AccountCategoryClient':
             service_class = node
             break
 
     if not service_class:
-        print("❌ ERROR: AccountCategoryService class not found!")
+        print("❌ ERROR: AccountCategoryClient class not found!")
         return False
 
     # Get all method names
@@ -48,12 +48,12 @@ def test_account_service_methods():
     print(f"✅ Does NOT have get_account: {not has_wrong_method}")
 
     if has_wrong_method:
-        print("❌ ERROR: AccountCategoryService should not have 'get_account' method!")
+        print("❌ ERROR: AccountCategoryClient should not have 'get_account' method!")
         print("         Use 'get_account_by_email' instead.")
         return False
 
     if not has_correct_method:
-        print("❌ ERROR: AccountCategoryService is missing 'get_account_by_email' method!")
+        print("❌ ERROR: AccountCategoryClient is missing 'get_account_by_email' method!")
         return False
 
     # Also check api_service.py for correct usage

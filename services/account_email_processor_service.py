@@ -2,11 +2,13 @@ import os
 import time
 import logging
 from datetime import datetime, date
-from typing import Dict, Callable
+from typing import Dict, Callable, Optional
 from services.account_email_processor_interface import AccountEmailProcessorInterface
-from services.account_category_service import AccountCategoryService
+from clients.account_category_client_interface import AccountCategoryClientInterface
+from services.email_deduplication_factory_interface import EmailDeduplicationFactoryInterface
 from services.logs_collector_service import LogsCollectorService
-from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
+from services.gmail_fetcher_interface import GmailFetcherInterface
+from services.gmail_fetcher_service import GmailFetcher
 from services.email_processor_service import EmailProcessorService
 from services.processing_status_manager import ProcessingState
 
@@ -19,29 +21,38 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
     def __init__(
         self,
         processing_status_manager,
-        account_service_provider,
         settings_service,
         email_categorizer_callback: Callable[[str, str], str],
         api_token: str,
-        llm_model: str
+        llm_model: str,
+        account_category_client: AccountCategoryClientInterface,
+        deduplication_factory: EmailDeduplicationFactoryInterface,
+        logs_collector: Optional[LogsCollectorService] = None,
+        create_gmail_fetcher: Optional[Callable[[str, str, str], GmailFetcherInterface]] = None
     ):
         """
         Initialize the account email processor service.
 
         Args:
             processing_status_manager: Manager for tracking processing status
-            account_service_provider: Provider for getting AccountCategoryService instances
             settings_service: Service for getting settings like lookback hours
             email_categorizer_callback: Function to categorize email content
             api_token: Control API token for domain service authentication
             llm_model: LLM model identifier (e.g., "vertex/google/gemini-2.5-flash")
+            account_category_client: AccountCategoryClientInterface implementation (required)
+            deduplication_factory: EmailDeduplicationFactoryInterface implementation (required)
+            logs_collector: LogsCollectorService instance (optional, creates new if not provided)
+            create_gmail_fetcher: Optional callable to create GmailFetcherInterface instances (defaults to GmailFetcher constructor)
         """
         self.processing_status_manager = processing_status_manager
-        self.account_service_provider = account_service_provider
         self.settings_service = settings_service
         self.email_categorizer_callback = email_categorizer_callback
         self.api_token = api_token
         self.llm_model = llm_model
+        self.account_category_client = account_category_client
+        self.deduplication_factory = deduplication_factory
+        self.logs_collector = logs_collector if logs_collector is not None else LogsCollectorService()
+        self.create_gmail_fetcher = create_gmail_fetcher if create_gmail_fetcher is not None else GmailFetcher
 
     def process_account(self, email_address: str) -> Dict:
         """
@@ -62,9 +73,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         """
         logger.info(f"🔍 Processing emails for account: {email_address}")
 
-        # Initialize logs collector service
-        logs_collector = LogsCollectorService()
-        logs_collector.send_log(
+        self.logs_collector.send_log(
             "INFO",
             f"Email processing started for {email_address}",
             {"email": email_address},
@@ -85,13 +94,12 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 }
 
             # Get account service to check if account exists in database
-            service = self.account_service_provider.get_service()
-            account = service.get_account_by_email(email_address)
+            account = self.account_category_client.get_account_by_email(email_address)
 
             if not account:
                 error_msg = f"Account {email_address} not found in database"
                 logger.error(f"❌ {error_msg}")
-                logs_collector.send_log("ERROR", error_msg, {"email": email_address}, "api-service")
+                self.logs_collector.send_log("ERROR", error_msg, {"email": email_address}, "api-service")
                 self.processing_status_manager.update_status(
                     ProcessingState.ERROR,
                     error_msg,
@@ -112,7 +120,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             if not app_password:
                 error_msg = f"No app password configured for {email_address}"
                 logger.error(f"❌ {error_msg}")
-                logs_collector.send_log("ERROR", error_msg, {"email": email_address}, "api-service")
+                self.logs_collector.send_log("ERROR", error_msg, {"email": email_address}, "api-service")
                 self.processing_status_manager.update_status(
                     ProcessingState.ERROR,
                     error_msg,
@@ -131,8 +139,8 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             # Get the current lookback hours from settings
             current_lookback_hours = self.settings_service.get_lookback_hours()
 
-            # Initialize the fetcher
-            fetcher = ServiceGmailFetcher(email_address, app_password, api_token)
+            # Initialize the fetcher using the create function
+            fetcher = self.create_gmail_fetcher(email_address, app_password, api_token)
 
             # Clear any existing tracked data to start fresh
             fetcher.summary_service.clear_tracked_data()
@@ -159,30 +167,13 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             recent_emails = fetcher.get_recent_emails(current_lookback_hours)
             logger.info(f"Fetched {len(recent_emails)} records from the last {current_lookback_hours} hours.")
 
-            # Identify which emails are new using EmailDeduplicationService
-            new_emails = []
-            db_svc = getattr(fetcher.summary_service, "db_service", None)
+            # Identify which emails are new using deduplication client
+            deduplication_client = self.deduplication_factory.create_deduplication_client(email_address)
+            new_emails = deduplication_client.filter_new_emails(recent_emails)
 
-            if not db_svc:
-                error_msg = "Database service not available"
-                logger.error(f"❌ {error_msg}")
-                logs_collector.send_log("ERROR", error_msg, {"email": email_address}, "api-service")
-                fetcher.disconnect()
-                raise Exception(error_msg)
-
-            try:
-                from services.email_deduplication_service import EmailDeduplicationService
-                with db_svc.Session() as session:
-                    deduplication_service = EmailDeduplicationService(session, email_address)
-                    new_emails = deduplication_service.filter_new_emails(recent_emails)
-
-                    # Log deduplication stats
-                    stats = deduplication_service.get_stats()
-                    logger.info(f"📊 Email deduplication stats: {stats}")
-            except Exception as e:
-                logger.error(f"Failed to use EmailDeduplicationService: {e}")
-                fetcher.disconnect()
-                raise
+            # Log deduplication stats
+            stats = deduplication_client.get_stats()
+            logger.info(f"📊 Email deduplication stats: {stats}")
 
             # Update fetched count
             fetcher.summary_service.run_metrics['fetched'] = len(recent_emails)
@@ -196,7 +187,13 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 {"current": 0, "total": len(new_emails)}
             )
 
-            processor = EmailProcessorService(fetcher, email_address, self.llm_model, self.email_categorizer_callback)
+            processor = EmailProcessorService(
+                fetcher,
+                email_address,
+                self.llm_model,
+                self.email_categorizer_callback,
+                self.logs_collector
+            )
 
             for i, msg in enumerate(new_emails, 1):
                 logger.info(f"    ⚡ Processing email {i}/{len(new_emails)}")
@@ -239,13 +236,10 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             if processed_message_ids:
                 logger.info(f"🔄 Bulk marking {len(processed_message_ids)} emails as processed...")
                 try:
-                    from services.email_deduplication_service import EmailDeduplicationService
-                    with db_svc.Session() as session:
-                        dedup_service = EmailDeduplicationService(session, email_address)
-                        successful, errors = dedup_service.bulk_mark_as_processed(processed_message_ids)
-                        logger.info(f"✅ Bulk processing completed: {successful} successful, {errors} errors")
+                    successful, errors = deduplication_client.bulk_mark_as_processed(processed_message_ids)
+                    logger.info(f"✅ Bulk processing completed: {successful} successful, {errors} errors")
                 except Exception as e:
-                    logger.error(f"❌ Bulk EmailDeduplicationService failed: {e}")
+                    logger.error(f"❌ Bulk deduplication failed: {e}")
 
             # Record category statistics
             category_actions = processor.category_actions
@@ -294,7 +288,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             logger.info(f"✅ Successfully processed {email_address}: {len(new_emails)} emails in {processing_time:.2f}s")
 
             # Send completion log
-            logs_collector.send_log(
+            self.logs_collector.send_log(
                 "INFO",
                 f"Email processing completed successfully for {email_address}",
                 {
@@ -317,7 +311,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             logger.error(f"❌ Error processing emails for {email_address}: {str(e)}")
 
             # Send error log to remote collector
-            logs_collector.send_log(
+            self.logs_collector.send_log(
                 "ERROR",
                 f"Email processing failed for {email_address}: {str(e)}",
                 {"error": str(e), "email": email_address},

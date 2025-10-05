@@ -11,23 +11,24 @@ from sqlalchemy import create_engine, func, and_, or_
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.exc import IntegrityError
 
+from clients.account_category_client_interface import AccountCategoryClientInterface
 from models.database import (
     Base, EmailAccount, AccountCategoryStats, get_database_url, init_database
 )
 from models.account_models import (
-    TopCategoriesResponse, CategoryStats, DatePeriod, 
+    TopCategoriesResponse, CategoryStats, DatePeriod,
     EmailAccountInfo, AccountListResponse
 )
 
 logger = logging.getLogger(__name__)
 
 
-class AccountCategoryService:
-    """Service for managing email accounts and category statistics."""
-    
+class AccountCategoryClient(AccountCategoryClientInterface):
+    """Client for managing email accounts and category statistics."""
+
     def __init__(self, db_session: Optional[Session] = None, db_path: Optional[str] = None):
         """
-        Initialize the AccountCategoryService.
+        Initialize the AccountCategoryClient.
         
         Args:
             db_session: Optional existing database session to use
@@ -45,7 +46,7 @@ class AccountCategoryService:
             self.session = None
             self.owns_session = True
         
-        logger.info("AccountCategoryService initialized")
+        logger.info("AccountCategoryClient initialized")
     
     def _get_session(self) -> Session:
         """Get a database session (either provided or create new one)."""
@@ -514,8 +515,8 @@ class AccountCategoryService:
 
 # Example usage and testing
 if __name__ == "__main__":
-    # Example usage of AccountCategoryService
-    service = AccountCategoryService()
+    # Example usage of AccountCategoryClient
+    service = AccountCategoryClient()
     
     try:
         # Create/get an account
