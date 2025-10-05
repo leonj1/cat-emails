@@ -70,8 +70,11 @@ class LogsCollectorService:
             if self.api_token:
                 headers["Authorization"] = f"Bearer {self.api_token}"
 
+            # Ensure we're posting to the /logs endpoint
+            endpoint = f"{self.api_url.rstrip('/')}/logs"
+
             response = requests.post(
-                self.api_url,
+                endpoint,
                 json=payload,
                 headers=headers,
                 timeout=5  # 5 second timeout to avoid blocking
