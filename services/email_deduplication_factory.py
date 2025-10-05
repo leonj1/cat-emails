@@ -4,7 +4,7 @@ Factory for creating Gmail deduplication clients.
 from services.email_deduplication_factory_interface import EmailDeduplicationFactoryInterface
 from clients.email_deduplication_client_interface import EmailDeduplicationClientInterface
 from clients.gmail_deduplication_client import GmailDeduplicationClient
-from models.database import get_db_service
+from models.database import init_database, get_session
 
 
 class EmailDeduplicationFactory(EmailDeduplicationFactoryInterface):
@@ -20,6 +20,6 @@ class EmailDeduplicationFactory(EmailDeduplicationFactoryInterface):
         Returns:
             GmailDeduplicationClient instance
         """
-        db_service = get_db_service()
-        session = db_service.Session()
+        engine = init_database()
+        session = get_session(engine)
         return GmailDeduplicationClient(session, email_address)
