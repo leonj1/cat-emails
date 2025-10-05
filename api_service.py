@@ -149,6 +149,50 @@ API_KEY = os.getenv("API_KEY")
 CONTROL_API_TOKEN = os.getenv("CONTROL_API_TOKEN", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "vertex/google/gemini-2.5-flash")
 
+# Validate critical environment variables at startup
+def validate_environment():
+    """Validate that all required environment variables are set."""
+    missing_vars = []
+
+    # Check for at least one LLM API key
+    requestyai_key = os.getenv("REQUESTYAI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if not requestyai_key and not openai_key:
+        missing_vars.append("REQUESTYAI_API_KEY or OPENAI_API_KEY")
+
+    if missing_vars:
+        error_msg = f"""
+╔════════════════════════════════════════════════════════════════╗
+║                  CRITICAL CONFIGURATION ERROR                   ║
+╚════════════════════════════════════════════════════════════════╝
+
+Missing required environment variables:
+{chr(10).join(f'  ✗ {var}' for var in missing_vars)}
+
+The Cat-Emails API requires an LLM service API key to function.
+Please set one of the following environment variables:
+
+  • REQUESTYAI_API_KEY - For RequestYAI service
+  • OPENAI_API_KEY     - For OpenAI service
+
+Example:
+  export REQUESTYAI_API_KEY="your-api-key-here"
+
+For Railway deployment:
+  railway variables set REQUESTYAI_API_KEY "your-api-key-here"
+
+See docs/RAILWAY_DEPLOYMENT.md for more information.
+"""
+        logger.error(error_msg)
+        print(error_msg, file=sys.stderr)
+        sys.exit(1)
+
+    logger.info("✓ All required environment variables are set")
+
+# Validate environment on module load
+validate_environment()
+
 # Background processing configuration
 BACKGROUND_PROCESSING_ENABLED = os.getenv("BACKGROUND_PROCESSING", "true").lower() == "true"
 BACKGROUND_SCAN_INTERVAL = int(os.getenv("BACKGROUND_SCAN_INTERVAL", "300"))  # 5 minutes default
@@ -390,25 +434,44 @@ async def health_check():
     Returns the health status of the API service and background processor information.
     """
     global background_thread, background_thread_running
-    
-    background_status = "disabled"
-    if BACKGROUND_PROCESSING_ENABLED:
-        if background_thread and background_thread.is_alive():
-            background_status = "running"
-        else:
-            background_status = "stopped"
-    
-    return {
+
+    health_status = {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "service": "Cat Emails Summary API",
-        "background_processor": {
+        "version": "1.1.0"
+    }
+
+    # Background processor status
+    try:
+        background_status = "disabled"
+        if BACKGROUND_PROCESSING_ENABLED:
+            if background_thread and background_thread.is_alive():
+                background_status = "running"
+            else:
+                background_status = "stopped"
+
+        health_status["background_processor"] = {
             "enabled": BACKGROUND_PROCESSING_ENABLED,
             "status": background_status,
             "scan_interval_seconds": BACKGROUND_SCAN_INTERVAL,
-            "process_hours": settings_service.get_lookback_hours()
+            "process_hours": settings_service.get_lookback_hours() if settings_service else None
         }
-    }
+    except Exception as e:
+        logger.error(f"Error getting background processor status: {e}")
+        health_status["background_processor"] = {"error": str(e)}
+
+    # Database status
+    try:
+        from clients.account_category_client import AccountCategoryClient
+        test_client = AccountCategoryClient()
+        health_status["database"] = "connected"
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        health_status["database"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+
+    return health_status
 
 
 @app.post("/api/background/start", tags=["background-processing"])
@@ -1486,28 +1549,57 @@ async def delete_account(
 async def startup_event():
     """Initialize WebSocket manager and start background tasks on server startup"""
     global websocket_manager
-    
+
+    logger.info("=== API Service Startup ===")
+    logger.info(f"Python version: {sys.version}")
+    logger.info(f"Working directory: {os.getcwd()}")
+
+    # Log critical environment variables (without sensitive values)
+    env_vars = {
+        "API_KEY": "***" if API_KEY else None,
+        "CONTROL_API_TOKEN": "***" if CONTROL_API_TOKEN else None,
+        "LLM_MODEL": LLM_MODEL,
+        "BACKGROUND_PROCESSING_ENABLED": BACKGROUND_PROCESSING_ENABLED,
+        "BACKGROUND_SCAN_INTERVAL": BACKGROUND_SCAN_INTERVAL,
+        "DATABASE_PATH": os.getenv("DATABASE_PATH", "default"),
+        "REQUESTYAI_API_KEY": "***" if os.getenv("REQUESTYAI_API_KEY") else None,
+        "OPENAI_API_KEY": "***" if os.getenv("OPENAI_API_KEY") else None,
+    }
+    logger.info(f"Environment configuration: {env_vars}")
+
     try:
+        # Test database initialization
+        logger.info("Testing database connection...")
+        from clients.account_category_client import AccountCategoryClient
+        test_client = AccountCategoryClient()
+        logger.info("Database connection successful")
+
         # Initialize WebSocket manager
+        logger.info("Initializing WebSocket manager...")
         websocket_manager = StatusWebSocketManager(
             status_manager=processing_status_manager,
             max_clients=50  # Configure max clients as needed
         )
-        
+
         # Start background broadcasting task
         websocket_manager.broadcast_task = asyncio.create_task(
             websocket_manager.start_broadcasting()
         )
-        
+
         # Start heartbeat task
         websocket_manager.heartbeat_task = asyncio.create_task(
             websocket_manager.start_heartbeat()
         )
-        
+
         logger.info("WebSocket manager initialized and background tasks started")
-        
+        logger.info("=== API Service Startup Complete ===")
+
     except Exception as e:
-        logger.error(f"Failed to initialize WebSocket manager: {e}")
+        logger.error(f"FATAL: Failed to initialize during startup: {e}")
+        logger.exception("Full traceback:")
+        # Terminate the service - cannot function without proper initialization
+        logger.error("Service cannot start. Exiting...")
+        sys.exit(1)
 
 
 @app.on_event("shutdown")
