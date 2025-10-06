@@ -4,6 +4,7 @@ Service for sending logs to LOGS_COLLECTOR_API.
 import os
 import logging
 import requests
+import socket
 from typing import Dict, Optional, Any
 from datetime import datetime
 import json
@@ -21,10 +22,11 @@ class LogsCollectorService:
 
         Args:
             api_url: URL of the logs collector API (defaults to LOGS_COLLECTOR_API env var)
-            api_token: Authentication token for the API (defaults to LOGS_COLLECTOR_API_TOKEN env var)
+            api_token: Authentication token for the API (defaults to LOGS_COLLECTOR_TOKEN or LOGS_COLLECTOR_API_TOKEN env var)
         """
         self.api_url = api_url or os.getenv("LOGS_COLLECTOR_API")
-        self.api_token = api_token or os.getenv("LOGS_COLLECTOR_API_TOKEN")
+        # Support both LOGS_COLLECTOR_TOKEN (deployment) and LOGS_COLLECTOR_API_TOKEN (local) env vars
+        self.api_token = api_token or os.getenv("LOGS_COLLECTOR_TOKEN") or os.getenv("LOGS_COLLECTOR_API_TOKEN")
 
         if not self.api_url:
             logger.warning("LOGS_COLLECTOR_API not configured. Logs will not be sent to collector.")
@@ -54,12 +56,16 @@ class LogsCollectorService:
             return False
 
         try:
+            # Required fields for logs-collector API
             payload = {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "level": level.upper(),
+                "application_name": source or "cat-emails",
+                "environment": os.getenv("ENVIRONMENT", "production"),
                 "message": message,
-                "source": source or "cat-emails",
-                "context": context or {}
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "level": level.lower(),  # logs-collector expects lowercase levels
+                "trace_id": context.get("trace_id", "") if context else "",
+                "version": os.getenv("APP_VERSION", "1.0.0"),
+                "hostname": socket.gethostname()
             }
 
             headers = {
