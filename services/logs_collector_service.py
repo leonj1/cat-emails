@@ -5,6 +5,7 @@ import os
 import logging
 import requests
 import socket
+import uuid
 from typing import Dict, Optional, Any
 from datetime import datetime
 import json
@@ -57,13 +58,16 @@ class LogsCollectorService:
 
         try:
             # Required fields for logs-collector API
+            # Generate a default trace_id if not provided (API requires non-empty trace_id)
+            default_trace_id = str(uuid.uuid4())
+
             payload = {
                 "application_name": source or "cat-emails",
                 "environment": os.getenv("ENVIRONMENT", "production"),
                 "message": message,
                 "timestamp": datetime.utcnow().isoformat() + "Z",
                 "level": level.lower(),  # logs-collector expects lowercase levels
-                "trace_id": context.get("trace_id", "") if context else "",
+                "trace_id": context.get("trace_id", default_trace_id) if context else default_trace_id,
                 "version": os.getenv("APP_VERSION", "1.0.0"),
                 "hostname": socket.gethostname()
             }
