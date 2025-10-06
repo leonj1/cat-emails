@@ -31,9 +31,10 @@ class UserSettings(Base):
 class EmailAccount(Base):
     """Email account information for multi-account support"""
     __tablename__ = 'email_accounts'
-    
+
     id = Column(Integer, primary_key=True)
     email_address = Column(String(255), unique=True, nullable=False, index=True)
+    app_password = Column(String(255))  # Gmail app-specific password for IMAP access
     display_name = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
