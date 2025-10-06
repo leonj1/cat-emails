@@ -77,10 +77,11 @@ class TestLogsCollectorService(unittest.TestCase):
         # Verify the request payload
         call_args = mock_post.call_args
         payload = call_args[1]['json']
-        self.assertEqual(payload['level'], "INFO")
+        self.assertEqual(payload['level'], "info")  # API expects lowercase
         self.assertEqual(payload['message'], "Test message")
-        self.assertEqual(payload['source'], "test-source")
-        self.assertEqual(payload['context'], {"key": "value"})
+        self.assertEqual(payload['application_name'], "test-source")
+        # Context is not a separate field - trace_id should be at top level
+        self.assertIn('trace_id', payload)  # Should have auto-generated trace_id
 
         # Verify headers
         headers = call_args[1]['headers']
@@ -152,12 +153,12 @@ class TestLogsCollectorService(unittest.TestCase):
 
         self.assertTrue(result)
 
-        # Verify the context includes run details
+        # Verify the payload - note that context data is passed but implementation
+        # uses trace_id from context at top level
         call_args = mock_post.call_args
         payload = call_args[1]['json']
-        self.assertEqual(payload['context']['run_id'], "run-123")
-        self.assertEqual(payload['context']['status'], "completed")
-        self.assertEqual(payload['context']['metrics']['processed'], 10)
+        self.assertIn('trace_id', payload)  # Should have auto-generated or from context
+        self.assertEqual(payload['message'], "Processing run completed: run-123")
 
     @patch('services.logs_collector_service.requests.post')
     def test_send_email_processing_log(self, mock_post):
@@ -180,14 +181,95 @@ class TestLogsCollectorService(unittest.TestCase):
 
         self.assertTrue(result)
 
-        # Verify the context includes email details
+        # Verify the payload structure - context is passed but trace_id is at top level
         call_args = mock_post.call_args
         payload = call_args[1]['json']
-        self.assertEqual(payload['context']['message_id'], "msg-123")
-        self.assertEqual(payload['context']['category'], "Marketing")
-        self.assertEqual(payload['context']['action'], "deleted")
-        self.assertEqual(payload['context']['sender'], "test@example.com")
-        self.assertEqual(payload['context']['processing_time_seconds'], 1.5)
+        self.assertIn('trace_id', payload)  # Should have auto-generated trace_id
+        self.assertEqual(payload['message'], "Email processed: Marketing - deleted")
+        self.assertEqual(payload['application_name'], "email-processor")
+
+    @patch('services.logs_collector_service.requests.post')
+    def test_send_log_without_trace_id_generates_uuid(self, mock_post):
+        """Verify that a UUID trace_id is auto-generated when not provided."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        service = LogsCollectorService(
+            api_url="https://api.example.com/logs",
+            api_token="test-token"
+        )
+
+        result = service.send_log(
+            level="INFO",
+            message="Test log - auto-generated trace_id",
+            context={"test": "data"},
+            source="test-fix"
+        )
+
+        self.assertTrue(result)
+        call_args = mock_post.call_args
+        payload = call_args[1]['json']
+
+        # Verify trace_id exists and is a valid UUID format
+        self.assertIn('trace_id', payload)
+        self.assertEqual(len(payload['trace_id']), 36)  # UUID string length with hyphens
+        self.assertEqual(payload['trace_id'].count('-'), 4)  # UUIDs have 4 hyphens
+
+    @patch('services.logs_collector_service.requests.post')
+    def test_send_log_with_explicit_trace_id(self, mock_post):
+        """Verify that an explicit trace_id is preserved."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        service = LogsCollectorService(
+            api_url="https://api.example.com/logs",
+            api_token="test-token"
+        )
+
+        expected_trace_id = "explicit-trace-123"
+        result = service.send_log(
+            level="INFO",
+            message="Test log - explicit trace_id",
+            context={"trace_id": expected_trace_id, "test": "data"},
+            source="test-fix"
+        )
+
+        self.assertTrue(result)
+        call_args = mock_post.call_args
+        payload = call_args[1]['json']
+
+        # Verify the explicit trace_id was used
+        self.assertEqual(payload['trace_id'], expected_trace_id)
+
+    @patch('services.logs_collector_service.requests.post')
+    def test_send_log_no_context_generates_uuid(self, mock_post):
+        """Verify that a UUID trace_id is generated when no context is provided."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        service = LogsCollectorService(
+            api_url="https://api.example.com/logs",
+            api_token="test-token"
+        )
+
+        result = service.send_log(
+            level="INFO",
+            message="Test log - no context",
+            context=None,
+            source="test-fix"
+        )
+
+        self.assertTrue(result)
+        call_args = mock_post.call_args
+        payload = call_args[1]['json']
+
+        # Verify trace_id exists and is a valid UUID format
+        self.assertIn('trace_id', payload)
+        self.assertEqual(len(payload['trace_id']), 36)
+        self.assertEqual(payload['trace_id'].count('-'), 4)
 
 
 if __name__ == '__main__':
