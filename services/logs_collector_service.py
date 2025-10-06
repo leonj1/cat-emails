@@ -97,6 +97,24 @@ class LogsCollectorService:
         except requests.exceptions.Timeout:
             logger.warning("Timeout sending log to collector")
             return False
+        except requests.exceptions.HTTPError as e:
+            # Extract error details from response if available
+            error_msg = f"Failed to send log to collector: {str(e)}"
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_data = e.response.json()
+                    if 'details' in error_data:
+                        error_msg += f" - Details: {error_data['details']}"
+                        print(f"ERROR: Logs collector API error details: {error_data['details']}")
+                    elif 'message' in error_data:
+                        error_msg += f" - Message: {error_data['message']}"
+                    elif 'error' in error_data:
+                        error_msg += f" - Error: {error_data['error']}"
+                except (json.JSONDecodeError, KeyError):
+                    # If response is not JSON or doesn't have expected fields
+                    error_msg += f" - Response: {e.response.text[:500]}"
+            logger.error(error_msg)
+            return False
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to send log to collector: {str(e)}")
             return False

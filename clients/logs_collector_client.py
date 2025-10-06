@@ -106,6 +106,24 @@ class RemoteLogsCollectorClient(LogsCollectorClient):
             response.raise_for_status()
             return True
 
+        except requests.exceptions.HTTPError as e:
+            # Extract error details from response if available
+            error_msg = f"Failed to send log to collector: {e}"
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_data = e.response.json()
+                    if 'details' in error_data:
+                        error_msg += f" - Details: {error_data['details']}"
+                        print(f"ERROR: Logs collector API error details: {error_data['details']}")
+                    elif 'message' in error_data:
+                        error_msg += f" - Message: {error_data['message']}"
+                    elif 'error' in error_data:
+                        error_msg += f" - Error: {error_data['error']}"
+                except Exception:
+                    # If response is not JSON or doesn't have expected fields
+                    error_msg += f" - Response: {e.response.text[:500]}"
+            print(error_msg)
+            return False
         except requests.exceptions.RequestException as e:
             # Log error locally
             print(f"Failed to send log to collector: {e}")

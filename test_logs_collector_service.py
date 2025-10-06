@@ -271,6 +271,74 @@ class TestLogsCollectorService(unittest.TestCase):
         self.assertEqual(len(payload['trace_id']), 36)
         self.assertEqual(payload['trace_id'].count('-'), 4)
 
+    @patch('services.logs_collector_service.requests.post')
+    @patch('builtins.print')
+    def test_send_log_http_error_with_details(self, mock_print, mock_post):
+        """Test that error details from API are properly displayed"""
+        import requests
+
+        # Create a mock response with error details
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.json.return_value = {
+            'details': 'Invalid trace_id format: must be a valid UUID',
+            'error': 'Bad Request'
+        }
+        mock_response.text = '{"details":"Invalid trace_id format: must be a valid UUID","error":"Bad Request"}'
+
+        # Create HTTP error with the response
+        http_error = requests.exceptions.HTTPError(response=mock_response)
+        mock_post.return_value = mock_response
+        mock_response.raise_for_status.side_effect = http_error
+
+        service = LogsCollectorService(
+            api_url="https://api.example.com/logs",
+            api_token="test-token"
+        )
+
+        result = service.send_log(
+            level="INFO",
+            message="Test message",
+            context={"trace_id": "invalid-trace-id"},
+            source="test"
+        )
+
+        self.assertFalse(result)
+
+        # Verify that error details were printed to stdout
+        mock_print.assert_called_with("ERROR: Logs collector API error details: Invalid trace_id format: must be a valid UUID")
+
+    @patch('services.logs_collector_service.requests.post')
+    @patch('builtins.print')
+    def test_send_log_http_error_without_details(self, mock_print, mock_post):
+        """Test error handling when API doesn't return details field"""
+        import requests
+
+        # Create a mock response without details field
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.json.return_value = {
+            'error': 'Internal Server Error'
+        }
+        mock_response.text = '{"error":"Internal Server Error"}'
+
+        # Create HTTP error with the response
+        http_error = requests.exceptions.HTTPError(response=mock_response)
+        mock_post.return_value = mock_response
+        mock_response.raise_for_status.side_effect = http_error
+
+        service = LogsCollectorService(
+            api_url="https://api.example.com/logs",
+            api_token="test-token"
+        )
+
+        result = service.send_log("ERROR", "Test error message")
+
+        self.assertFalse(result)
+
+        # Verify that details were NOT printed since they don't exist
+        mock_print.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()
