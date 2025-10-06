@@ -11,10 +11,11 @@ if not os.getenv("LOGS_COLLECTOR_API"):
     os.environ["LOGS_COLLECTOR_API"] = "https://logs-collector-production.up.railway.app"
     print("Using default LOGS_COLLECTOR_API endpoint")
 
+token_value = os.getenv("LOGS_COLLECTOR_TOKEN") or os.getenv("LOGS_COLLECTOR_API_TOKEN")
 # The token should be set in the deployment environment
-if not os.getenv("LOGS_COLLECTOR_TOKEN"):
-    print("WARNING: LOGS_COLLECTOR_TOKEN not set - authentication will fail")
-    print("Please set LOGS_COLLECTOR_TOKEN environment variable with a valid token")
+if not token_value:
+    print("WARNING: No logs collector token found - authentication will fail")
+    print("Please set LOGS_COLLECTOR_TOKEN (preferred) or LOGS_COLLECTOR_API_TOKEN with a valid token")
 
 from services.logs_collector_service import LogsCollectorService
 
@@ -22,7 +23,7 @@ def test_logs_collector():
     """Test the logs collector service."""
     print("\n=== Testing Logs Collector Service ===")
     print(f"API URL: {os.getenv('LOGS_COLLECTOR_API', 'Not set')}")
-    print(f"Token present: {'Yes' if os.getenv('LOGS_COLLECTOR_TOKEN') else 'No'}")
+    print(f"Token present: {'Yes' if token_value else 'No'}")
 
     # Initialize the service
     service = LogsCollectorService()
@@ -55,7 +56,7 @@ def test_logs_collector():
         print("❌ FAILED: Log could not be sent.")
         print("Check the error messages above for details.")
         print("\nCommon issues:")
-        print("1. LOGS_COLLECTOR_TOKEN not set or invalid")
+        print("1. LOGS_COLLECTOR_TOKEN or LOGS_COLLECTOR_API_TOKEN not set or invalid")
         print("2. LOGS_COLLECTOR_API endpoint is incorrect")
         print("3. Network connectivity issues")
 
