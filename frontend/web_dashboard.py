@@ -59,6 +59,18 @@ def dashboard():
         return f"Error loading dashboard: {str(e)}", 500
 
 
+@app.route('/app/accounts')
+def accounts_page():
+    """Dedicated accounts management page"""
+    try:
+        logger.info("Rendering accounts page")
+        api_base_url = os.getenv('API_BASE_URL', 'http://localhost:8001')
+        return render_template('accounts.html', api_base_url=api_base_url)
+    except Exception as e:
+        logger.error(f"Error rendering accounts page: {e}")
+        return f"Error loading accounts page: {str(e)}", 500
+
+
 @app.route('/api/stats/overview')
 def api_overview_stats():
     """API endpoint for overview statistics"""

@@ -16,11 +16,12 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-    
+
     <script>
         window.API_BASE_URL = "{{ api_base_url|safe }}";
     </script>
-    
+
+    {% block extra_styles %}{% endblock %}
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -42,6 +43,12 @@
                         <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
                             <i class="bi bi-speedometer2 me-1"></i>
                             Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'accounts_page' %}active{% endif %}" href="{{ url_for('accounts_page') }}">
+                            <i class="bi bi-person-lines-fill me-1"></i>
+                            Accounts
                         </a>
                     </li>
                 </ul>
