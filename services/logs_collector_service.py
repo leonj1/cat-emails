@@ -6,8 +6,10 @@ import logging
 import requests
 import socket
 import uuid
-from typing import Dict, Optional, Any
-from datetime import datetime
+import time
+from typing import Dict, Optional, Any, Tuple
+from datetime import datetime, timedelta
+from urllib.parse import urlparse
 import json
 
 
@@ -29,12 +31,137 @@ class LogsCollectorService:
         # Support both LOGS_COLLECTOR_TOKEN (deployment) and LOGS_COLLECTOR_API_TOKEN (local) env vars
         self.api_token = api_token or os.getenv("LOGS_COLLECTOR_TOKEN") or os.getenv("LOGS_COLLECTOR_API_TOKEN")
 
+        # DNS cache for Railway domains
+        self._dns_cache: Dict[str, Tuple[str, datetime]] = {}
+        self._dns_cache_ttl = timedelta(minutes=5)  # Cache DNS for 5 minutes
+
+        # Retry configuration
+        self.max_retries = 3
+        self.retry_delay = 1  # Initial retry delay in seconds
+
         if not self.api_url:
             logger.warning("LOGS_COLLECTOR_API not configured. Logs will not be sent to collector.")
             self.enabled = False
         else:
             self.enabled = True
             logger.info(f"LogsCollectorService initialized with API: {self.api_url}")
+            # Pre-resolve DNS on initialization
+            self._resolve_dns(self.api_url)
+
+    def _resolve_dns(self, url: str) -> Optional[str]:
+        """
+        Resolve and cache DNS for a given URL.
+
+        Args:
+            url: The URL to resolve
+
+        Returns:
+            The resolved IP address or None if resolution fails
+        """
+        try:
+            parsed = urlparse(url)
+            hostname = parsed.hostname
+
+            if not hostname:
+                return None
+
+            # Check cache first
+            if hostname in self._dns_cache:
+                cached_ip, cached_time = self._dns_cache[hostname]
+                if datetime.now() - cached_time < self._dns_cache_ttl:
+                    logger.debug(f"Using cached DNS for {hostname}: {cached_ip}")
+                    return cached_ip
+
+            # Resolve DNS
+            ip_address = socket.gethostbyname(hostname)
+            self._dns_cache[hostname] = (ip_address, datetime.now())
+            logger.debug(f"Resolved DNS for {hostname}: {ip_address}")
+            return ip_address
+
+        except socket.gaierror as e:
+            logger.warning(f"Failed to resolve DNS for {url}: {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"Error during DNS resolution for {url}: {e}")
+            return None
+
+    def _make_request_with_retry(self, endpoint: str, payload: dict, headers: dict) -> requests.Response:
+        """
+        Make an HTTP request with retry logic and DNS fallback.
+
+        Args:
+            endpoint: The API endpoint
+            payload: The request payload
+            headers: The request headers
+
+        Returns:
+            The response object
+
+        Raises:
+            requests.exceptions.RequestException: If all retries fail
+        """
+        last_exception = None
+
+        for attempt in range(self.max_retries):
+            try:
+                # Try to pre-resolve DNS before making the request
+                if attempt > 0:
+                    self._resolve_dns(endpoint)
+                    time.sleep(self.retry_delay * (2 ** attempt))  # Exponential backoff
+
+                response = requests.post(
+                    endpoint,
+                    json=payload,
+                    headers=headers,
+                    timeout=5 + (attempt * 2)  # Increase timeout with each retry
+                )
+                return response
+
+            except requests.exceptions.ConnectionError as e:
+                # Check if it's a DNS resolution error
+                if "NameResolutionError" in str(e) or "Failed to resolve" in str(e):
+                    logger.warning(f"DNS resolution failed (attempt {attempt + 1}/{self.max_retries}): {endpoint}")
+
+                    # Try using IP directly if we have it cached
+                    parsed = urlparse(endpoint)
+                    hostname = parsed.hostname
+                    if hostname and hostname in self._dns_cache:
+                        cached_ip, _ = self._dns_cache[hostname]
+                        # Construct URL with IP
+                        ip_endpoint = endpoint.replace(hostname, cached_ip)
+                        # Add Host header for proper routing
+                        headers_with_host = headers.copy()
+                        headers_with_host["Host"] = hostname
+
+                        try:
+                            logger.info(f"Retrying with cached IP: {cached_ip}")
+                            response = requests.post(
+                                ip_endpoint,
+                                json=payload,
+                                headers=headers_with_host,
+                                timeout=5 + (attempt * 2),
+                                verify=False  # Skip SSL verification when using IP directly
+                            )
+                            return response
+                        except Exception as ip_error:
+                            logger.warning(f"Failed to connect using IP directly: {ip_error}")
+
+                last_exception = e
+
+            except requests.exceptions.Timeout as e:
+                logger.warning(f"Request timeout (attempt {attempt + 1}/{self.max_retries})")
+                last_exception = e
+
+            except requests.exceptions.RequestException as e:
+                last_exception = e
+                if attempt == self.max_retries - 1:
+                    raise
+
+        # All retries failed
+        if last_exception:
+            raise last_exception
+        else:
+            raise requests.exceptions.RequestException(f"Failed after {self.max_retries} attempts")
 
     def send_log(self,
                  level: str,
@@ -83,19 +210,15 @@ class LogsCollectorService:
             # Ensure we're posting to the /logs endpoint
             endpoint = f"{self.api_url.rstrip('/')}/logs"
 
-            response = requests.post(
-                endpoint,
-                json=payload,
-                headers=headers,
-                timeout=5  # 5 second timeout to avoid blocking
-            )
+            # Use the retry mechanism
+            response = self._make_request_with_retry(endpoint, payload, headers)
 
             response.raise_for_status()
             logger.debug(f"Log sent to collector: {level} - {message[:50]}...")
             return True
 
         except requests.exceptions.Timeout:
-            logger.warning("Timeout sending log to collector")
+            logger.warning("Timeout sending log to collector after retries")
             return False
         except requests.exceptions.HTTPError as e:
             # Extract error details from response if available
