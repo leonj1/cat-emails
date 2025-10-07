@@ -541,6 +541,50 @@ class AccountCategoryClient(AccountCategoryClientInterface):
             logger.error(f"Error deactivating account {email_address}: {str(e)}")
             raise
 
+    def delete_account(self, email_address: str) -> bool:
+        """
+        Delete account and all associated data.
+
+        Args:
+            email_address: Gmail email address
+
+        Returns:
+            True if account found and deleted, False otherwise
+
+        Raises:
+            ValueError: If email address is invalid
+        """
+        email_address = self._validate_email_address(email_address)
+
+        try:
+            if self.owns_session:
+                with self._get_session() as session:
+                    account = session.query(EmailAccount).filter_by(email_address=email_address).first()
+                    if account:
+                        # Delete the account - cascade will handle related records
+                        session.delete(account)
+                        session.commit()
+                        logger.info(f"Deleted account and all associated data: {email_address}")
+                        return True
+                    else:
+                        logger.warning(f"Account not found for deletion: {email_address}")
+                        return False
+            else:
+                account = self.session.query(EmailAccount).filter_by(email_address=email_address).first()
+                if account:
+                    # Delete the account - cascade will handle related records
+                    self.session.delete(account)
+                    self.session.commit()
+                    logger.info(f"Deleted account and all associated data: {email_address}")
+                    return True
+                else:
+                    logger.warning(f"Account not found for deletion: {email_address}")
+                    return False
+
+        except Exception as e:
+            logger.error(f"Database error in delete_account: {str(e)}")
+            raise
+
 
 # Example usage and testing
 if __name__ == "__main__":
