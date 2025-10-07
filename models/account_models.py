@@ -99,15 +99,19 @@ class EmailAccountInfo(BaseModel):
     id: int = Field(gt=0, description="Unique account identifier")
     email_address: str = Field(description="Gmail email address")
     display_name: Optional[str] = Field(
-        None, 
+        None,
         description="Optional display name for the account"
     )
+    masked_password: Optional[str] = Field(
+        None,
+        description="Masked app password showing first 2 and last 2 characters (e.g., 'ab********yz')"
+    )
     is_active: bool = Field(
-        default=True, 
+        default=True,
         description="Whether the account is actively being scanned"
     )
     last_scan_at: Optional[datetime] = Field(
-        None, 
+        None,
         description="Timestamp of the last successful email scan"
     )
     created_at: datetime = Field(description="When the account was first added to tracking")

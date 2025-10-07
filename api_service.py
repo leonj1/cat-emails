@@ -46,6 +46,7 @@ from models.error_response import ErrorResponse
 from models.processing_current_status_response import ProcessingCurrentStatusResponse
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import date
+from utils.password_utils import mask_password
 
 # Configure logging
 logging.basicConfig(
@@ -405,6 +406,7 @@ async def root():
             "top_categories": "GET /api/accounts/{email_address}/categories/top",
             "list_accounts": "GET /api/accounts",
             "create_account": "POST /api/accounts",
+            "verify_password": "GET /api/accounts/{email_address}/verify-password",
             "deactivate_account": "PUT /api/accounts/{email_address}/deactivate",
             "processing_status": "GET /api/processing/status",
             "processing_history": "GET /api/processing/history",
@@ -1262,13 +1264,14 @@ async def get_all_accounts(
         logger.info(f"Retrieving all accounts (active_only: {active_only})")
         
         accounts = service.get_all_accounts(active_only=active_only)
-        
+
         # Convert to response format
         account_infos = [
             EmailAccountInfo(
                 id=account.id,
                 email_address=account.email_address,
                 display_name=account.display_name,
+                masked_password=mask_password(account.app_password),
                 is_active=account.is_active,
                 last_scan_at=account.last_scan_at,
                 created_at=account.created_at
@@ -1377,6 +1380,109 @@ async def create_account(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=error_msg
+        )
+
+
+@app.get("/api/accounts/{email_address}/verify-password", response_model=StandardResponse, tags=["accounts"])
+async def verify_account_password(
+    email_address: str = Path(..., description="Gmail email address to verify"),
+    x_api_key: Optional[str] = Header(None),
+    service: AccountCategoryClientInterface = Depends(get_account_service)
+):
+    """
+    Verify the password status for an email account
+
+    Tests whether the account has a password configured and attempts to verify
+    if it can authenticate with Gmail. This helps diagnose authentication issues.
+
+    Args:
+        email_address: Gmail email address to verify
+
+    Returns:
+        StandardResponse with verification status and details
+
+    Raises:
+        401: Invalid or missing API key
+        404: Account not found
+        500: Internal server error
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        logger.info(f"Verifying password for account: {email_address}")
+
+        # Get the account from database
+        accounts = service.get_all_accounts(active_only=False)
+        account = None
+        for acc in accounts:
+            if acc.email_address.lower() == email_address.lower():
+                account = acc
+                break
+
+        if not account:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Account not found: {email_address}"
+            )
+
+        # Check if password exists
+        if not account.app_password:
+            response = StandardResponse(
+                status="error",
+                message=f"No app password configured for {email_address}. Please add an app password using POST /api/accounts with app_password field.",
+                timestamp=datetime.now().isoformat()
+            )
+            logger.warning(f"No app password found for account: {email_address}")
+            return response
+
+        # Try to connect to Gmail to verify the password
+        from services.gmail_connection_service import GmailConnectionService
+        connection_service = GmailConnectionService(
+            email_address=account.email_address,
+            password=account.app_password
+        )
+
+        try:
+            conn = connection_service.connect()
+            conn.logout()
+
+            response = StandardResponse(
+                status="success",
+                message=f"Password verified successfully for {email_address}. Authentication with Gmail succeeded.",
+                timestamp=datetime.now().isoformat()
+            )
+            logger.info(f"Password verified successfully for account: {email_address}")
+            return response
+
+        except Exception as auth_error:
+            error_msg = str(auth_error)
+
+            # Determine if it's an authentication error or other issue
+            if "authentication failed" in error_msg.lower() or "AUTHENTICATIONFAILED" in error_msg:
+                response = StandardResponse(
+                    status="error",
+                    message=f"Password verification failed for {email_address}. The app password appears to be incorrect. Error: {error_msg}",
+                    timestamp=datetime.now().isoformat()
+                )
+                logger.error(f"Invalid password for account {email_address}: {error_msg}")
+            else:
+                response = StandardResponse(
+                    status="error",
+                    message=f"Connection test failed for {email_address}. This may be a network issue or Gmail service problem. Error: {error_msg}",
+                    timestamp=datetime.now().isoformat()
+                )
+                logger.error(f"Connection error for account {email_address}: {error_msg}")
+
+            return response
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in verify_account_password: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
         )
 
 
@@ -1628,6 +1734,7 @@ async def not_found(request, exc):
                 "top_categories": "GET /api/accounts/{email_address}/categories/top",
                 "list_accounts": "GET /api/accounts",
                 "create_account": "POST /api/accounts",
+                "verify_password": "GET /api/accounts/{email_address}/verify-password",
                 "deactivate_account": "PUT /api/accounts/{email_address}/deactivate",
                 "delete_account": "DELETE /api/accounts/{email_address}",
                 "processing_status": "GET /api/processing/status",
