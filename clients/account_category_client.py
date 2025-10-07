@@ -57,27 +57,48 @@ class AccountCategoryClient(AccountCategoryClientInterface):
         else:
             raise ValueError("No database session available")
     
+    def _detach_account(self, account: EmailAccount) -> EmailAccount:
+        """
+        Create a detached copy of an EmailAccount to avoid lazy loading issues.
+
+        Args:
+            account: Session-bound EmailAccount object
+
+        Returns:
+            New EmailAccount object with copied attributes
+        """
+        return EmailAccount(
+            id=account.id,
+            email_address=account.email_address,
+            display_name=account.display_name,
+            app_password=account.app_password,
+            is_active=account.is_active,
+            last_scan_at=account.last_scan_at,
+            created_at=account.created_at,
+            updated_at=account.updated_at
+        )
+
     def _validate_email_address(self, email_address: str) -> str:
         """
         Validate email address format.
-        
+
         Args:
             email_address: Email address to validate
-            
+
         Returns:
             Normalized email address (lowercase)
-            
+
         Raises:
             ValueError: If email format is invalid
         """
         if not email_address or not isinstance(email_address, str):
             raise ValueError("Email address must be a non-empty string")
-        
+
         # Basic email validation regex
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_pattern, email_address.strip()):
             raise ValueError(f"Invalid email address format: {email_address}")
-        
+
         return email_address.strip().lower()
     
     def get_or_create_account(self, email_address: str, display_name: Optional[str] = None, app_password: Optional[str] = None) -> EmailAccount:
@@ -130,7 +151,11 @@ class AccountCategoryClient(AccountCategoryClientInterface):
                     session.commit()
                     logger.info(f"Updated existing account: {email_address}")
 
-                return account
+                # For owns_session=True, detach from session to avoid lazy loading issues
+                if self.owns_session:
+                    return self._detach_account(account)
+                else:
+                    return account
             else:
                 # Create new account
                 account = EmailAccount(
@@ -144,8 +169,13 @@ class AccountCategoryClient(AccountCategoryClientInterface):
                 session.add(account)
                 session.commit()
                 logger.info(f"Created new account: {email_address}")
-                return account
-                
+
+                # For owns_session=True, detach from session to avoid lazy loading issues
+                if self.owns_session:
+                    return self._detach_account(account)
+                else:
+                    return account
+
         except IntegrityError as e:
             session.rollback()
             logger.error(f"Database integrity error creating account {email_address}: {str(e)}")
@@ -158,22 +188,26 @@ class AccountCategoryClient(AccountCategoryClientInterface):
     def get_account_by_email(self, email_address: str) -> Optional[EmailAccount]:
         """
         Retrieve account by email address.
-        
+
         Args:
             email_address: Gmail email address
-            
+
         Returns:
             EmailAccount object if found, None otherwise
-            
+
         Raises:
             ValueError: If email address is invalid
         """
         email_address = self._validate_email_address(email_address)
-        
+
         try:
             if self.owns_session:
                 with self._get_session() as session:
-                    return session.query(EmailAccount).filter_by(email_address=email_address).first()
+                    account = session.query(EmailAccount).filter_by(email_address=email_address).first()
+                    if account:
+                        # Detach from session to avoid lazy loading issues
+                        return self._detach_account(account)
+                    return None
             else:
                 return self.session.query(EmailAccount).filter_by(email_address=email_address).first()
         except Exception as e:
@@ -451,17 +485,7 @@ class AccountCategoryClient(AccountCategoryClientInterface):
                     
                     accounts = query.order_by(EmailAccount.email_address).all()
                     # Detach from session to avoid lazy loading issues
-                    return [
-                        EmailAccount(
-                            id=acc.id,
-                            email_address=acc.email_address,
-                            display_name=acc.display_name,
-                            is_active=acc.is_active,
-                            last_scan_at=acc.last_scan_at,
-                            created_at=acc.created_at,
-                            updated_at=acc.updated_at
-                        ) for acc in accounts
-                    ]
+                    return [self._detach_account(acc) for acc in accounts]
             else:
                 query = self.session.query(EmailAccount)
                 if active_only:
