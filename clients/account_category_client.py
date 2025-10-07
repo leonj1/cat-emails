@@ -80,43 +80,47 @@ class AccountCategoryClient(AccountCategoryClientInterface):
         
         return email_address.strip().lower()
     
-    def get_or_create_account(self, email_address: str, display_name: Optional[str] = None) -> EmailAccount:
+    def get_or_create_account(self, email_address: str, display_name: Optional[str] = None, app_password: Optional[str] = None) -> EmailAccount:
         """
         Get existing account or create a new one.
-        
+
         Args:
             email_address: Gmail email address
             display_name: Optional display name for the account
-            
+            app_password: Optional Gmail app-specific password for IMAP access
+
         Returns:
             EmailAccount object (existing or newly created)
-            
+
         Raises:
             ValueError: If email address is invalid
         """
         email_address = self._validate_email_address(email_address)
-        
+
         try:
             if self.owns_session:
                 with self._get_session() as session:
-                    return self._get_or_create_account_impl(session, email_address, display_name)
+                    return self._get_or_create_account_impl(session, email_address, display_name, app_password)
             else:
-                return self._get_or_create_account_impl(self.session, email_address, display_name)
+                return self._get_or_create_account_impl(self.session, email_address, display_name, app_password)
         except Exception as e:
             logger.error(f"Error in get_or_create_account for {email_address}: {str(e)}")
             raise
     
-    def _get_or_create_account_impl(self, session: Session, email_address: str, display_name: Optional[str]) -> EmailAccount:
+    def _get_or_create_account_impl(self, session: Session, email_address: str, display_name: Optional[str], app_password: Optional[str]) -> EmailAccount:
         """Implementation of get_or_create_account that works with a session."""
         try:
             # Try to get existing account
             account = session.query(EmailAccount).filter_by(email_address=email_address).first()
-            
+
             if account:
                 # Update existing account
                 updated = False
                 if display_name and display_name != account.display_name:
                     account.display_name = display_name
+                    updated = True
+                if app_password and app_password != account.app_password:
+                    account.app_password = app_password
                     updated = True
                 if not account.is_active:
                     account.is_active = True
@@ -125,13 +129,14 @@ class AccountCategoryClient(AccountCategoryClientInterface):
                     account.updated_at = datetime.utcnow()
                     session.commit()
                     logger.info(f"Updated existing account: {email_address}")
-                
+
                 return account
             else:
                 # Create new account
                 account = EmailAccount(
                     email_address=email_address,
                     display_name=display_name,
+                    app_password=app_password,
                     is_active=True,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()

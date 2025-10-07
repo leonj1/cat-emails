@@ -1328,12 +1328,13 @@ async def create_account(
     
     try:
         logger.info(f"Creating account for {request.email_address}")
-        
+
         account = service.get_or_create_account(
             email_address=request.email_address,
-            display_name=request.display_name
+            display_name=request.display_name,
+            app_password=request.app_password
         )
-        
+
         response = StandardResponse(
             status="success",
             message=f"Account registered successfully: {account.email_address}",
