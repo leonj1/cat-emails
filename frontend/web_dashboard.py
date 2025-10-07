@@ -14,6 +14,7 @@ from typing import Dict, List, Any
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, render_template, jsonify, request, redirect, url_for
+from jinja2 import TemplateNotFound
 from services.database_service import DatabaseService
 from services.dashboard_service import DashboardService
 from clients.account_category_client import AccountCategoryClient
@@ -54,9 +55,27 @@ def dashboard():
         logger.info("Rendering dashboard page")
         api_base_url = os.getenv('API_BASE_URL', 'http://localhost:8001')
         return render_template('dashboard.html', api_base_url=api_base_url)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard: {e}")
-        return f"Error loading dashboard: {str(e)}", 500
+    except TemplateNotFound:
+        logger.exception("Template not found for dashboard page")
+        return "Dashboard page template not found", 500
+    except Exception:
+        logger.exception("Unexpected error rendering dashboard page")
+        return "An error occurred while loading the dashboard", 500
+
+
+@app.route('/app/accounts')
+def accounts_page():
+    """Dedicated accounts management page"""
+    try:
+        logger.info("Rendering accounts page")
+        api_base_url = os.getenv('API_BASE_URL', 'http://localhost:8001')
+        return render_template('accounts.html', api_base_url=api_base_url)
+    except TemplateNotFound:
+        logger.exception("Template not found for accounts page")
+        return "Accounts page template not found", 500
+    except Exception:
+        logger.exception("Unexpected error rendering accounts page")
+        return "An error occurred while loading the accounts page", 500
 
 
 @app.route('/api/stats/overview')
