@@ -1486,35 +1486,24 @@ async def delete_account(
     
     try:
         logger.info(f"Deleting account: {email_address}")
-        
-        # Validate email address
-        email_address = service._validate_email_address(email_address)
-        
-        # Get account to verify it exists
-        account = service.get_account_by_email(email_address)
-        if not account:
+
+        # Use the delete_account method from the service
+        success = service.delete_account(email_address)
+
+        if success:
+            response = StandardResponse(
+                status="success",
+                message=f"Account and all associated data deleted successfully: {email_address}",
+                timestamp=datetime.now().isoformat()
+            )
+            logger.info(f"Successfully deleted account: {email_address}")
+            return response
+        else:
             logger.warning(f"Account not found for deletion: {email_address}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Account not found: {email_address}"
             )
-        
-        # Delete account and associated data
-        if service.owns_session:
-            with service._get_session() as session:
-                session.delete(account)
-                session.commit()
-        else:
-            service.session.delete(account)
-            service.session.commit()
-        
-        response = StandardResponse(
-            status="success",
-            message=f"Account and all associated data deleted successfully: {email_address}",
-            timestamp=datetime.now().isoformat()
-        )
-        logger.info(f"Successfully deleted account: {email_address}")
-        return response
         
     except ValueError as e:
         error_msg = str(e)
