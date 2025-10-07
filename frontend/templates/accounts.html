@@ -505,44 +505,92 @@
                 created = createdDate.toLocaleDateString();
             }
 
-            // Status badge
-            const statusBadge = account.is_active
-                ? '<span class="status-badge active">Active</span>'
-                : '<span class="status-badge inactive">Inactive</span>';
+            // Create Email Address cell
+            const emailCell = document.createElement('td');
+            emailCell.setAttribute('data-label', 'Email Address');
+            const emailSpan = document.createElement('span');
+            emailSpan.className = 'email-address';
+            emailSpan.textContent = account.email_address;
+            emailCell.appendChild(emailSpan);
 
-            // Display name (escape to prevent XSS)
-            const displayName = account.display_name
-                ? escapeHtml(account.display_name)
-                : '<span class="display-name">No display name</span>';
+            // Create Display Name cell
+            const displayNameCell = document.createElement('td');
+            displayNameCell.setAttribute('data-label', 'Display Name');
+            if (account.display_name) {
+                displayNameCell.textContent = account.display_name;
+            } else {
+                const noNameSpan = document.createElement('span');
+                noNameSpan.className = 'display-name';
+                noNameSpan.textContent = 'No display name';
+                displayNameCell.appendChild(noNameSpan);
+            }
 
-            // Escape email address for safe use in HTML and onclick handlers
-            const escapedEmail = escapeHtml(account.email_address);
-            const emailForJs = account.email_address.replace(/'/g, "\\'").replace(/"/g, '\\"');
+            // Create Status cell
+            const statusCell = document.createElement('td');
+            statusCell.setAttribute('data-label', 'Status');
+            const statusBadge = document.createElement('span');
+            statusBadge.className = account.is_active ? 'status-badge active' : 'status-badge inactive';
+            statusBadge.textContent = account.is_active ? 'Active' : 'Inactive';
+            statusCell.appendChild(statusBadge);
 
-            row.innerHTML = `
-                <td data-label="Email Address">
-                    <span class="email-address">${escapedEmail}</span>
-                </td>
-                <td data-label="Display Name">${displayName}</td>
-                <td data-label="Status">${statusBadge}</td>
-                <td data-label="Last Scan">
-                    <span class="last-scan">${lastScan}</span>
-                </td>
-                <td data-label="Created">${created}</td>
-                <td data-label="Actions">
-                    <div class="action-buttons">
-                        <button class="btn-action btn-edit" onclick="editAccount('${emailForJs}')" title="Edit Account">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn-action btn-refresh" onclick="scanAccount('${emailForJs}')" title="Scan Now">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                        <button class="btn-action btn-delete" onclick="deleteAccount('${emailForJs}')" title="Delete Account">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                </td>
-            `;
+            // Create Last Scan cell
+            const lastScanCell = document.createElement('td');
+            lastScanCell.setAttribute('data-label', 'Last Scan');
+            const lastScanSpan = document.createElement('span');
+            lastScanSpan.className = 'last-scan';
+            lastScanSpan.textContent = lastScan;
+            lastScanCell.appendChild(lastScanSpan);
+
+            // Create Created cell
+            const createdCell = document.createElement('td');
+            createdCell.setAttribute('data-label', 'Created');
+            createdCell.textContent = created;
+
+            // Create Actions cell
+            const actionsCell = document.createElement('td');
+            actionsCell.setAttribute('data-label', 'Actions');
+            const actionButtons = document.createElement('div');
+            actionButtons.className = 'action-buttons';
+
+            // Create Edit button
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn-action btn-edit';
+            editBtn.title = 'Edit Account';
+            editBtn.addEventListener('click', () => editAccount(account.email_address));
+            const editIcon = document.createElement('i');
+            editIcon.className = 'bi bi-pencil';
+            editBtn.appendChild(editIcon);
+
+            // Create Refresh button
+            const refreshBtn = document.createElement('button');
+            refreshBtn.className = 'btn-action btn-refresh';
+            refreshBtn.title = 'Scan Now';
+            refreshBtn.addEventListener('click', () => scanAccount(account.email_address));
+            const refreshIcon = document.createElement('i');
+            refreshIcon.className = 'bi bi-arrow-clockwise';
+            refreshBtn.appendChild(refreshIcon);
+
+            // Create Delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-action btn-delete';
+            deleteBtn.title = 'Delete Account';
+            deleteBtn.addEventListener('click', () => deleteAccount(account.email_address));
+            const deleteIcon = document.createElement('i');
+            deleteIcon.className = 'bi bi-trash';
+            deleteBtn.appendChild(deleteIcon);
+
+            actionButtons.appendChild(editBtn);
+            actionButtons.appendChild(refreshBtn);
+            actionButtons.appendChild(deleteBtn);
+            actionsCell.appendChild(actionButtons);
+
+            // Append all cells to row
+            row.appendChild(emailCell);
+            row.appendChild(displayNameCell);
+            row.appendChild(statusCell);
+            row.appendChild(lastScanCell);
+            row.appendChild(createdCell);
+            row.appendChild(actionsCell);
 
             tbody.appendChild(row);
         });
