@@ -75,14 +75,14 @@ def check_password_status(email_address: str):
             elif "2-step verification" in error_msg:
                 return ('config', f"2-Step Verification not enabled for '{email_address}'. Please enable it in Gmail settings.", masked_pwd)
             elif "network" in error_msg or "connection" in error_msg:
-                return ('network', f"Network error connecting to Gmail for '{email_address}': {str(auth_error)}', masked_pwd)
+                return ('network', f"Network error connecting to Gmail for '{email_address}': {str(auth_error)}", masked_pwd)
             else:
-                return ('error', f"Connection error for '{email_address}': {str(auth_error)}', masked_pwd)
+                return ('error', f"Connection error for '{email_address}': {str(auth_error)}", masked_pwd)
 
     except ImportError as e:
         return ('error', f"Missing dependencies: {str(e)}. Please run: pip install -r requirements.txt", None)
     except Exception as e:
-        return ('error', f"Unexpected error: {str(e)}', None)
+        return ('error', f"Unexpected error: {str(e)}", None)
     finally:
         if 'session' in locals():
             session.close()
