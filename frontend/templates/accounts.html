@@ -446,12 +446,12 @@
 
         // Calculate accounts scanned today
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        today.setUTCHours(0, 0, 0, 0);
         const recent = accountsData.filter(a => {
             if (!a.last_scan_at) return false;
             const scanDate = new Date(a.last_scan_at);
-            scanDate.setHours(0, 0, 0, 0);
-            return scanDate.getTime() === today.getTime();
+            scanDate.setUTCHours(0, 0, 0, 0);
+            return scanDate.getTime() >= today.getTime();
         }).length;
 
         document.getElementById('total-accounts').textContent = total;
