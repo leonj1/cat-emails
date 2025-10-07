@@ -409,6 +409,7 @@
 <script>
     let accountsData = [];
     let accountToDelete = null;
+    let autoRefreshInterval = null;
 
     // HTML escaping function to prevent XSS
     function escapeHtml(unsafe) {
@@ -723,8 +724,34 @@
     }
 
     // Auto-refresh every 30 seconds
-    setInterval(() => {
+    autoRefreshInterval = setInterval(() => {
         loadAccounts();
     }, 30000);
+
+    // Cleanup interval on page unload
+    window.addEventListener('beforeunload', () => {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+        }
+    });
+
+    // Also cleanup on visibility change (when user switches tabs)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            // Page is hidden - clear interval
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        } else {
+            // Page is visible again - restart interval
+            if (!autoRefreshInterval) {
+                loadAccounts(); // Refresh immediately
+                autoRefreshInterval = setInterval(() => {
+                    loadAccounts();
+                }, 30000);
+            }
+        }
+    });
 </script>
 {% endblock %}
