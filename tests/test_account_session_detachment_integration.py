@@ -146,7 +146,7 @@ class TestAccountSessionDetachmentIntegration(unittest.TestCase):
         test_email = "test_retrieve@example.com"
 
         # Create account first
-        created = client.get_or_create_account(
+        client.get_or_create_account(
             email_address=test_email,
             display_name="Test User",
             app_password="test_pass"
