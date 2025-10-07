@@ -167,11 +167,11 @@ class EmailProcessorService:
             subject = msg.get("Subject", "")
             message_id = msg.get("Message-ID", "")
 
-            print(f"From: {from_header}")
-            print(f"Subject: {subject}")
+            # Build log message (will complete after action is taken)
+            log_msg = f'From: "{from_header}" | Subject: {subject}'
             if len(category) < 20:
-                print(f"Category: {category}")
-            print(f"Deletion Candidate: {deletion_candidate}")
+                log_msg += f" | Category: {category}"
+            log_msg += f" | Deletion Candidate: {deletion_candidate}"
 
             # Extract sender domain for tracking
             sender_domain = self.fetcher._extract_domain(from_header) if from_header else None
@@ -195,20 +195,24 @@ class EmailProcessorService:
             if deletion_candidate:
                 try:
                     if self.fetcher.delete_email(message_id):
-                        print("Email deleted successfully")
+                        log_msg += " | Email deleted successfully"
                         action_taken = "deleted"
                         self.fetcher.stats["deleted"] += 1
                     else:
-                        print("Failed to delete email")
+                        log_msg += " | Failed to delete email"
                         self.fetcher.stats["kept"] += 1
                 except ssl.SSLError as ssl_err:
                     logger.error(f"SSL Error while deleting email: {ssl_err}")
-                    print("Skipping email deletion due to SSL error")
+                    log_msg += " | Skipping email deletion due to SSL error"
+                    print(log_msg)
                     self.fetcher.stats["kept"] += 1
                     return None
             else:
-                print("Email left in inbox")
+                log_msg += " | Email left in inbox"
                 self.fetcher.stats["kept"] += 1
+
+            # Print the complete log message
+            print(log_msg)
 
             # Track email in summary service
             self.fetcher.summary_service.track_email(
@@ -260,8 +264,6 @@ class EmailProcessorService:
                 logger.info(f"📝 Queued email for bulk processing: {message_id}")
             else:
                 logger.warning("⚠️ No message_id available - cannot mark as processed")
-
-            print("-" * 50)
         except Exception as e:
             logger.error(f"Error processing email: {e}")
             print(f"Skipping email due to error: {e}")
