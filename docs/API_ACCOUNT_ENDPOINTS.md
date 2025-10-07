@@ -246,6 +246,7 @@ Creates a new account entry in the system for email category tracking. If the ac
 ```json
 {
   "email_address": "newuser@gmail.com",
+  "app_password": "your-gmail-app-password",
   "display_name": "New User"
 }
 ```
@@ -253,6 +254,7 @@ Creates a new account entry in the system for email category tracking. If the ac
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email_address` | string | Yes | Valid Gmail email address |
+| `app_password` | string | Yes | Gmail app-specific password for IMAP access |
 | `display_name` | string | No | Optional display name for the account |
 
 #### Request Example
@@ -263,6 +265,7 @@ curl -X POST "http://localhost:8000/api/accounts" \
   -H "Content-Type: application/json" \
   -d '{
     "email_address": "newuser@gmail.com",
+    "app_password": "your-gmail-app-password",
     "display_name": "New User"
   }'
 ```
@@ -454,7 +457,7 @@ curl -X GET "http://localhost:8000/api/accounts" \
 curl -X POST "http://localhost:8000/api/accounts" \
   -H "X-API-Key: your-api-key" \
   -H "Content-Type: application/json" \
-  -d '{"email_address": "new@gmail.com", "display_name": "New Account"}'
+  -d '{"email_address": "new@gmail.com", "app_password": "your-app-password", "display_name": "New Account"}'
 
 # 2. Check account was created
 curl -X GET "http://localhost:8000/api/accounts" \
@@ -568,10 +571,10 @@ class CatEmailsAPI:
         response.raise_for_status()
         return response.json()
     
-    def create_account(self, email_address, display_name=None):
+    def create_account(self, email_address, app_password, display_name=None):
         """Register a new account."""
         url = f"{self.base_url}/api/accounts"
-        data = {"email_address": email_address}
+        data = {"email_address": email_address, "app_password": app_password}
         if display_name:
             data["display_name"] = display_name
         response = requests.post(url, headers=self.headers, json=data)
