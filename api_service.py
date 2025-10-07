@@ -46,6 +46,7 @@ from models.error_response import ErrorResponse
 from models.processing_current_status_response import ProcessingCurrentStatusResponse
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import date
+from utils.password_utils import mask_password
 
 # Configure logging
 logging.basicConfig(
@@ -247,31 +248,6 @@ def _initialize_account_email_processor():
 
 
 # API response models are now imported from models/ directory above
-
-
-def mask_password(password: Optional[str]) -> Optional[str]:
-    """
-    Mask a password showing only first 2 and last 2 characters.
-
-    Args:
-        password: The password to mask
-
-    Returns:
-        Masked password string or None if password is None/empty
-    """
-    if not password:
-        return None
-
-    # If password is too short, return all asterisks
-    if len(password) <= 4:
-        return "*" * len(password)
-
-    # Show first 2, asterisks in middle, last 2
-    first_two = password[:2]
-    last_two = password[-2:]
-    middle_stars = "*" * (len(password) - 4)
-
-    return f"{first_two}{middle_stars}{last_two}"
 
 
 def get_account_service() -> AccountCategoryClientInterface:

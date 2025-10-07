@@ -6,25 +6,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-
-def mask_password(password):
-    """
-    Mask a password showing only first 2 and last 2 characters.
-    (Copy of the function from api_service.py for testing)
-    """
-    if not password:
-        return None
-
-    # If password is too short, return all asterisks
-    if len(password) <= 4:
-        return "*" * len(password)
-
-    # Show first 2, asterisks in middle, last 2
-    first_two = password[:2]
-    last_two = password[-2:]
-    middle_stars = "*" * (len(password) - 4)
-
-    return f"{first_two}{middle_stars}{last_two}"
+from utils.password_utils import mask_password
 
 
 def test_mask_password():

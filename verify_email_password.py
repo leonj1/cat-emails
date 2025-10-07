@@ -12,6 +12,7 @@ import sys
 import argparse
 import logging
 from datetime import datetime
+from utils.password_utils import mask_password
 
 # Configure logging
 logging.basicConfig(
@@ -19,21 +20,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-
-def mask_password(password):
-    """Mask a password showing only first 2 and last 2 characters."""
-    if not password:
-        return None
-
-    if len(password) <= 4:
-        return "*" * len(password)
-
-    first_two = password[:2]
-    last_two = password[-2:]
-    middle_stars = "*" * (len(password) - 4)
-
-    return f"{first_two}{middle_stars}{last_two}"
 
 
 def check_password_status(email_address: str):
