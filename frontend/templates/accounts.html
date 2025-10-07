@@ -410,6 +410,17 @@
     let accountsData = [];
     let accountToDelete = null;
 
+    // HTML escaping function to prevent XSS
+    function escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return unsafe
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     // Initialize page
     document.addEventListener('DOMContentLoaded', function() {
         loadAccounts();
@@ -499,12 +510,18 @@
                 ? '<span class="status-badge active">Active</span>'
                 : '<span class="status-badge inactive">Inactive</span>';
 
-            // Display name
-            const displayName = account.display_name || '<span class="display-name">No display name</span>';
+            // Display name (escape to prevent XSS)
+            const displayName = account.display_name
+                ? escapeHtml(account.display_name)
+                : '<span class="display-name">No display name</span>';
+
+            // Escape email address for safe use in HTML and onclick handlers
+            const escapedEmail = escapeHtml(account.email_address);
+            const emailForJs = account.email_address.replace(/'/g, "\\'").replace(/"/g, '\\"');
 
             row.innerHTML = `
                 <td data-label="Email Address">
-                    <span class="email-address">${account.email_address}</span>
+                    <span class="email-address">${escapedEmail}</span>
                 </td>
                 <td data-label="Display Name">${displayName}</td>
                 <td data-label="Status">${statusBadge}</td>
@@ -514,13 +531,13 @@
                 <td data-label="Created">${created}</td>
                 <td data-label="Actions">
                     <div class="action-buttons">
-                        <button class="btn-action btn-edit" onclick="editAccount('${account.email_address}')" title="Edit Account">
+                        <button class="btn-action btn-edit" onclick="editAccount('${emailForJs}')" title="Edit Account">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn-action btn-refresh" onclick="scanAccount('${account.email_address}')" title="Scan Now">
+                        <button class="btn-action btn-refresh" onclick="scanAccount('${emailForJs}')" title="Scan Now">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
-                        <button class="btn-action btn-delete" onclick="deleteAccount('${account.email_address}')" title="Delete Account">
+                        <button class="btn-action btn-delete" onclick="deleteAccount('${emailForJs}')" title="Delete Account">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
