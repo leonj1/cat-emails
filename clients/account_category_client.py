@@ -130,7 +130,20 @@ class AccountCategoryClient(AccountCategoryClientInterface):
                     session.commit()
                     logger.info(f"Updated existing account: {email_address}")
 
-                return account
+                # For owns_session=True, detach from session to avoid lazy loading issues
+                if self.owns_session:
+                    return EmailAccount(
+                        id=account.id,
+                        email_address=account.email_address,
+                        display_name=account.display_name,
+                        app_password=account.app_password,
+                        is_active=account.is_active,
+                        last_scan_at=account.last_scan_at,
+                        created_at=account.created_at,
+                        updated_at=account.updated_at
+                    )
+                else:
+                    return account
             else:
                 # Create new account
                 account = EmailAccount(
@@ -144,8 +157,22 @@ class AccountCategoryClient(AccountCategoryClientInterface):
                 session.add(account)
                 session.commit()
                 logger.info(f"Created new account: {email_address}")
-                return account
-                
+
+                # For owns_session=True, detach from session to avoid lazy loading issues
+                if self.owns_session:
+                    return EmailAccount(
+                        id=account.id,
+                        email_address=account.email_address,
+                        display_name=account.display_name,
+                        app_password=account.app_password,
+                        is_active=account.is_active,
+                        last_scan_at=account.last_scan_at,
+                        created_at=account.created_at,
+                        updated_at=account.updated_at
+                    )
+                else:
+                    return account
+
         except IntegrityError as e:
             session.rollback()
             logger.error(f"Database integrity error creating account {email_address}: {str(e)}")
@@ -158,22 +185,35 @@ class AccountCategoryClient(AccountCategoryClientInterface):
     def get_account_by_email(self, email_address: str) -> Optional[EmailAccount]:
         """
         Retrieve account by email address.
-        
+
         Args:
             email_address: Gmail email address
-            
+
         Returns:
             EmailAccount object if found, None otherwise
-            
+
         Raises:
             ValueError: If email address is invalid
         """
         email_address = self._validate_email_address(email_address)
-        
+
         try:
             if self.owns_session:
                 with self._get_session() as session:
-                    return session.query(EmailAccount).filter_by(email_address=email_address).first()
+                    account = session.query(EmailAccount).filter_by(email_address=email_address).first()
+                    if account:
+                        # Detach from session to avoid lazy loading issues
+                        return EmailAccount(
+                            id=account.id,
+                            email_address=account.email_address,
+                            display_name=account.display_name,
+                            app_password=account.app_password,
+                            is_active=account.is_active,
+                            last_scan_at=account.last_scan_at,
+                            created_at=account.created_at,
+                            updated_at=account.updated_at
+                        )
+                    return None
             else:
                 return self.session.query(EmailAccount).filter_by(email_address=email_address).first()
         except Exception as e:
