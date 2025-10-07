@@ -265,7 +265,7 @@ class ProcessingStatusManager:
     def get_processing_email(self) -> Optional[str]:
         """
         Get the email address currently being processed.
-        
+
         Returns:
             Email address if processing is active, None otherwise
         """
@@ -273,6 +273,21 @@ class ProcessingStatusManager:
             if self._current_status:
                 return self._current_status.email_address
             return None
+
+    def is_processing_account(self, email_address: str) -> bool:
+        """
+        Check if a specific email account is currently being processed.
+
+        Args:
+            email_address: Email address to check
+
+        Returns:
+            True if the specified account is currently being processed, False otherwise
+        """
+        with self._lock:
+            if self._current_status:
+                return self._current_status.email_address.lower() == email_address.lower()
+            return False
     
     def clear_history(self) -> None:
         """Clear the processing history."""
