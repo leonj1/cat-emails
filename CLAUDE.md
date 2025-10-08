@@ -403,10 +403,180 @@ The system generates the following charts:
 - **Daily Volume**: Line chart showing email trends over the past week (weekly reports)
 - **Performance Metrics**: Time series chart of processing efficiency
 
+## API Service
+
+The Cat-Emails project includes a comprehensive REST API service (`api_service.py`) for managing email accounts, triggering processing, and monitoring status.
+
+### Starting the API Service
+```bash
+# Start the API service locally
+python api_service.py
+
+# Or using environment variables for configuration
+API_HOST=0.0.0.0 API_PORT=8001 python api_service.py
+
+# The service will be available at http://localhost:8001
+# OpenAPI docs: http://localhost:8001/docs
+# ReDoc: http://localhost:8001/redoc
+```
+
+### Key API Endpoints
+
+#### Account Management
+- `GET /api/accounts` - List all tracked email accounts
+- `POST /api/accounts` - Register a new email account for tracking
+- `GET /api/accounts/{email_address}/verify-password` - Verify Gmail app password
+- `PUT /api/accounts/{email_address}/deactivate` - Deactivate an account
+- `DELETE /api/accounts/{email_address}` - Delete account and all data
+- `GET /api/accounts/{email_address}/categories/top` - Get top categories for account
+
+#### Force Processing (On-Demand)
+- `POST /api/accounts/{email_address}/process` - **Force immediate email processing**
+
+**Force Processing Features:**
+- Triggers immediate email processing outside regular background scan cycle
+- Returns 202 Accepted immediately (async processing)
+- **Concurrency protection**: Blocks if account is already being processed
+- **Rate limiting**: Max 1 request per account every 5 minutes (returns 429 if exceeded)
+- **Custom lookback hours**: Optional `hours` query parameter (1-168 hours)
+- Real-time status via WebSocket or polling endpoint
+
+**Example Usage:**
+```bash
+# Force process an account with default settings
+curl -X POST "http://localhost:8001/api/accounts/user@gmail.com/process" \
+  -H "X-API-Key: your-api-key"
+
+# Force process with custom 24-hour lookback
+curl -X POST "http://localhost:8001/api/accounts/user@gmail.com/process?hours=24" \
+  -H "X-API-Key: your-api-key"
+
+# Response (202 Accepted):
+{
+  "status": "success",
+  "message": "Email processing started for user@gmail.com",
+  "email_address": "user@gmail.com",
+  "timestamp": "2025-10-07T10:30:00Z",
+  "processing_info": {
+    "hours": 2,
+    "status_url": "/api/processing/current-status",
+    "websocket_url": "/ws/status"
+  }
+}
+
+# If already processing (409 Conflict):
+{
+  "status": "already_processing",
+  "message": "Account user@gmail.com is currently being processed",
+  "email_address": "user@gmail.com",
+  "timestamp": "2025-10-07T10:30:00Z",
+  "processing_info": {
+    "state": "PROCESSING",
+    "current_step": "Processing email 5 of 20"
+  }
+}
+
+# If rate limited (429 Too Many Requests):
+{
+  "error": "Rate limit exceeded",
+  "message": "Please wait 3.5 minutes before processing user@gmail.com again",
+  "seconds_remaining": 210.0,
+  "retry_after": 210
+}
+```
+
+#### Processing Status & Monitoring
+- `GET /api/processing/status` - Get current processing status
+- `GET /api/processing/history` - Get recent processing runs
+- `GET /api/processing/statistics` - Get aggregate statistics
+- `GET /api/processing/current-status` - Comprehensive status (polling-friendly)
+- `WS /ws/status` - WebSocket for real-time status updates
+
+#### Background Processing Control
+- `POST /api/background/start` - Start background processor
+- `POST /api/background/stop` - Stop background processor
+- `GET /api/background/status` - Get background processor status
+- `GET /api/background/next-execution` - Get next scheduled scan time
+
+#### Summary Reports
+- `POST /api/summaries/morning` - Trigger morning summary
+- `POST /api/summaries/evening` - Trigger evening summary
+- `POST /api/summaries/weekly` - Trigger weekly summary
+- `POST /api/summaries/monthly` - Trigger monthly summary
+
+### API Authentication
+Configure optional API key authentication:
+```bash
+export API_KEY="your-secret-api-key"
+python api_service.py
+```
+
+Include in requests via header:
+```bash
+curl -H "X-API-Key: your-secret-api-key" http://localhost:8001/api/accounts
+```
+
+### WebSocket Real-time Updates
+Connect to `/ws/status` for real-time processing status:
+```javascript
+const ws = new WebSocket('ws://localhost:8001/ws/status?api_key=your-key');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Processing status:', data);
+};
+```
+
+### Environment Variables for API Service
+```bash
+# API server configuration
+API_HOST=0.0.0.0                    # Host to bind (default: 0.0.0.0)
+API_PORT=8001                       # Port to listen (default: 8001)
+API_KEY=your-secret-key             # Optional API key for authentication
+
+# Background processing
+BACKGROUND_PROCESSING=true          # Enable background processing (default: true)
+BACKGROUND_SCAN_INTERVAL=300        # Interval between scans in seconds (default: 300 = 5 min)
+BACKGROUND_PROCESS_HOURS=2          # Lookback hours for background scans (default: 2)
+
+# LLM configuration
+REQUESTYAI_API_KEY=your-key         # RequestYAI API key
+OPENAI_API_KEY=your-key             # OpenAI API key (alternative)
+LLM_MODEL=vertex/google/gemini-2.5-flash  # Model to use
+
+# Database
+DATABASE_PATH=./email_summaries/summaries.db  # SQLite database path
+
+# Control API
+CONTROL_API_TOKEN=your-token        # Control API authentication token
+```
+
+### Force Processing vs Background Processing
+
+**Background Processing:**
+- Automatic, scheduled scanning of all active accounts
+- Runs at regular intervals (configurable, default: 5 minutes)
+- Processes all accounts sequentially
+- Always-on, daemon-style operation
+
+**Force Processing (On-Demand):**
+- Manual, immediate processing of a specific account
+- Triggered via API endpoint when needed
+- Single account at a time
+- Useful for:
+  - Immediate processing after adding new account
+  - Catching up on missed emails with custom lookback hours
+  - Testing/debugging specific account issues
+  - User-initiated "refresh" from UI
+
+**Rate Limiting:** Force processing is rate-limited (5 minutes per account) to prevent abuse and excessive Gmail API calls.
+
 ## Security Notes
 
 - Never commit `.env` files with real credentials
 - Use app-specific passwords for Gmail
 - Keep CONTROL_API_TOKEN secure
 - Keep email provider API tokens secure (e.g., MAILTRAP_API_TOKEN)
+- Keep API_KEY secure if using API authentication
 - SSL/TLS is enforced for IMAP connections
+- Rate limiting protects against abuse of force processing endpoint

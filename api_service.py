@@ -35,6 +35,7 @@ from services.llm_service_factory import LLMServiceFactory
 from services.email_categorizer_service import EmailCategorizerService
 from services.openai_llm_service import OpenAILLMService
 from services.categorize_emails_llm import LLMCategorizeEmails
+from services.rate_limiter_service import RateLimiterService
 from models.account_models import (
     TopCategoriesResponse, AccountListResponse, EmailAccountInfo,
     AccountCategoryStatsRequest
@@ -44,6 +45,7 @@ from models.create_account_request import CreateAccountRequest
 from models.standard_response import StandardResponse
 from models.error_response import ErrorResponse
 from models.processing_current_status_response import ProcessingCurrentStatusResponse
+from models.force_process_response import ForceProcessResponse, ProcessingInfo
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import date
 from utils.password_utils import mask_password
@@ -225,6 +227,9 @@ websocket_auth_service = WebSocketAuthService(API_KEY)
 
 # Global account email processor service instance (will be initialized with dependencies below)
 account_email_processor_service: Optional[AccountEmailProcessorService] = None
+
+# Global rate limiter for force processing endpoint (5 minutes default)
+force_process_rate_limiter = RateLimiterService(default_interval_seconds=300)
 
 
 # Initialize account email processor service after all dependencies are ready
@@ -408,6 +413,7 @@ async def root():
             "create_account": "POST /api/accounts",
             "verify_password": "GET /api/accounts/{email_address}/verify-password",
             "deactivate_account": "PUT /api/accounts/{email_address}/deactivate",
+            "force_process_account": "POST /api/accounts/{email_address}/process",
             "processing_status": "GET /api/processing/status",
             "processing_history": "GET /api/processing/history",
             "processing_statistics": "GET /api/processing/statistics",
@@ -1638,7 +1644,225 @@ async def delete_account(
             detail="An unexpected error occurred"
         )
 
-    
+
+@app.post("/api/accounts/{email_address}/process", response_model=ForceProcessResponse, tags=["accounts"], status_code=status.HTTP_202_ACCEPTED)
+async def force_process_account(
+    email_address: str = Path(..., description="Gmail email address to process"),
+    hours: Optional[int] = Query(None, ge=1, le=168, description="Override lookback hours (1-168, default from settings)"),
+    x_api_key: Optional[str] = Header(None),
+    service: AccountCategoryClientInterface = Depends(get_account_service)
+):
+    """
+    Force immediate email processing for a specific account
+
+    Triggers immediate email processing for a specific Gmail account outside the regular
+    background scan cycle. This is useful for on-demand processing or catching up on
+    missed emails.
+
+    **Concurrency Protection:**
+    - Returns 409 Conflict if the account is already being processed
+    - Returns 409 Conflict if a different account is currently being processed
+    - Only one account can be processed at a time
+
+    **Async Execution:**
+    - Returns 202 Accepted immediately without waiting for completion
+    - Processing happens asynchronously in the background
+    - Use WebSocket (/ws/status) or polling (/api/processing/current-status) to monitor progress
+
+    Args:
+        email_address: Gmail email address to process
+        hours: Optional override for lookback hours (1-168 hours, default from settings)
+
+    Returns:
+        ForceProcessResponse with processing status and monitoring information
+
+    Raises:
+        400: Invalid email address or parameters
+        401: Invalid or missing API key
+        404: Account not found in database
+        409: Account is already being processed
+        500: Failed to start processing
+
+    Example Response (202 Accepted):
+        {
+            "status": "success",
+            "message": "Email processing started for user@gmail.com",
+            "email_address": "user@gmail.com",
+            "timestamp": "2025-10-07T10:30:00Z",
+            "processing_info": {
+                "hours": 2,
+                "status_url": "/api/processing/current-status",
+                "websocket_url": "/ws/status"
+            }
+        }
+
+    Example Response (409 Conflict):
+        {
+            "status": "already_processing",
+            "message": "Account user@gmail.com is currently being processed",
+            "email_address": "user@gmail.com",
+            "timestamp": "2025-10-07T10:30:00Z",
+            "processing_info": {
+                "state": "PROCESSING",
+                "current_step": "Processing email 5 of 20"
+            }
+        }
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        logger.info(f"Force processing request for account: {email_address}")
+
+        # Validate email address format (basic validation)
+        if not email_address or '@' not in email_address:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid email address format: {email_address}"
+            )
+
+        # Check rate limit for this account
+        global force_process_rate_limiter
+        allowed, seconds_remaining = force_process_rate_limiter.check_rate_limit(email_address.lower())
+
+        if not allowed:
+            minutes_remaining = seconds_remaining / 60
+            logger.warning(
+                f"Rate limit exceeded for {email_address}: "
+                f"{seconds_remaining:.0f}s remaining ({minutes_remaining:.1f} minutes)"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "error": "Rate limit exceeded",
+                    "message": f"Please wait {minutes_remaining:.1f} minutes before processing {email_address} again",
+                    "seconds_remaining": round(seconds_remaining, 1),
+                    "retry_after": round(seconds_remaining)
+                }
+            )
+
+        # Check if any processing is currently active
+        global processing_status_manager
+
+        if processing_status_manager.is_processing():
+            current_email = processing_status_manager.get_processing_email()
+            current_status = processing_status_manager.get_current_status()
+
+            # Check if it's the same account being requested
+            if current_email and current_email.lower() == email_address.lower():
+                logger.warning(f"Account {email_address} is already being processed")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ForceProcessResponse(
+                        status="already_processing",
+                        message=f"Account {email_address} is currently being processed",
+                        email_address=email_address,
+                        timestamp=datetime.now().isoformat(),
+                        processing_info=ProcessingInfo(
+                            state=current_status.get('state') if current_status else None,
+                            current_step=current_status.get('current_step') if current_status else None,
+                            status_url="/api/processing/current-status",
+                            websocket_url="/ws/status"
+                        )
+                    ).model_dump()
+                )
+            else:
+                # Different account is being processed
+                logger.warning(f"Cannot process {email_address}: {current_email} is currently being processed")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ForceProcessResponse(
+                        status="already_processing",
+                        message=f"Cannot process {email_address}: another account ({current_email}) is currently being processed",
+                        email_address=email_address,
+                        timestamp=datetime.now().isoformat(),
+                        processing_info=ProcessingInfo(
+                            state=current_status.get('state') if current_status else None,
+                            current_step=f"Processing {current_email}",
+                            status_url="/api/processing/current-status",
+                            websocket_url="/ws/status"
+                        )
+                    ).model_dump()
+                )
+
+        # Check if account exists in database
+        account = service.get_account_by_email(email_address)
+        if not account:
+            logger.warning(f"Account not found for force processing: {email_address}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Account not found: {email_address}. Please create the account first via POST /api/accounts"
+            )
+
+        # Check if account has app password
+        if not account.app_password:
+            logger.error(f"No app password configured for account: {email_address}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No app password configured for {email_address}. Please update the account with a valid app password."
+            )
+
+        # Determine lookback hours
+        lookback_hours = hours if hours is not None else settings_service.get_lookback_hours()
+
+        # Initialize account email processor service if not already initialized
+        processor_service = _initialize_account_email_processor()
+
+        # Temporarily override lookback hours if specified
+        original_hours = settings_service.get_lookback_hours()
+        if hours is not None:
+            settings_service.set_lookback_hours(hours)
+
+        # Start processing asynchronously in a background thread
+        def process_in_background():
+            try:
+                logger.info(f"Starting background processing for {email_address} with {lookback_hours} hours lookback")
+                processor_service.process_account(email_address)
+            except Exception as e:
+                logger.error(f"Error in background processing for {email_address}: {str(e)}")
+            finally:
+                # Restore original lookback hours if it was overridden
+                if hours is not None:
+                    settings_service.set_lookback_hours(original_hours)
+
+        # Launch in background thread
+        thread = threading.Thread(
+            target=process_in_background,
+            name=f"ForceProcess-{email_address}",
+            daemon=True
+        )
+        thread.start()
+
+        logger.info(f"Successfully started force processing for {email_address}")
+
+        # Return 202 Accepted immediately
+        return ForceProcessResponse(
+            status="success",
+            message=f"Email processing started for {email_address}",
+            email_address=email_address,
+            timestamp=datetime.now().isoformat(),
+            processing_info=ProcessingInfo(
+                hours=lookback_hours,
+                status_url="/api/processing/current-status",
+                websocket_url="/ws/status"
+            )
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except ValueError as e:
+        error_msg = str(e)
+        logger.error(f"Validation error in force_process_account: {error_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in force_process_account: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start email processing: {str(e)}"
+        )
 
 
 @app.on_event("startup")
@@ -1737,6 +1961,7 @@ async def not_found(request, exc):
                 "verify_password": "GET /api/accounts/{email_address}/verify-password",
                 "deactivate_account": "PUT /api/accounts/{email_address}/deactivate",
                 "delete_account": "DELETE /api/accounts/{email_address}",
+                "force_process_account": "POST /api/accounts/{email_address}/process",
                 "processing_status": "GET /api/processing/status",
                 "processing_history": "GET /api/processing/history",
                 "processing_statistics": "GET /api/processing/statistics",
