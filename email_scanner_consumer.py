@@ -12,8 +12,6 @@ from imapclient import IMAPClient
 from email import message_from_bytes
 from bs4 import BeautifulSoup
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = get_logger(__name__)
 
 # Parse command-line arguments
