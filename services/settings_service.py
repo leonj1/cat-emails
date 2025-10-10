@@ -2,6 +2,7 @@
 Settings service for managing user preferences and configuration
 """
 import logging
+from utils.logger import get_logger
 import os
 from typing import Optional, Any, Union
 from sqlalchemy.orm import Session, sessionmaker
@@ -9,7 +10,7 @@ from datetime import datetime
 
 from models.database import UserSettings, init_database
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SettingsService:

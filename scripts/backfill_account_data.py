@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import logging
+from utils.logger import get_logger
 import os
 import sys
 from datetime import datetime, UTC
@@ -51,7 +52,7 @@ class BackfillMigrator:
             level=level,
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         
         if dry_run:
             self.logger.info("DRY RUN MODE: No changes will be made to the database")

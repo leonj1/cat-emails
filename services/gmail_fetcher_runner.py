@@ -1,4 +1,5 @@
 import logging
+from utils.logger import get_logger
 import os
 from typing import Any
 
@@ -11,7 +12,7 @@ class GmailFetcherRunner:
     """
 
     def __init__(self) -> None:
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
 
     def run(self, email_address: str, app_password: str, api_token: str, hours: int) -> Any:
         """Execute one Gmail fetch run.

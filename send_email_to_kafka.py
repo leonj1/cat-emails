@@ -1,12 +1,13 @@
 import json
 import logging
+from utils.logger import get_logger
 import os
 from bs4 import BeautifulSoup
 from imapclient import IMAPClient
 from kafka import KafkaProducer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def get_imap_client():
     # Replace with your Gmail IMAP settings

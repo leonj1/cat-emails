@@ -7,6 +7,7 @@ Provides a web interface for viewing email categorization statistics and trends
 import os
 import sys
 import logging
+from utils.logger import get_logger
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
 
@@ -25,7 +26,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')

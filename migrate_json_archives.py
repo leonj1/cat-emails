@@ -5,6 +5,7 @@ Migrate existing JSON archive files to the SQLite database.
 import os
 import json
 import logging
+from utils.logger import get_logger
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
@@ -16,7 +17,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def parse_json_archive(file_path: Path) -> dict:

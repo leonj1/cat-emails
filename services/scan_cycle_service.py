@@ -1,5 +1,6 @@
 import time
 import logging
+from utils.logger import get_logger
 from typing import Any
 
 from services.summary_sender_interface import SummarySenderInterface
@@ -27,7 +28,7 @@ class ScanCycleService(ScanCycleServiceInterface):
         self.config = config
         self.gmail_fetcher = gmail_fetcher
         self.summary_sender = summary_sender
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
 
     def execute_cycle(self, cycle_count: int, running: bool) -> None:
         self.logger.info(f"Starting scan cycle #{cycle_count}")

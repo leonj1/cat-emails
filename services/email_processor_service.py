@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from utils.logger import get_logger
 import ssl
 from email.message import Message
 from typing import Callable, Dict, List, Optional
@@ -9,7 +10,7 @@ from services.categorize_emails_interface import SimpleEmailCategory
 from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
 from services.logs_collector_service import LogsCollectorService
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class EmailProcessorService:

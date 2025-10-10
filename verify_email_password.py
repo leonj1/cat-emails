@@ -11,6 +11,7 @@ import os
 import sys
 import argparse
 import logging
+from utils.logger import get_logger
 from datetime import datetime
 from utils.password_utils import mask_password
 
@@ -19,7 +20,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def check_password_status(email_address: str):

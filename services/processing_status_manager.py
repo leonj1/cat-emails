@@ -33,6 +33,7 @@ Example usage in Cat-Emails project:
     stats = status_manager.get_statistics()
 """
 import logging
+from utils.logger import get_logger
 import threading
 from datetime import datetime, timezone
 from enum import Enum, auto
@@ -97,7 +98,7 @@ class ProcessingStatusManager:
         self._current_status: Optional[AccountStatus] = None
         self._recent_runs: deque = deque(maxlen=max_history)
         self._max_history = max_history
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         
         self.logger.info(f"ProcessingStatusManager initialized with max_history={max_history}")
     

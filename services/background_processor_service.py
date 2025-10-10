@@ -1,11 +1,12 @@
 import logging
+from utils.logger import get_logger
 import time
 from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
 from services.background_processor_interface import BackgroundProcessorInterface
 from clients.account_category_client import AccountCategoryClient
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class BackgroundProcessorService(BackgroundProcessorInterface):

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
 import logging
+from utils.logger import get_logger
 
 from models.email_models import EmailMessage, EmailOperationResult
 
@@ -26,7 +27,7 @@ class EmailProviderInterface(ABC):
             config: Provider-specific configuration
         """
         self.config = config
-        self.logger = logging.getLogger(f"{__name__}.{config.provider_name}")
+        self.logger = get_logger(f"{__name__}.{config.provider_name}")
     
     @abstractmethod
     def send_email(self, message: EmailMessage) -> EmailOperationResult:
