@@ -1278,6 +1278,7 @@ async def get_all_accounts(
                 email_address=account.email_address,
                 display_name=account.display_name,
                 masked_password=mask_password(account.app_password),
+                password_length=len(account.app_password) if account.app_password else 0,
                 is_active=account.is_active,
                 last_scan_at=account.last_scan_at,
                 created_at=account.created_at

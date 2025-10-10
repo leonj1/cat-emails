@@ -106,6 +106,11 @@ class EmailAccountInfo(BaseModel):
         None,
         description="Masked app password showing first 2 and last 2 characters (e.g., 'ab********yz')"
     )
+    password_length: int = Field(
+        default=0,
+        ge=0,
+        description="Length of the app password (0 if not set)"
+    )
     is_active: bool = Field(
         default=True,
         description="Whether the account is actively being scanned"
