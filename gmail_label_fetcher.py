@@ -7,6 +7,7 @@ import os
 import sys
 import argparse
 import logging
+from utils.logger import get_logger
 import imaplib
 import getpass
 import json
@@ -23,7 +24,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class GmailLabelFetcher:
@@ -217,7 +218,7 @@ def main():
     args = parser.parse_args()
     
     if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+        get_logger().setLevel(logging.DEBUG)
     
     # Handle dry run mode
     if args.dry_run:

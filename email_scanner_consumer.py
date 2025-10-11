@@ -2,6 +2,7 @@ import ell
 import openai
 import json
 import logging
+from utils.logger import get_logger
 import os
 import re
 import time
@@ -11,9 +12,7 @@ from imapclient import IMAPClient
 from email import message_from_bytes
 from bs4 import BeautifulSoup
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Email Scanner Consumer")

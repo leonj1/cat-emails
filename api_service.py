@@ -50,12 +50,18 @@ from sqlalchemy.exc import SQLAlchemyError
 from datetime import date
 from utils.password_utils import mask_password
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# Configure centralized logging
+from utils.logger import initialize_central_logging, get_logger, shutdown_logging
+
+# Initialize central logging service at application startup
+# This replaces logging.basicConfig() and ensures all logs go to both stdout and remote service
+initialize_central_logging(
+    log_level=logging.INFO,
+    enable_remote=True  # Enable sending logs to remote collector if configured
 )
-logger = logging.getLogger(__name__)
+
+# Get logger instance - same API as before but now uses CentralLoggingService
+logger = get_logger(__name__)
 
 # Create FastAPI app with comprehensive OpenAPI/Swagger configuration
 app = FastAPI(
@@ -1925,7 +1931,7 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Gracefully shutdown WebSocket manager and background tasks"""
+    """Gracefully shutdown WebSocket manager, background tasks, and logging service"""
     global websocket_manager
     
     try:
@@ -1937,6 +1943,10 @@ async def shutdown_event():
         
         # Stop background processor if running
         stop_background_processor()
+        
+        # Gracefully shutdown central logging service
+        logger.info("Shutting down central logging service...")
+        shutdown_logging(timeout=5.0)
         
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")

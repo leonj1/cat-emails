@@ -3,6 +3,7 @@ Service for managing account and category statistics.
 Handles business logic for account management and email category tracking.
 """
 import logging
+from utils.logger import get_logger
 import re
 import os
 from datetime import datetime, date, timedelta
@@ -20,7 +21,7 @@ from models.account_models import (
     EmailAccountInfo, AccountListResponse
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AccountCategoryClient(AccountCategoryClientInterface):

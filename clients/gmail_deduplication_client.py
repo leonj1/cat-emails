@@ -6,6 +6,7 @@ duplicate processing across application restarts and container rebuilds.
 """
 
 import logging
+from utils.logger import get_logger
 from datetime import datetime, timedelta
 from typing import List, Optional, Set, Dict, Tuple
 from sqlalchemy.orm import Session
@@ -15,7 +16,7 @@ from clients.email_deduplication_client_interface import EmailDeduplicationClien
 from models.database import ProcessedEmailLog
 from models.processed_email_log_model import ProcessedEmailLogModel
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class GmailDeduplicationClient(EmailDeduplicationClientInterface):

@@ -7,6 +7,7 @@ import os
 import sys
 import smtplib
 import logging
+from utils.logger import get_logger
 import time
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -24,7 +25,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class EmailSender:

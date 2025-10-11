@@ -2,6 +2,7 @@
 Resilient Ollama client with automatic failover support.
 """
 import logging
+from utils.logger import get_logger
 import time
 from typing import Optional, List, Dict, Any, Callable
 from urllib.parse import urlparse
@@ -9,7 +10,7 @@ import requests
 import openai
 from openai import OpenAI
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class OllamaHost:

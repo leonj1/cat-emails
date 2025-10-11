@@ -4,6 +4,7 @@ Core logic for consolidating Gmail labels into a maximum number of categories
 """
 import re
 import logging
+from utils.logger import get_logger
 from typing import List, Dict, Set, Tuple, Optional
 from collections import defaultdict, Counter
 from difflib import SequenceMatcher
@@ -17,7 +18,7 @@ from .models import (
     ConsolidationStats
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class LabelConsolidationService:

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 import logging
+from utils.logger import get_logger
 from collections import Counter, defaultdict
 
 from models.email_summary import (
@@ -22,7 +23,7 @@ from clients.account_category_client import AccountCategoryClient
 from services.logs_collector_service import LogsCollectorService
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class EmailSummaryService:

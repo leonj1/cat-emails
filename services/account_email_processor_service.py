@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+from utils.logger import get_logger
 from datetime import datetime, date
 from typing import Dict, Callable, Optional
 from services.account_email_processor_interface import AccountEmailProcessorInterface
@@ -12,7 +13,7 @@ from services.gmail_fetcher_service import GmailFetcher
 from services.email_processor_service import EmailProcessorService
 from services.processing_status_manager import ProcessingState
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AccountEmailProcessorService(AccountEmailProcessorInterface):

@@ -1,6 +1,7 @@
 from typing import Dict, Optional, List
 from pydantic import BaseModel, Field
 import logging
+from utils.logger import get_logger
 import time
 
 from models.email_models import (
@@ -38,7 +39,7 @@ class EmailService:
         """
         self.config = config
         self.providers: Dict[str, EmailProviderInterface] = {}
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
     
     def register_provider(self, provider: EmailProviderInterface) -> None:
         """

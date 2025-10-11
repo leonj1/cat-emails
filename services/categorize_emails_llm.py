@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from utils.logger import get_logger
 from typing import Optional
 
 from openai import OpenAI
@@ -13,7 +14,7 @@ from services.categorize_emails_interface import (
 )
 from services.llm_service_interface import LLMServiceInterface
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class LLMCategorizeEmails(CategorizeEmails):

@@ -8,6 +8,7 @@ import sys
 import argparse
 import json
 import logging
+from utils.logger import get_logger
 import imaplib
 from typing import List, Dict
 
@@ -19,7 +20,7 @@ logging.basicConfig(
     level=logging.WARNING,
     format='%(levelname)s: %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class GmailLabelChecker:

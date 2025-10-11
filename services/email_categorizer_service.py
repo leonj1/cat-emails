@@ -1,10 +1,11 @@
 import logging
+from utils.logger import get_logger
 from services.email_categorizer_interface import EmailCategorizerInterface
 from services.categorize_emails_llm import LLMCategorizeEmails
 from services.categorize_emails_interface import SimpleEmailCategory
 from services.llm_service_interface import LLMServiceInterface
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class EmailCategorizerService(EmailCategorizerInterface):

@@ -5,6 +5,7 @@ This service aggregates email category data from the existing database and enfor
 the 40-character category name constraint while providing formatted data for web consumption.
 """
 import logging
+from utils.logger import get_logger
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from enum import Enum
 from services.database_service import DatabaseService
 from models.email_category import EmailCategory
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TimePeriod(Enum):

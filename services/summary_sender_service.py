@@ -1,5 +1,6 @@
 import os
 import logging
+from utils.logger import get_logger
 from datetime import datetime
 import pytz
 
@@ -12,7 +13,7 @@ class SummarySenderService(SummarySenderInterface):
     def __init__(self, summary_recipient: str, send_summary_fn) -> None:
         self.summary_recipient = summary_recipient
         self.send_summary_fn = send_summary_fn
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
 
         # Initialize last sent times far in the past (timezone-aware)
         self._last_morning_sent = datetime(2000, 1, 1, tzinfo=pytz.utc)

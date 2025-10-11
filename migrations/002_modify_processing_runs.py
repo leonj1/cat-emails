@@ -23,6 +23,7 @@ Created: 2025-09-06
 """
 
 import logging
+from utils.logger import get_logger
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -38,7 +39,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Import the existing database module
 sys.path.append(str(Path(__file__).parent.parent))
@@ -308,7 +309,7 @@ def main():
     args = parser.parse_args()
     
     if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+        get_logger().setLevel(logging.DEBUG)
     
     try:
         if args.action == 'upgrade':

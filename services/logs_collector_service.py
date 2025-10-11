@@ -3,6 +3,7 @@ Service for sending logs to LOGS_COLLECTOR_API.
 """
 import os
 import logging
+from utils.logger import get_logger
 import requests
 import socket
 import uuid
@@ -13,7 +14,7 @@ from urllib.parse import urlparse
 import json
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class LogsCollectorService:

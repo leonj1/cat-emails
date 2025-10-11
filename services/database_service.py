@@ -3,6 +3,7 @@ Database service for managing email summary persistence
 """
 import os
 import logging
+from utils.logger import get_logger
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 from uuid import uuid4
@@ -15,7 +16,7 @@ from models.database import (
     DomainSummary, ProcessingRun, get_database_url, init_database, ProcessedEmailLog
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DatabaseService:

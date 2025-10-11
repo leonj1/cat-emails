@@ -22,6 +22,7 @@ Example usage:
 import asyncio
 import json
 import logging
+from utils.logger import get_logger
 import time
 from typing import Set, Dict, Any, Optional
 from datetime import datetime, timezone
@@ -36,7 +37,7 @@ except ImportError:
 
 from services.processing_status_manager import ProcessingStatusManager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ConnectionLimitExceeded(Exception):

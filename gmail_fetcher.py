@@ -1,5 +1,6 @@
 import argparse
 import logging
+from utils.logger import get_logger
 import os
 import ssl
 import imaplib
@@ -41,7 +42,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Handle deprecated --base-url argument
 if args.base_url:

@@ -5,6 +5,7 @@ Send email summary reports using the configured email provider.
 import os
 import sys
 import logging
+from utils.logger import get_logger
 from datetime import datetime
 from typing import Optional
 
@@ -19,7 +20,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def generate_html_report(report: DailySummaryReport) -> str:

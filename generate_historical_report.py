@@ -6,6 +6,7 @@ import os
 import sys
 import argparse
 import logging
+from utils.logger import get_logger
 from datetime import datetime, timedelta
 from tabulate import tabulate
 
@@ -16,7 +17,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def format_summary(summary: dict, title: str) -> str:

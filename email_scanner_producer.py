@@ -1,6 +1,7 @@
 import os
 import argparse
 import logging
+from utils.logger import get_logger
 from email.header import decode_header
 from collections import Counter
 from datetime import datetime, timedelta
@@ -12,7 +13,7 @@ from send_email_to_kafka import send_email_to_kafka
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 ok = [
         'Personal', 

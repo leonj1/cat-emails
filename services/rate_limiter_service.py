@@ -5,12 +5,13 @@ Provides thread-safe rate limiting functionality to prevent abuse
 of resource-intensive operations like force email processing.
 """
 import logging
+from utils.logger import get_logger
 import threading
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 from collections import defaultdict
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RateLimiterService:
@@ -31,7 +32,7 @@ class RateLimiterService:
         self._lock = threading.RLock()
         self._last_request_times: Dict[str, datetime] = {}
         self._default_interval = default_interval_seconds
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
 
         self.logger.info(f"RateLimiterService initialized with {default_interval_seconds}s interval")
 

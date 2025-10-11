@@ -1,9 +1,10 @@
 import logging
+from utils.logger import get_logger
 from typing import Optional
 from fastapi import WebSocket
 from services.websocket_auth_interface import WebSocketAuthInterface
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class WebSocketAuthService(WebSocketAuthInterface):

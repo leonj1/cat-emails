@@ -4,6 +4,7 @@ This logic was extracted from gmail_fetcher.py to a dedicated service module.
 """
 from __future__ import annotations
 import logging
+from utils.logger import get_logger
 import ssl
 import imaplib
 import re
@@ -23,7 +24,7 @@ from services.gmail_connection_service import GmailConnectionService
 from services.http_link_remover_service import HttpLinkRemoverService
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class GmailFetcher(GmailFetcherInterface):
