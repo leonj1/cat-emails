@@ -50,7 +50,7 @@ class TestAccountEmailProcessorService(unittest.TestCase):
         self.service = AccountEmailProcessorService(
             processing_status_manager=self.mock_processing_status_manager,
             settings_service=self.mock_settings_service,
-            email_categorizer_callback=self.fake_email_categorizer.categorize,
+            email_categorizer=self.fake_email_categorizer,
             api_token=self.api_token,
             llm_model=self.llm_model,
             account_category_client=self.account_category_client,
@@ -104,7 +104,7 @@ class TestAccountEmailProcessorService(unittest.TestCase):
         self.assertEqual(self.service.llm_model, self.llm_model)
         self.assertEqual(self.service.processing_status_manager, self.mock_processing_status_manager)
         self.assertEqual(self.service.settings_service, self.mock_settings_service)
-        self.assertEqual(self.service.email_categorizer_callback, self.fake_email_categorizer.categorize)
+        self.assertEqual(self.service.email_categorizer, self.fake_email_categorizer)
 
     def test_process_account_already_processing(self):
         """Test process_account when another account is already being processed."""
@@ -343,7 +343,7 @@ class TestAccountEmailProcessorServiceStatusUpdates(unittest.TestCase):
         self.service = AccountEmailProcessorService(
             processing_status_manager=self.mock_processing_status_manager,
             settings_service=self.mock_settings_service,
-            email_categorizer_callback=self.fake_email_categorizer.categorize,
+            email_categorizer=self.fake_email_categorizer,
             api_token=fake.uuid4(),
             llm_model=fake.word(),
             account_category_client=self.fake_account_category_client,
