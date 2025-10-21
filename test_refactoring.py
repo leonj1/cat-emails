@@ -8,9 +8,11 @@ EmailCategorizerInterface instead of a Callable.
 import inspect
 import sys
 import os
+from pathlib import Path
 
 # Add the repo to the path
-sys.path.insert(0, '/root/repo')
+REPO_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(REPO_ROOT))
 
 def test_email_processor_service_signature():
     """Test that EmailProcessorService constructor accepts EmailCategorizerInterface."""
@@ -19,7 +21,7 @@ def test_email_processor_service_signature():
     print("=" * 60)
 
     # Read the file to check imports and constructor
-    with open('/root/repo/services/email_processor_service.py', 'r') as f:
+    with open(REPO_ROOT / 'services' / 'email_processor_service.py', 'r') as f:
         content = f.read()
 
     # Check 1: Verify the import is for EmailCategorizerInterface
@@ -67,7 +69,7 @@ def test_account_email_processor_service():
     print("\nTesting AccountEmailProcessorService refactoring...")
     print("=" * 60)
 
-    with open('/root/repo/services/account_email_processor_service.py', 'r') as f:
+    with open(REPO_ROOT / 'services' / 'account_email_processor_service.py', 'r') as f:
         content = f.read()
 
     # Check 1: Verify the import
@@ -102,7 +104,7 @@ def test_factory_interfaces():
     print("=" * 60)
 
     # Test EmailProcessorFactory
-    with open('/root/repo/services/email_processor_factory.py', 'r') as f:
+    with open(REPO_ROOT / 'services' / 'email_processor_factory.py', 'r') as f:
         factory_content = f.read()
 
     if 'from services.email_categorizer_interface import EmailCategorizerInterface' in factory_content:
@@ -118,7 +120,7 @@ def test_factory_interfaces():
         return False
 
     # Test EmailProcessorFactoryInterface
-    with open('/root/repo/services/email_processor_factory_interface.py', 'r') as f:
+    with open(REPO_ROOT / 'services' / 'email_processor_factory_interface.py', 'r') as f:
         interface_content = f.read()
 
     if 'from services.email_categorizer_interface import EmailCategorizerInterface' in interface_content:
