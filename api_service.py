@@ -248,7 +248,7 @@ def _initialize_account_email_processor():
         account_email_processor_service = AccountEmailProcessorService(
             processing_status_manager=processing_status_manager,
             settings_service=settings_service,
-            email_categorizer_callback=categorize_email_with_resilient_client,
+            email_categorizer=email_categorizer_service,
             api_token=CONTROL_API_TOKEN,
             llm_model=LLM_MODEL,
             account_category_client=AccountCategoryClient(),

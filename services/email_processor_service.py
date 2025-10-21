@@ -4,9 +4,10 @@ import logging
 from utils.logger import get_logger
 import ssl
 from email.message import Message
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from services.categorize_emails_interface import SimpleEmailCategory
+from services.email_categorizer_interface import EmailCategorizerInterface
 from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
 from services.logs_collector_service import LogsCollectorService
 
@@ -25,13 +26,13 @@ class EmailProcessorService:
         fetcher: ServiceGmailFetcher,
         email_address: str,
         model: str,
-        categorize_fn: Callable[[str, str], str],
+        email_categorizer: EmailCategorizerInterface,
         logs_collector: Optional[LogsCollectorService] = None,
     ) -> None:
         self.fetcher = fetcher
         self.email_address = email_address
         self.model = model
-        self.categorize_fn = categorize_fn
+        self.email_categorizer = email_categorizer
 
         # Initialize logs collector service
         self.logs_collector = logs_collector if logs_collector is not None else LogsCollectorService()
@@ -132,7 +133,7 @@ class EmailProcessorService:
             contents_cleaned = contents_without_encoded
 
             # Use injected categorizer for categorization
-            category = self.categorize_fn(contents_cleaned, self.model)
+            category = self.email_categorizer.categorize(contents_cleaned, self.model)
 
             # Clean up the category response
             category = (

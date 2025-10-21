@@ -20,7 +20,9 @@ from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
 from services.categorize_emails_interface import SimpleEmailCategory
 from services.categorize_emails_llm import LLMCategorizeEmails
 from services.email_processor_service import EmailProcessorService
+from services.email_categorizer_service import EmailCategorizerService
 from services.llm_service_interface import LLMServiceInterface
+from services.llm_service_factory import LLMServiceFactory
 from services.openai_llm_service import OpenAILLMService
 from services.logs_collector_service import LogsCollectorService
 
@@ -655,7 +657,12 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         fetcher.summary_service.run_metrics['fetched'] = len(recent_emails)
 
         print(f"Found {len(new_emails)} new emails to process:")
-        processor = EmailProcessorService(fetcher, email_address, model, categorize_email_with_resilient_client)
+
+        # Create EmailCategorizerService instance
+        llm_service_factory = LLMServiceFactory()
+        email_categorizer_service = EmailCategorizerService(llm_service_factory)
+
+        processor = EmailProcessorService(fetcher, email_address, model, email_categorizer_service)
         for msg in new_emails:
             # Delegate processing to EmailProcessorService
             processor.process_email(msg)

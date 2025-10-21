@@ -2,8 +2,8 @@
 Factory interface for creating EmailProcessorService instances.
 """
 from abc import ABC, abstractmethod
-from typing import Callable
 from services.email_processor_service import EmailProcessorService
+from services.email_categorizer_interface import EmailCategorizerInterface
 from services.gmail_fetcher_interface import GmailFetcherInterface
 from services.logs_collector_service import LogsCollectorService
 
@@ -17,7 +17,7 @@ class EmailProcessorFactoryInterface(ABC):
         fetcher: GmailFetcherInterface,
         email_address: str,
         model: str,
-        categorize_fn: Callable[[str, str], str],
+        email_categorizer: EmailCategorizerInterface,
         logs_collector: LogsCollectorService
     ) -> EmailProcessorService:
         """
@@ -27,7 +27,7 @@ class EmailProcessorFactoryInterface(ABC):
             fetcher: GmailFetcherInterface implementation
             email_address: Email address being processed
             model: LLM model identifier
-            categorize_fn: Function to categorize email content
+            email_categorizer: Email categorizer implementation
             logs_collector: LogsCollectorService instance
 
         Returns:

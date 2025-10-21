@@ -7,6 +7,7 @@ from typing import Dict, Callable, Optional
 from services.account_email_processor_interface import AccountEmailProcessorInterface
 from clients.account_category_client_interface import AccountCategoryClientInterface
 from services.email_deduplication_factory_interface import EmailDeduplicationFactoryInterface
+from services.email_categorizer_interface import EmailCategorizerInterface
 from services.logs_collector_service import LogsCollectorService
 from services.gmail_fetcher_interface import GmailFetcherInterface
 from services.gmail_fetcher_service import GmailFetcher
@@ -23,7 +24,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         self,
         processing_status_manager,
         settings_service,
-        email_categorizer_callback: Callable[[str, str], str],
+        email_categorizer: EmailCategorizerInterface,
         api_token: str,
         llm_model: str,
         account_category_client: AccountCategoryClientInterface,
@@ -37,7 +38,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         Args:
             processing_status_manager: Manager for tracking processing status
             settings_service: Service for getting settings like lookback hours
-            email_categorizer_callback: Function to categorize email content
+            email_categorizer: Email categorizer implementation
             api_token: Control API token for domain service authentication
             llm_model: LLM model identifier (e.g., "vertex/google/gemini-2.5-flash")
             account_category_client: AccountCategoryClientInterface implementation (required)
@@ -47,7 +48,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         """
         self.processing_status_manager = processing_status_manager
         self.settings_service = settings_service
-        self.email_categorizer_callback = email_categorizer_callback
+        self.email_categorizer = email_categorizer
         self.api_token = api_token
         self.llm_model = llm_model
         self.account_category_client = account_category_client
@@ -192,7 +193,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 fetcher,
                 email_address,
                 self.llm_model,
-                self.email_categorizer_callback,
+                self.email_categorizer,
                 self.logs_collector
             )
 
