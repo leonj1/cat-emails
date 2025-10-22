@@ -12,6 +12,7 @@ from services.logs_collector_service import LogsCollectorService
 from services.gmail_fetcher_interface import GmailFetcherInterface
 from services.gmail_fetcher_service import GmailFetcher
 from services.email_processor_service import EmailProcessorService
+from services.extract_sender_email_service import ExtractSenderEmailService
 from services.processing_status_manager import ProcessingState
 
 logger = get_logger(__name__)
@@ -189,11 +190,15 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 {"current": 0, "total": len(new_emails)}
             )
 
+            # Create email extractor service
+            email_extractor = ExtractSenderEmailService()
+            
             processor = EmailProcessorService(
                 fetcher,
                 email_address,
                 self.llm_model,
                 self.email_categorizer,
+                email_extractor,
                 self.logs_collector
             )
 

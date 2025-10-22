@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import logging
-from utils.logger import get_logger
 import ssl
 from email.message import Message
 from typing import Dict, List, Optional
 
+from utils.logger import get_logger
 from services.categorize_emails_interface import SimpleEmailCategory
 from services.email_categorizer_interface import EmailCategorizerInterface
+from services.interfaces.email_extractor_interface import EmailExtractorInterface
 from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
 from services.logs_collector_service import LogsCollectorService
 
@@ -27,12 +27,24 @@ class EmailProcessorService:
         email_address: str,
         model: str,
         email_categorizer: EmailCategorizerInterface,
+        email_extractor: EmailExtractorInterface,
         logs_collector: Optional[LogsCollectorService] = None,
     ) -> None:
+        """Initialize the service.
+
+        Args:
+            fetcher: Gmail fetcher service for email operations
+            email_address: Email address being processed
+            model: Model identifier for categorization
+            email_categorizer: Service for categorizing emails
+            email_extractor: Service for extracting email addresses
+            logs_collector: Optional service for collecting logs
+        """
         self.fetcher = fetcher
         self.email_address = email_address
         self.model = model
         self.email_categorizer = email_categorizer
+        self.email_extractor = email_extractor
 
         # Initialize logs collector service
         self.logs_collector = logs_collector if logs_collector is not None else LogsCollectorService()
@@ -40,18 +52,6 @@ class EmailProcessorService:
         # Aggregated results for the whole batch
         self.category_actions: Dict[str, Dict[str, int]] = {}
         self.processed_message_ids: List[str] = []
-
-    def _extract_sender_email(self, from_header: str) -> str:
-        """Extract sender email using fetcher helper if available, otherwise fallback."""
-        if hasattr(self.fetcher, "_extract_email_address"):
-            try:
-                # type: ignore[attr-defined]
-                return self.fetcher._extract_email_address(from_header) if from_header else ""
-            except Exception:
-                pass
-        from email.utils import parseaddr
-        _, sender_email = parseaddr(from_header) if from_header else ("", "")
-        return sender_email.lower() if sender_email else ""
 
     def process_email(self, msg: Message) -> Optional[str]:
         """Process a single email message. Returns the resolved category or None if skipped."""
@@ -77,8 +77,8 @@ class EmailProcessorService:
         pre_categorized = False
         deletion_candidate = False
 
-        # Extract sender details
-        sender_email = self._extract_sender_email(from_header)
+        # Extract sender details using injected service
+        sender_email = self.email_extractor.extract_sender_email(from_header)
         sender_domain = self.fetcher._extract_domain(from_header) if from_header else ""
 
         # Check repeat offender patterns first (skip expensive LLM)

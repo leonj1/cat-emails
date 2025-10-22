@@ -60,23 +60,16 @@ class TestTrackedCategoriesIntegration(unittest.TestCase):
         self.logs_collector = LogsCollectorService()
         
         # Create fake email categorizer that returns valid SimpleEmailCategory values
-        self.category_rotation = [
-            "Advertising",
-            "Marketing", 
-            "Wants-Money",
-            "Other",
-            "Marketing",
-            "Advertising"
-        ]
-        self.category_index = 0
-        
-        def rotating_categorizer(content: str, model: str) -> str:
-            """Return rotating categories for testing."""
-            category = self.category_rotation[self.category_index % len(self.category_rotation)]
-            self.category_index += 1
-            return category
-        
-        self.email_categorizer = rotating_categorizer
+        # Valid categories are: "Advertising", "Marketing", "Wants-Money", and "Other"
+        self.email_categorizer = FakeEmailCategorizer(default_category="Other")
+
+        # Set up category mappings based on test email subjects/content
+        self.email_categorizer.set_category_mapping("invoice", "Wants-Money")
+        self.email_categorizer.set_category_mapping("payment", "Wants-Money")
+        self.email_categorizer.set_category_mapping("subscription", "Marketing")
+        self.email_categorizer.set_category_mapping("order", "Marketing")
+        self.email_categorizer.set_category_mapping("discount", "Advertising")
+        self.email_categorizer.set_category_mapping("sale", "Advertising")
         
         # Create factory function for fake Gmail fetcher
         def create_fake_fetcher(email_address: str, app_password: str, api_token: str) -> FakeGmailFetcher:
@@ -150,7 +143,7 @@ class TestTrackedCategoriesIntegration(unittest.TestCase):
         self.processor_service = AccountEmailProcessorService(
             processing_status_manager=self.processing_status_manager,
             settings_service=self.settings_service,
-            email_categorizer_callback=self.email_categorizer,
+            email_categorizer=self.email_categorizer,
             api_token="test-api-token",
             llm_model="test-model",
             account_category_client=self.account_category_client,

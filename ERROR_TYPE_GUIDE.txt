@@ -1,0 +1,173 @@
+================================================================================
+                        ERROR TYPE GUIDE
+          Understanding What the Test Fixer Can and Cannot Fix
+================================================================================
+
+🔴 IMPORT ERROR - Cannot Auto-Fix (What's in your errors2.txt)
+────────────────────────────────────────────────────────────────────────────
+
+ERROR: test_fix_script (unittest.loader._FailedTest.test_fix_script)
+ImportError: Failed to import test module: test_fix_script
+Traceback (most recent call last):
+  File "/app/test_fix_script.py", line 8, in <module>
+    from fix_test_errors import ErrorFileParser, TestError
+  File "/app/fix_test_errors.py", line 21, in <module>
+    from claude_agent_sdk import ClaudeSDKClient
+ModuleNotFoundError: No module named 'claude_agent_sdk'
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      Missing package - need to install!
+
+Identifiers:
+  🚫 "in <module>" - not a test method
+  🚫 ModuleNotFoundError - missing dependency
+  🚫 Happens BEFORE tests run
+  🚫 No test method visible
+
+Manual Fix Required:
+  $ pip install claude_agent_sdk
+
+Why script can't fix:
+  • Not a test code issue
+  • Environment/setup problem
+  • No test method to update
+  • Needs package installation
+
+Script will say:
+  ⚠ Skipping error - cannot identify test file/method
+
+────────────────────────────────────────────────────────────────────────────
+
+🟢 TEST METHOD ERROR - CAN Auto-Fix (What you need)
+────────────────────────────────────────────────────────────────────────────
+
+ERROR: test_create_account (tests.test_account.TestAccount)
+Traceback (most recent call last):
+  File "/app/tests/test_account.py", line 42, in test_create_account
+                                                   ^^^^^^^^^^^^^^^^^^^
+                                                   Actual test method!
+    result = service.create_account(email)
+                     ^^^^^^^^^^^^^^
+                     Wrong method name!
+AttributeError: 'Service' object has no attribute 'create_account'
+
+Identifiers:
+  ✅ "in test_create_account" - real test method
+  ✅ AttributeError - code issue, not environment
+  ✅ Happens DURING test execution
+  ✅ Test file and method clearly visible
+
+Script Auto-Fix:
+  1. Reads test file
+  2. Reads service source code
+  3. Sees method is now "create_or_update_account"
+  4. Updates test code
+  5. Runs test to validate
+  6. Reports success!
+
+Script will say:
+  ✓ Successfully fixed: tests/test_account.py::test_create_account
+
+================================================================================
+
+                            DECISION TREE
+
+    Error in traceback?
+           │
+           ├─ Yes → Where is it?
+           │        │
+           │        ├─ "in <module>" → IMPORT ERROR (Manual fix)
+           │        │                  └→ Install package
+           │        │                  └→ Fix syntax
+           │        │
+           │        ├─ "in test_xxx" → TEST METHOD ERROR (Auto-fixable!)
+           │        │                  └→ Use test fixer script
+           │        │
+           │        └─ "in _some_service_method" → RUNTIME ERROR (Manual)
+           │                                        └→ Fix source code
+           │                                        └→ Fix mocks
+           │
+           └─ No → Not a test error
+
+================================================================================
+
+                         WHAT'S IN YOUR FILES?
+
+errors.txt (5.2K):
+  ❌ 0 test method errors
+  ❌ 6 timeout exceptions in logging service
+  ❌ 1 import error
+  → Cannot auto-fix
+
+errors2.txt (301K):
+  ❌ 0 test method errors
+  ❌ 2 import errors (claude_agent_sdk, faker)
+  ❌ Runtime errors during tests
+  → Cannot auto-fix
+
+sample_test_errors.txt (1.1K):
+  ✅ 2 test method errors
+  ✅ 1 import error (but shows test file)
+  → Partially auto-fixable (2 out of 3)
+
+================================================================================
+
+                      HOW TO GET FIXABLE ERRORS
+
+Step 1: Fix Import Errors First
+────────────────────────────────────────────────────────────────────────────
+$ pip install claude_agent_sdk faker
+# Install all missing dependencies
+
+Step 2: Run Tests Again
+────────────────────────────────────────────────────────────────────────────
+$ python3 -m pytest tests/ -v 2>&1 > fresh_output.txt
+# Now imports work, may reveal actual test failures
+
+Step 3: Extract Test Method Errors
+────────────────────────────────────────────────────────────────────────────
+$ python3 extract_test_errors.py fresh_output.txt > fixable_errors.txt
+# Only test method errors extracted
+
+Step 4: Verify
+────────────────────────────────────────────────────────────────────────────
+$ ./check_error_file.sh fixable_errors.txt
+# Should show: ✅ Found N test method references
+
+Step 5: Auto-Fix
+────────────────────────────────────────────────────────────────────────────
+$ python3 fix_test_errors.py fixable_errors.txt --model sonnet
+# Script updates test code automatically
+
+================================================================================
+
+                           QUICK REFERENCE
+
+Error Type          | Location       | Can Auto-Fix? | Fix Method
+--------------------|----------------|---------------|------------------
+Import Error        | in <module>    | 🚫 No         | pip install
+Syntax Error        | in <module>    | 🚫 No         | Fix code
+Test Method Error   | in test_xxx    | ✅ YES        | Run script
+Runtime Error       | in _service    | 🚫 No         | Fix source/mocks
+Environment Error   | Connection     | 🚫 No         | Setup env
+Setup Error         | setUp()        | ⚠️ Maybe      | Depends on issue
+
+================================================================================
+
+                              SUMMARY
+
+Your errors2.txt has:
+  • Import errors (ModuleNotFoundError)
+  • These happen "in <module>"
+  • These are NOT test method errors
+  • Script correctly identifies: 0 fixable errors
+
+To get fixable errors:
+  1. pip install claude_agent_sdk faker
+  2. python3 -m pytest tests/ -v 2>&1 > new.txt
+  3. python3 extract_test_errors.py new.txt > fixable.txt
+  4. python3 fix_test_errors.py fixable.txt --model sonnet
+
+The checker IS working correctly!
+It's telling you: "No test method errors - only import errors"
+
+================================================================================

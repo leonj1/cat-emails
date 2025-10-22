@@ -11,9 +11,13 @@ from unittest.mock import patch, MagicMock
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Set required environment variables before importing api_service
+# This prevents validate_environment() from exiting during module load
+os.environ.setdefault('REQUESTYAI_API_KEY', 'test-key-for-unit-tests')
+
 from api_service import app, get_account_service
 from models.account_models import EmailAccountInfo, AccountListResponse
-from fake_account_category_client import FakeAccountCategoryClient
+from tests.fake_account_category_client import FakeAccountCategoryClient
 
 
 class TestAccountsEndpointPasswordLength(unittest.TestCase):

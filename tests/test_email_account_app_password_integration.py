@@ -40,11 +40,9 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         self.engine = init_database(self.temp_db_path)
         self.session = get_session(self.engine)
 
-        # Create real AccountCategoryClient with session factory
-        def session_factory():
-            return get_session(self.engine)
-
-        self.real_client = AccountCategoryClient(session_factory=session_factory)
+        # Create real AccountCategoryClient with the session
+        # Pass the session directly so it uses the same session for all operations
+        self.real_client = AccountCategoryClient(db_session=self.session)
 
     def tearDown(self):
         """Clean up test database."""
@@ -116,7 +114,7 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         service = AccountEmailProcessorService(
             processing_status_manager=processing_status_manager,
             settings_service=settings_service,
-            email_categorizer_callback=email_categorizer,
+            email_categorizer=email_categorizer,
             api_token=api_token,
             llm_model="test-model",
             account_category_client=self.real_client,
@@ -154,7 +152,7 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         service = AccountEmailProcessorService(
             processing_status_manager=processing_status_manager,
             settings_service=settings_service,
-            email_categorizer_callback=email_categorizer,
+            email_categorizer=email_categorizer,
             api_token=api_token,
             llm_model="test-model",
             account_category_client=self.real_client,

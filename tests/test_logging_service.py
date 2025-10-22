@@ -5,6 +5,7 @@ import os
 import time
 from services.logging_service import CentralLoggingService
 from models.log_models import LogLevel
+from clients.logs_collector_client import FakeLogsCollectorClient, LogsCollectorClient
 
 
 class TestCentralLoggingService(unittest.TestCase):
@@ -36,7 +37,8 @@ class TestCentralLoggingService(unittest.TestCase):
 
     def test_init_with_remote_disabled(self):
         """Test initialization with remote logging disabled."""
-        service = CentralLoggingService(enable_remote=False)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=False)
         self.assertFalse(service.enable_remote)
         self.assertIsNotNone(service.logger)
 
@@ -46,8 +48,9 @@ class TestCentralLoggingService(unittest.TestCase):
         os.environ.pop('LOGS_COLLECTOR_TOKEN', None)
 
         with patch('logging.Logger.warning') as mock_warning:
-            service = CentralLoggingService(enable_remote=True)
-            self.assertFalse(service.enable_remote)
+            fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+            service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=True)
+            self.assertTrue(service.enable_remote)
 
     def test_init_without_api_token(self):
         """Test initialization without LOGS_COLLECTOR_TOKEN."""
@@ -55,8 +58,9 @@ class TestCentralLoggingService(unittest.TestCase):
         os.environ.pop('LOGS_COLLECTOR_TOKEN', None)
 
         with patch('logging.Logger.warning') as mock_warning:
-            service = CentralLoggingService(enable_remote=True)
-            self.assertFalse(service.enable_remote)
+            fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+            service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=True)
+            self.assertTrue(service.enable_remote)
 
     def test_init_with_valid_config(self):
         """Test initialization with valid configuration."""
@@ -66,11 +70,10 @@ class TestCentralLoggingService(unittest.TestCase):
         os.environ['APP_VERSION'] = '2.0.0'
         os.environ['APP_ENVIRONMENT'] = 'testing'
 
-        service = CentralLoggingService(enable_remote=True)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=True)
 
         self.assertTrue(service.enable_remote)
-        self.assertEqual(service.api_base_url, 'http://test.example.com')
-        self.assertEqual(service.api_token, 'test-token')
         self.assertEqual(service.app_name, 'test-app')
         self.assertEqual(service.app_version, '2.0.0')
         self.assertEqual(service.app_environment, 'testing')
@@ -81,7 +84,8 @@ class TestCentralLoggingService(unittest.TestCase):
 
     def test_map_log_level(self):
         """Test log level mapping."""
-        service = CentralLoggingService(enable_remote=False)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=False)
 
         self.assertEqual(
             service._map_log_level(logging.DEBUG),
@@ -115,7 +119,11 @@ class TestCentralLoggingService(unittest.TestCase):
         mock_response.status_code = 202
         mock_post.return_value = mock_response
 
-        service = CentralLoggingService(enable_remote=True)
+        # Use mock client that calls requests.post
+        mock_client = Mock(spec=LogsCollectorClient)
+        mock_client.send = Mock(return_value=True)
+
+        service = CentralLoggingService(logs_collector_client=mock_client, enable_remote=True)
 
         # Send log via queue (non-blocking)
         service._send_to_remote(
@@ -128,17 +136,9 @@ class TestCentralLoggingService(unittest.TestCase):
         service.log_queue.join()
         time.sleep(0.1)  # Brief wait for worker processing
 
-        # Verify request was made
-        mock_post.assert_called_once()
+        # Verify client send was called
+        mock_client.send.assert_called_once()
 
-        # Verify the call arguments
-        call_args = mock_post.call_args
-        self.assertEqual(call_args[0][0], 'http://test.example.com/logs')
-        self.assertIn('Authorization', call_args[1]['headers'])
-        self.assertEqual(
-            call_args[1]['headers']['Authorization'],
-            'Bearer test-token'
-        )
         service.shutdown()
 
     @patch('requests.post')
@@ -152,7 +152,11 @@ class TestCentralLoggingService(unittest.TestCase):
         mock_response.status_code = 400
         mock_post.return_value = mock_response
 
-        service = CentralLoggingService(enable_remote=True)
+        # Use mock client that returns False on error
+        mock_client = Mock(spec=LogsCollectorClient)
+        mock_client.send = Mock(return_value=False)
+
+        service = CentralLoggingService(logs_collector_client=mock_client, enable_remote=True)
 
         # Queue the log
         service._send_to_remote(
@@ -165,8 +169,8 @@ class TestCentralLoggingService(unittest.TestCase):
         service.log_queue.join()
         time.sleep(0.1)
 
-        # Verify request was made (even though it failed)
-        mock_post.assert_called_once()
+        # Verify client send was called (even though it failed)
+        mock_client.send.assert_called_once()
         service.shutdown()
 
     @patch('requests.post')
@@ -178,27 +182,35 @@ class TestCentralLoggingService(unittest.TestCase):
         # Mock timeout
         mock_post.side_effect = Exception("Timeout")
 
-        service = CentralLoggingService(enable_remote=True)
+        # Use mock client that raises exception
+        mock_client = Mock(spec=LogsCollectorClient)
+        mock_client.send = Mock(side_effect=Exception("Timeout"))
 
-        # Queue the log
-        service._send_to_remote(
-            LogLevel.INFO,
-            "Test message",
-            "trace-123"
-        )
+        service = CentralLoggingService(logs_collector_client=mock_client, enable_remote=True)
 
-        # Wait for processing
-        service.log_queue.join()
-        time.sleep(0.1)
+        # Suppress error logs during this test (expected behavior)
+        with patch.object(service.logger, 'exception'):
+            # Queue the log
+            service._send_to_remote(
+                LogLevel.INFO,
+                "Test message",
+                "trace-123"
+            )
 
-        # Verify request was attempted
-        mock_post.assert_called_once()
+            # Wait for processing
+            service.log_queue.join()
+            time.sleep(0.1)
+
+            # Verify client send was attempted
+            mock_client.send.assert_called_once()
+
         service.shutdown()
 
     @patch('services.logging_service.CentralLoggingService._send_to_remote')
     def test_info_logging(self, mock_send):
         """Test info level logging."""
-        service = CentralLoggingService(enable_remote=True)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=True)
 
         with patch.object(service.logger, 'info') as mock_logger_info:
             service.info("Test info message", "trace-123")
@@ -212,7 +224,8 @@ class TestCentralLoggingService(unittest.TestCase):
     @patch('services.logging_service.CentralLoggingService._send_to_remote')
     def test_debug_logging(self, mock_send):
         """Test debug level logging."""
-        service = CentralLoggingService(enable_remote=True)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=True)
 
         with patch.object(service.logger, 'debug') as mock_logger_debug:
             service.debug("Test debug message", "trace-456")
@@ -226,7 +239,8 @@ class TestCentralLoggingService(unittest.TestCase):
     @patch('services.logging_service.CentralLoggingService._send_to_remote')
     def test_warning_logging(self, mock_send):
         """Test warning level logging."""
-        service = CentralLoggingService(enable_remote=True)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=True)
 
         with patch.object(service.logger, 'warning') as mock_logger_warning:
             service.warning("Test warning message")
@@ -236,7 +250,8 @@ class TestCentralLoggingService(unittest.TestCase):
     @patch('services.logging_service.CentralLoggingService._send_to_remote')
     def test_error_logging(self, mock_send):
         """Test error level logging."""
-        service = CentralLoggingService(enable_remote=True)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=True)
 
         with patch.object(service.logger, 'error') as mock_logger_error:
             service.error("Test error message")
@@ -246,7 +261,8 @@ class TestCentralLoggingService(unittest.TestCase):
     @patch('services.logging_service.CentralLoggingService._send_to_remote')
     def test_critical_logging(self, mock_send):
         """Test critical level logging."""
-        service = CentralLoggingService(enable_remote=True)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=True)
 
         with patch.object(service.logger, 'critical') as mock_logger_critical:
             service.critical("Test critical message")
@@ -256,7 +272,8 @@ class TestCentralLoggingService(unittest.TestCase):
     @patch('services.logging_service.CentralLoggingService._send_to_remote')
     def test_log_with_level(self, mock_send):
         """Test log method with custom level."""
-        service = CentralLoggingService(enable_remote=True)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=True)
 
         with patch.object(service.logger, 'log') as mock_logger_log:
             service.log(logging.WARNING, "Test custom level message")
@@ -272,7 +289,8 @@ class TestCentralLoggingService(unittest.TestCase):
 
     def test_remote_disabled_no_send(self):
         """Test that remote logging is skipped when disabled."""
-        service = CentralLoggingService(enable_remote=False)
+        fake_client = FakeLogsCollectorClient("http://test.example.com", "test-app", "test-token")
+        service = CentralLoggingService(logs_collector_client=fake_client, enable_remote=False)
 
         with patch('requests.post') as mock_post:
             service.info("Test message")
@@ -284,29 +302,28 @@ class TestCentralLoggingService(unittest.TestCase):
         os.environ['LOGS_COLLECTOR_TOKEN'] = 'test-token'
 
         # Create a slow mock that would block if called synchronously
-        slow_response = Mock()
-        slow_response.status_code = 202
-
-        def slow_post(*args, **kwargs):
+        def slow_send(*args, **kwargs):
             time.sleep(2)  # Simulate slow network
-            return slow_response
+            return True
 
-        with patch('requests.post', side_effect=slow_post) as mock_post:
-            service = CentralLoggingService(enable_remote=True)
+        mock_client = Mock(spec=LogsCollectorClient)
+        mock_client.send = Mock(side_effect=slow_send)
 
-            # Measure time for log call (should be instant, not wait for HTTP)
-            start = time.time()
-            service.info("Test message")
-            elapsed = time.time() - start
+        service = CentralLoggingService(logs_collector_client=mock_client, enable_remote=True)
 
-            # Should return in < 100ms (not 2 seconds)
-            self.assertLess(elapsed, 0.1,
-                "Log call blocked on HTTP request instead of returning immediately")
+        # Measure time for log call (should be instant, not wait for HTTP)
+        start = time.time()
+        service.info("Test message")
+        elapsed = time.time() - start
 
-            # Wait for background processing and verify request was made
-            service.log_queue.join()
-            mock_post.assert_called_once()
-            service.shutdown()
+        # Should return in < 100ms (not 2 seconds)
+        self.assertLess(elapsed, 0.1,
+            "Log call blocked on HTTP request instead of returning immediately")
+
+        # Wait for background processing and verify request was made
+        service.log_queue.join()
+        mock_client.send.assert_called_once()
+        service.shutdown()
 
     @patch('requests.post')
     def test_auto_trace_id_generation(self, mock_post):
@@ -318,7 +335,17 @@ class TestCentralLoggingService(unittest.TestCase):
         mock_response.status_code = 202
         mock_post.return_value = mock_response
 
-        service = CentralLoggingService(enable_remote=True)
+        # Mock client to capture the log entry
+        captured_entry = None
+        def capture_send(entry):
+            nonlocal captured_entry
+            captured_entry = entry
+            return True
+
+        mock_client = Mock(spec=LogsCollectorClient)
+        mock_client.send = Mock(side_effect=capture_send)
+
+        service = CentralLoggingService(logs_collector_client=mock_client, enable_remote=True)
         service.info("Test without trace ID")
 
         # Wait for background processing
@@ -326,10 +353,8 @@ class TestCentralLoggingService(unittest.TestCase):
         time.sleep(0.1)
 
         # Verify that a trace ID was generated
-        call_args = mock_post.call_args
-        payload = call_args[1]['json']
-        self.assertIn('trace_id', payload)
-        self.assertIsNotNone(payload['trace_id'])
+        self.assertIsNotNone(captured_entry)
+        self.assertIsNotNone(captured_entry.trace_id)
         service.shutdown()
 
     @patch('requests.post')
@@ -346,7 +371,17 @@ class TestCentralLoggingService(unittest.TestCase):
         mock_response.status_code = 202
         mock_post.return_value = mock_response
 
-        service = CentralLoggingService(enable_remote=True)
+        # Mock client to capture the log entry
+        captured_entry = None
+        def capture_send(entry):
+            nonlocal captured_entry
+            captured_entry = entry
+            return True
+
+        mock_client = Mock(spec=LogsCollectorClient)
+        mock_client.send = Mock(side_effect=capture_send)
+
+        service = CentralLoggingService(logs_collector_client=mock_client, enable_remote=True)
 
         # Send a log message
         service.info("User logged in successfully", trace_id="abc123xyz")
@@ -356,9 +391,8 @@ class TestCentralLoggingService(unittest.TestCase):
         time.sleep(0.1)
 
         # Get the payload that was sent
-        mock_post.assert_called_once()
-        call_args = mock_post.call_args
-        payload = call_args[1]['json']
+        self.assertIsNotNone(captured_entry)
+        payload = captured_entry.model_dump(exclude_none=True)
 
         # Validate all required fields are present
         required_fields = {
@@ -417,7 +451,16 @@ class TestCentralLoggingService(unittest.TestCase):
         mock_response.status_code = 202
         mock_post.return_value = mock_response
 
-        service = CentralLoggingService(enable_remote=True)
+        # Mock client to capture the log entries
+        captured_entries = []
+        def capture_send(entry):
+            captured_entries.append(entry)
+            return True
+
+        mock_client = Mock(spec=LogsCollectorClient)
+        mock_client.send = Mock(side_effect=capture_send)
+
+        service = CentralLoggingService(logs_collector_client=mock_client, enable_remote=True)
 
         # Test with different log levels
         test_cases = [
@@ -429,8 +472,6 @@ class TestCentralLoggingService(unittest.TestCase):
         ]
 
         for level_name, message in test_cases:
-            mock_post.reset_mock()
-
             # Send log at specific level
             getattr(service, level_name)(message, trace_id="test-trace-id")
 
@@ -438,9 +479,11 @@ class TestCentralLoggingService(unittest.TestCase):
             service.log_queue.join()
             time.sleep(0.05)
 
-            # Verify payload structure
-            call_args = mock_post.call_args
-            payload = call_args[1]['json']
+        # Verify all payloads
+        self.assertEqual(len(captured_entries), len(test_cases))
+        for i, (level_name, message) in enumerate(test_cases):
+            entry = captured_entries[i]
+            payload = entry.model_dump(exclude_none=True)
 
             # Check that it has exactly the expected shape
             self.assertIn('application_name', payload)
@@ -468,7 +511,17 @@ class TestCentralLoggingService(unittest.TestCase):
         mock_response.status_code = 202
         mock_post.return_value = mock_response
 
-        service = CentralLoggingService(enable_remote=True)
+        # Mock client to capture the log entry
+        captured_entry = None
+        def capture_send(entry):
+            nonlocal captured_entry
+            captured_entry = entry
+            return True
+
+        mock_client = Mock(spec=LogsCollectorClient)
+        mock_client.send = Mock(side_effect=capture_send)
+
+        service = CentralLoggingService(logs_collector_client=mock_client, enable_remote=True)
         service.info("Test message", trace_id="trace-123")
 
         # Wait for background processing
@@ -476,8 +529,8 @@ class TestCentralLoggingService(unittest.TestCase):
         time.sleep(0.1)
 
         # Verify the payload is JSON-serializable dict
-        call_args = mock_post.call_args
-        payload = call_args[1]['json']
+        self.assertIsNotNone(captured_entry)
+        payload = captured_entry.model_dump(exclude_none=True)
 
         # Should be a dict, not a Pydantic model
         self.assertIsInstance(payload, dict)

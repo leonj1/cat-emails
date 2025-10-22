@@ -675,6 +675,7 @@ After the agent completes, report back that extraction is complete."""
 # ============================================================================
 
 async def main():
+    """Main async function that returns an exit code instead of calling sys.exit()"""
     parser = argparse.ArgumentParser(
         description="Refactor a Python class by extracting large functions into service classes"
     )
@@ -696,11 +697,11 @@ async def main():
     source_file = Path(args.file)
     if not source_file.exists():
         print(f"Error: File not found: {source_file}")
-        sys.exit(1)
+        return 1
 
     if not source_file.suffix == '.py':
         print(f"Error: File must be a Python file: {source_file}")
-        sys.exit(1)
+        return 1
 
     # Create console
     console = Console()
@@ -719,16 +720,17 @@ async def main():
         success = await orchestrator.refactor()
         if success:
             console.print("\n[green]✓ Refactoring completed successfully![/green]")
-            sys.exit(0)
+            return 0
         else:
             console.print("\n[yellow]⚠ Refactoring completed with some failures[/yellow]")
-            sys.exit(1)
+            return 1
     except Exception as e:
         console.print(f"\n[red]✗ Error: {e}[/red]")
         import traceback
         console.print(traceback.format_exc())
-        sys.exit(1)
+        return 1
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    exit_code = asyncio.run(main())
+    sys.exit(exit_code)

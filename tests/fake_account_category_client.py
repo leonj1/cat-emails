@@ -65,13 +65,8 @@ class FakeAccountCategoryClient(AccountCategoryClientInterface):
         email_address = email_address.strip().lower()
 
         if email_address in self.accounts:
-            account = self.accounts[email_address]
-            # Update existing account if new values provided
-            if display_name:
-                account.display_name = display_name
-            if app_password:
-                account.app_password = app_password
-            return account
+            # Return existing account without modifying it
+            return self.accounts[email_address]
 
         # Create new account
         account = FakeEmailAccount(

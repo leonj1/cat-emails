@@ -171,7 +171,7 @@ class TestValidateUserDataService(unittest.TestCase):
         }
         result = self.service.validate(user)
         self.assertFalse(result)
-        self.assertIn("Invalid created_at date", self.mock_logger.messages)
+        self.assertTrue(any("Invalid created_at date" in msg for msg in self.mock_logger.messages))
 
     def test_invalid_age_negative(self):
         """Test validation fails for negative age."""
@@ -184,7 +184,7 @@ class TestValidateUserDataService(unittest.TestCase):
         }
         result = self.service.validate(user)
         self.assertFalse(result)
-        self.assertIn("Invalid age", self.mock_logger.messages)
+        self.assertTrue(any("Invalid age" in msg for msg in self.mock_logger.messages))
 
     def test_invalid_age_too_high(self):
         """Test validation fails for age over 150."""
@@ -197,7 +197,7 @@ class TestValidateUserDataService(unittest.TestCase):
         }
         result = self.service.validate(user)
         self.assertFalse(result)
-        self.assertIn("Invalid age", self.mock_logger.messages)
+        self.assertTrue(any("Invalid age" in msg for msg in self.mock_logger.messages))
 
     def test_invalid_age_not_integer(self):
         """Test validation fails for non-integer age."""
@@ -210,7 +210,7 @@ class TestValidateUserDataService(unittest.TestCase):
         }
         result = self.service.validate(user)
         self.assertFalse(result)
-        self.assertIn("Invalid age", self.mock_logger.messages)
+        self.assertTrue(any("Invalid age" in msg for msg in self.mock_logger.messages))
 
     def test_valid_age_boundary_zero(self):
         """Test validation passes for age 0."""
@@ -247,7 +247,7 @@ class TestValidateUserDataService(unittest.TestCase):
         }
         result = self.service.validate(user)
         self.assertFalse(result)
-        self.assertIn("Invalid phone", self.mock_logger.messages)
+        self.assertTrue(any("Invalid phone" in msg for msg in self.mock_logger.messages))
 
     def test_valid_phone_with_dashes(self):
         """Test validation passes for phone with dashes."""
@@ -301,7 +301,7 @@ class TestValidateUserDataService(unittest.TestCase):
         user = {}
         result = self.service.validate(user)
         self.assertFalse(result)
-        self.assertIn("Missing required field", self.mock_logger.messages)
+        self.assertTrue(any("Missing required field" in msg for msg in self.mock_logger.messages))
 
     def test_valid_iso_date_with_timezone(self):
         """Test validation passes for ISO date with timezone."""

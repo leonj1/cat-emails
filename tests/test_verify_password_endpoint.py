@@ -47,10 +47,15 @@ class TestVerifyPasswordLogic(unittest.TestCase):
     def test_invalid_password_detection(self, mock_imap_class):
         """Test detection of invalid password"""
         from services.gmail_connection_service import GmailConnectionService
+        import imaplib
 
         # Mock IMAP connection that fails authentication
         mock_imap = MagicMock()
-        mock_imap.authenticate.side_effect = Exception("AUTHENTICATIONFAILED")
+        # Simulate authentication failure with IMAP4.error
+        mock_imap.authenticate.side_effect = imaplib.IMAP4.error("AUTHENTICATIONFAILED")
+        # Also make login fail to prevent fallback from succeeding
+        mock_imap.login.side_effect = imaplib.IMAP4.error("AUTHENTICATIONFAILED")
+        mock_imap.logout.return_value = ("OK", [])
         mock_imap_class.return_value = mock_imap
 
         # Try to connect with invalid password

@@ -142,13 +142,16 @@ class CentralLoggingService:
                 trace_id = str(uuid.uuid4())
 
             # Create log entry using LogEntry model from client
+            # Format timestamp with 'Z' suffix instead of '+00:00' for UTC
+            timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
             log_entry = LogEntry(
                 application_name=self.app_name,
                 message=message,
                 environment=self.app_environment,
                 hostname=self.hostname,
                 level=level.value,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=timestamp,
                 trace_id=trace_id,
                 version=self.app_version
             )

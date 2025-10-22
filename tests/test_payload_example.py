@@ -57,6 +57,7 @@ class TestExactPayloadFormat(unittest.TestCase):
         """
         # Import here to use the environment variables we just set
         from services.logging_service import CentralLoggingService
+        from clients.logs_collector_client import RemoteLogsCollectorClient
 
         # Mock hostname to match example
         mock_hostname.return_value = 'server-01'
@@ -70,8 +71,18 @@ class TestExactPayloadFormat(unittest.TestCase):
         }
         mock_post.return_value = mock_response
 
+        # Create logs collector client
+        logs_client = RemoteLogsCollectorClient(
+            logs_collector_url='https://logs-collector-production.up.railway.app',
+            application_name='my-app',
+            logs_collector_token='test-token'
+        )
+
         # Create service and send log
-        service = CentralLoggingService(enable_remote=True)
+        service = CentralLoggingService(
+            logs_collector_client=logs_client,
+            enable_remote=True
+        )
         self.service = service  # Store for cleanup
         service.info("User logged in successfully", trace_id="abc123xyz")
 

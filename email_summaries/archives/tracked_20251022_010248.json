@@ -5,7 +5,7 @@
     "subject": "Invoice Payment Due",
     "category": "WantsMoney",
     "action": "kept",
-    "processed_at": "2025-10-22 01:02:48.224236",
+    "processed_at": "2025-10-22 01:02:42.996395",
     "sender_domain": "company.com",
     "was_pre_categorized": false
   },
@@ -15,7 +15,7 @@
     "subject": "Meeting Schedule Update",
     "category": "Other",
     "action": "kept",
-    "processed_at": "2025-10-22 01:02:48.235288",
+    "processed_at": "2025-10-22 01:02:43.009287",
     "sender_domain": "workplace.com",
     "was_pre_categorized": false
   },
@@ -25,7 +25,7 @@
     "subject": "Project Status Report",
     "category": "Other",
     "action": "kept",
-    "processed_at": "2025-10-22 01:02:48.236070",
+    "processed_at": "2025-10-22 01:02:43.010749",
     "sender_domain": "workplace.com",
     "was_pre_categorized": false
   },
@@ -35,7 +35,7 @@
     "subject": "Hello from your friend",
     "category": "Other",
     "action": "kept",
-    "processed_at": "2025-10-22 01:02:48.236779",
+    "processed_at": "2025-10-22 01:02:43.011958",
     "sender_domain": "personal.com",
     "was_pre_categorized": false
   },
@@ -45,7 +45,7 @@
     "subject": "Subscription Renewal Notice",
     "category": "Marketing",
     "action": "kept",
-    "processed_at": "2025-10-22 01:02:48.237475",
+    "processed_at": "2025-10-22 01:02:43.013052",
     "sender_domain": "subscriptions.com",
     "was_pre_categorized": false
   },
@@ -55,7 +55,7 @@
     "subject": "Order Confirmation",
     "category": "Marketing",
     "action": "kept",
-    "processed_at": "2025-10-22 01:02:48.246196",
+    "processed_at": "2025-10-22 01:02:43.022460",
     "sender_domain": "ecommerce.com",
     "was_pre_categorized": false
   },
@@ -65,7 +65,7 @@
     "subject": "Account Statement",
     "category": "Other",
     "action": "kept",
-    "processed_at": "2025-10-22 01:02:48.256452",
+    "processed_at": "2025-10-22 01:02:43.032829",
     "sender_domain": "bank.com",
     "was_pre_categorized": false
   },
@@ -75,7 +75,7 @@
     "subject": "Team Announcement",
     "category": "Other",
     "action": "kept",
-    "processed_at": "2025-10-22 01:02:48.258707",
+    "processed_at": "2025-10-22 01:02:43.034557",
     "sender_domain": "company.com",
     "was_pre_categorized": false
   }

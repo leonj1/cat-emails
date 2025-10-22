@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "/app/tests/test_account_email_processor_service.py", line 7, in <module>
+    from faker import Faker
+ModuleNotFoundError: No module named 'faker'
+
+================================================================================
+
+Traceback (most recent call last):
+  File "/app/tests/test_account_category_service.py", line 97, in test_create_or_update_account
+    account1 = self.service.create_or_update_account(self.test_email)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AccountCategoryClient' object has no attribute 'create_or_update_account'
+
+================================================================================
+
+Traceback (most recent call last):
+  File "/app/tests/test_account_category_service.py", line 196, in test_get_top_categories_no_data
+    response = self.service.get_top_categories(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: AccountCategoryClient.get_top_categories() missing 1 required positional argument: 'days'
+
+================================================================================

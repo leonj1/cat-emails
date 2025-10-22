@@ -13,6 +13,7 @@ Usage:
 """
 
 import os
+import sys
 import logging
 from typing import Optional, Dict
 from threading import Lock
@@ -89,19 +90,29 @@ def _configure_root_logger(log_level: int):
         root_logger.removeHandler(handler)
     
     # Create a custom handler that routes logs through CentralLoggingService
-    class CentralLoggingHandler(logging.StreamHandler):
+    class CentralLoggingHandler(logging.Handler):
         """Handler that routes logs through CentralLoggingService."""
         
         def emit(self, record):
             try:
+                # Format the message using the handler's formatter
+                if self.formatter:
+                    msg = self.formatter.format(record)
+                else:
+                    msg = record.getMessage()
+                
+                # If there's exception info, append it to the message
+                if record.exc_info:
+                    import traceback
+                    exc_text = ''.join(traceback.format_exception(*record.exc_info))
+                    msg = msg + '\n' + exc_text
+                
                 # Skip logs from the CentralLoggingService itself to avoid recursion
                 if record.name == "cat-emails" or record.name.startswith("cat-emails."):
                     # For the central logging service itself, use standard stderr output
-                    super().emit(record)
+                    sys.stderr.write(msg + '\n')
+                    sys.stderr.flush()
                     return
-                
-                # Get the formatted message
-                msg = self.format(record)
                 
                 # Directly call the internal methods of CentralLoggingService
                 # without going through the logger to avoid recursion
@@ -111,15 +122,21 @@ def _configure_root_logger(log_level: int):
                         msg
                     )
                 
-                # Also output to stdout/stderr
-                super().emit(record)
+                # Always output to stderr for all logs (including third-party)
+                # Use sys.stderr dynamically so it works with test mocking
+                sys.stderr.write(msg + '\n')
+                sys.stderr.flush()
                 
-            except Exception:
+            except Exception as e:
                 # Fallback to stderr if central logging fails
+                import traceback
+                sys.stderr.write(f"Error in logging handler: {e}\n")
+                traceback.print_exc(file=sys.stderr)
                 self.handleError(record)
     
     # Add our custom handler to the root logger
-    handler = CentralLoggingHandler()  # StreamHandler uses sys.stderr by default
+    handler = CentralLoggingHandler()
+    handler.setLevel(log_level)
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )

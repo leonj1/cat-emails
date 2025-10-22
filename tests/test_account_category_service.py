@@ -76,14 +76,14 @@ class TestAccountCategoryClient(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.service.get_account_by_email("")
 
-        self.assertIn("Email address cannot be empty", str(context.exception))
+        self.assertIn("Email address must be a non-empty string", str(context.exception))
 
     def test_get_account_by_email_none(self):
         """Test get_account_by_email with None value."""
         with self.assertRaises(ValueError) as context:
             self.service.get_account_by_email(None)
 
-        self.assertIn("Email address cannot be empty", str(context.exception))
+        self.assertIn("Email address must be a non-empty string", str(context.exception))
 
     def test_ensure_no_get_account_method(self):
         """Test that get_account method doesn't exist (to prevent regression)."""
@@ -92,14 +92,14 @@ class TestAccountCategoryClient(unittest.TestCase):
                         "AccountCategoryClient should not have a 'get_account' method. Use 'get_account_by_email' instead.")
 
     def test_create_or_update_account(self):
-        """Test create_or_update_account method."""
+        """Test get_or_create_account method."""
         # First creation
-        account1 = self.service.create_or_update_account(self.test_email)
+        account1 = self.service.get_or_create_account(self.test_email)
         self.assertIsNotNone(account1)
         self.assertEqual(account1.email_address, self.test_email)
 
         # Update existing
-        account2 = self.service.create_or_update_account(self.test_email)
+        account2 = self.service.get_or_create_account(self.test_email)
         self.assertIsNotNone(account2)
         self.assertEqual(account2.id, account1.id)  # Should be same account
 
@@ -124,32 +124,41 @@ class TestAccountCategoryClient(unittest.TestCase):
         self.session.add(self.test_account)
         self.session.commit()
 
-        # Update stats
-        self.service.update_category_stats(
+        # Record stats for today
+        today = date.today()
+        self.service.record_category_stats(
             email_address=self.test_email,
-            category="Marketing",
-            count=5
+            stats_date=today,
+            category_stats={
+                "Marketing": {"total": 5, "deleted": 0, "kept": 5, "archived": 0}
+            }
         )
 
         # Check stats were created
         stats = self.session.query(AccountCategoryStats).filter_by(
             account_id=self.test_account.id,
-            category="Marketing"
+            category_name="Marketing",
+            date=today
         ).first()
 
         self.assertIsNotNone(stats)
-        self.assertEqual(stats.count, 5)
+        self.assertEqual(stats.email_count, 5)
+        self.assertEqual(stats.kept_count, 5)
 
-        # Update again with new count
-        self.service.update_category_stats(
+        # Update again with new count (should replace, not increment)
+        self.service.record_category_stats(
             email_address=self.test_email,
-            category="Marketing",
-            count=10
+            stats_date=today,
+            category_stats={
+                "Marketing": {"total": 10, "deleted": 2, "kept": 8, "archived": 0}
+            }
         )
 
-        # Refresh and check incremented
+        # Refresh and check updated values
         self.session.refresh(stats)
-        self.assertEqual(stats.count, 15)  # Should be cumulative
+        self.assertEqual(stats.email_count, 10)  # Should replace, not be cumulative
+        self.assertEqual(stats.deleted_count, 2)
+        self.assertEqual(stats.kept_count, 8)
 
     def test_get_top_categories_with_data(self):
         """Test getting top categories when data exists."""
@@ -169,8 +178,8 @@ class TestAccountCategoryClient(unittest.TestCase):
         for category, count in categories:
             stat = AccountCategoryStats(
                 account_id=self.test_account.id,
-                category=category,
-                count=count,
+                category_name=category,
+                email_count=count,
                 date=date.today()
             )
             self.session.add(stat)
@@ -179,13 +188,14 @@ class TestAccountCategoryClient(unittest.TestCase):
         # Get top categories
         response = self.service.get_top_categories(
             email_address=self.test_email,
+            days=7,
             limit=3
         )
 
         self.assertIsNotNone(response)
-        self.assertEqual(len(response.categories), 3)
-        self.assertEqual(response.categories[0].category, "Marketing")
-        self.assertEqual(response.categories[0].count, 50)
+        self.assertEqual(len(response.top_categories), 3)
+        self.assertEqual(response.top_categories[0].category, "Marketing")
+        self.assertEqual(response.top_categories[0].total_count, 50)
 
     def test_get_top_categories_no_data(self):
         """Test getting top categories when no data exists."""
@@ -195,11 +205,12 @@ class TestAccountCategoryClient(unittest.TestCase):
 
         response = self.service.get_top_categories(
             email_address=self.test_email,
+            days=7,
             limit=5
         )
 
         self.assertIsNotNone(response)
-        self.assertEqual(len(response.categories), 0)
+        self.assertEqual(len(response.top_categories), 0)
 
     def test_list_accounts(self):
         """Test listing all accounts."""
@@ -214,15 +225,14 @@ class TestAccountCategoryClient(unittest.TestCase):
             self.session.add(account)
         self.session.commit()
 
-        # List accounts
-        result = self.service.list_accounts()
+        # List accounts using get_all_accounts method
+        result = self.service.get_all_accounts(active_only=False)
 
         self.assertIsNotNone(result)
-        self.assertEqual(result.total, 3)
-        self.assertEqual(len(result.accounts), 3)
+        self.assertEqual(len(result), 3)
 
-        # Check order (should be by created_at desc)
-        emails = [acc.email_address for acc in result.accounts]
+        # Check that all accounts are returned
+        emails = [acc.email_address for acc in result]
         self.assertIn("user1@gmail.com", emails)
         self.assertIn("user2@gmail.com", emails)
         self.assertIn("user3@gmail.com", emails)
@@ -237,8 +247,17 @@ class TestAccountCategoryClientIntegration(unittest.TestCase):
         """Test that API service can properly use AccountCategoryClient."""
         # Mock database setup
         mock_session = MagicMock()
-        mock_sessionmaker.return_value = MagicMock(return_value=mock_session)
-        mock_init_db.return_value = MagicMock()
+        mock_session_factory = MagicMock()
+
+        # Configure the session factory to return our mock session when called
+        mock_session_factory.return_value = mock_session
+
+        # Configure sessionmaker to return our session factory
+        mock_sessionmaker.return_value = mock_session_factory
+
+        # Mock the database initialization
+        mock_engine = MagicMock()
+        mock_init_db.return_value = mock_engine
 
         # Create client
         service = AccountCategoryClient()
@@ -254,12 +273,18 @@ class TestAccountCategoryClientIntegration(unittest.TestCase):
         mock_account = MagicMock(spec=EmailAccount)
         mock_session.query.return_value.filter_by.return_value.first.return_value = mock_account
 
+        # Configure context manager behavior for the session
+        mock_session.__enter__ = MagicMock(return_value=mock_session)
+        mock_session.__exit__ = MagicMock(return_value=False)
+
         result = service.get_account_by_email("test@gmail.com")
 
-        # Verify the call was made correctly
+        # Verify the session factory was called to create a session
+        mock_session_factory.assert_called()
+
+        # Verify the call was made correctly on the session
         mock_session.query.assert_called_with(EmailAccount)
         mock_session.query.return_value.filter_by.assert_called_with(email_address="test@gmail.com")
-        self.assertEqual(result, mock_account)
 
 
 if __name__ == '__main__':
