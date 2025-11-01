@@ -8,8 +8,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install -U "ell-ai[all]"
+
+# Upgrade pip and configure for better network resilience
+RUN pip install --upgrade pip setuptools wheel
+
+# Install all requirements with retries and longer timeout for network resilience
+RUN pip install --no-cache-dir --timeout=300 --retries=5 -r requirements.txt
+
+# Install ell-ai separately
+RUN pip install --timeout=300 --retries=5 -U "ell-ai[all]"
 
 # Copy the entire application
 COPY . .
