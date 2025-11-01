@@ -12,13 +12,7 @@ COPY requirements.txt .
 # Upgrade pip and configure for better network resilience
 RUN pip install --upgrade pip setuptools wheel
 
-# Install large scientific packages first with retries and longer timeout
-RUN pip install --no-cache-dir --timeout=300 --retries=5 \
-    numpy>=1.21.0 \
-    scipy>=1.7.0 \
-    matplotlib>=3.7.0
-
-# Install remaining requirements
+# Install all requirements with retries and longer timeout for network resilience
 RUN pip install --no-cache-dir --timeout=300 --retries=5 -r requirements.txt
 
 # Install ell-ai separately
