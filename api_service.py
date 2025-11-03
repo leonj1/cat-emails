@@ -2043,9 +2043,6 @@ async def startup_event():
 
         logger.info("WebSocket manager initialized and background tasks started")
 
-        # Start background processor if enabled
-        start_background_processor()
-
         logger.info("=== API Service Startup Complete ===")
 
     except Exception as e:
@@ -2054,6 +2051,25 @@ async def startup_event():
         # Terminate the service - cannot function without proper initialization
         logger.error("Service cannot start. Exiting...")
         sys.exit(1)
+
+    # Start background processor AFTER server is ready to accept requests
+    # This prevents healthcheck failures during initialization
+    # Schedule background processor to start after a short delay to ensure server is fully ready
+    async def delayed_background_start():
+        """Start background processor after a delay to ensure server is ready"""
+        await asyncio.sleep(5)  # Wait 5 seconds for server to be fully ready
+        try:
+            logger.info("Starting background processor (delayed start after server ready)...")
+            start_background_processor()
+            logger.info("Background processor started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start background processor: {e}")
+            logger.exception("Full traceback:")
+            # Don't exit - allow the API to run even if background processor fails
+            logger.warning("API service will continue without background processing")
+
+    # Schedule the delayed start as a background task
+    asyncio.create_task(delayed_background_start())
 
 
 @app.on_event("shutdown")
