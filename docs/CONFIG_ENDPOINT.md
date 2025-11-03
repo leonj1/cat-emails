@@ -75,7 +75,7 @@ The system determines database type based on environment variables:
 
 2. **SQLite** - If `DATABASE_PATH` is set:
    - `:memory:` → `sqlite_local`
-   - Contains `http://`, `https://`, or `cloud` → `sqlite_cloud`
+   - Starts with `sqlitecloud://`, `http://`, or `https://` → `sqlite_cloud`
    - Other paths → `sqlite_local`
 
 3. **Default** - Falls back to MySQL if no explicit config

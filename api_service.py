@@ -566,7 +566,7 @@ def _get_database_config() -> DatabaseConfig:
         # SQLite configuration
         if db_path == ":memory:":
             db_type = "sqlite_local"
-        elif db_path.startswith("http://") or db_path.startswith("https://") or "cloud" in db_path.lower():
+        elif db_path.startswith("sqlitecloud://") or db_path.startswith("http://") or db_path.startswith("https://"):
             db_type = "sqlite_cloud"
         else:
             db_type = "sqlite_local"
