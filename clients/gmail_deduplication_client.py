@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from clients.email_deduplication_client_interface import EmailDeduplicationClientInterface
 from models.database import ProcessedEmailLog
 from models.processed_email_log_model import ProcessedEmailLogModel
+from repositories.database_repository_interface import DatabaseRepositoryInterface
 
 logger = get_logger(__name__)
 
@@ -27,16 +28,25 @@ class GmailDeduplicationClient(EmailDeduplicationClientInterface):
     processing when the application restarts or containers are rebuilt.
     """
     
-    def __init__(self, session: Session, account_email: str):
+    def __init__(self, repository: DatabaseRepositoryInterface, account_email: str, session: Optional[Session] = None):
         """
-        Initialize the deduplication service.
-        
+        Initialize the deduplication service with dependency injection.
+
         Args:
-            session: SQLAlchemy database session
+            repository: Database repository for data access
             account_email: Email account being processed (for scoping)
+            session: Optional SQLAlchemy session (legacy, for backward compatibility)
         """
-        self.session = session
+        self.repository = repository
         self.account_email = account_email
+
+        # Session remains required until repository-backed bulk operations are migrated
+        if session is None:
+            raise ValueError(
+                "session remains required until repository-backed bulk operations are migrated"
+            )
+        self.session = session  # Keep for backward compatibility with legacy code
+
         self.stats = {
             'checked': 0,
             'duplicates_found': 0,
@@ -44,20 +54,8 @@ class GmailDeduplicationClient(EmailDeduplicationClientInterface):
             'logged': 0,
             'errors': 0
         }
-        # Log which database file/name is in use
-        try:
-            bind = self.session.get_bind() if hasattr(self.session, "get_bind") else getattr(self.session, "bind", None)
-            if bind is not None:
-                url = getattr(bind, "url", None)
-                backend = getattr(url, "get_backend_name", lambda: None)() if url is not None else None
-                # For SQLite, url.database is the absolute file path. For others, show database name if available.
-                if url is not None:
-                    db_desc = url.database or str(url)
-                    logger.info(f"🗄️ Using database: {db_desc} (backend={backend}) for account {self.account_email}")
-                else:
-                    logger.info(f"🗄️ Using database: <unknown url> for account {self.account_email}")
-        except Exception as e:
-            logger.debug(f"Could not determine database in GmailDeduplicationClient: {e}")
+
+        logger.info(f"GmailDeduplicationClient initialized for account {self.account_email}")
     
     def is_email_processed(self, message_id: str) -> bool:
         """
@@ -77,12 +75,7 @@ class GmailDeduplicationClient(EmailDeduplicationClientInterface):
         self.stats['checked'] += 1
         
         try:
-            exists = self.session.query(ProcessedEmailLog).filter_by(
-                account_email=self.account_email,
-                message_id=message_id.strip()
-            ).first()
-            
-            is_processed = exists is not None
+            is_processed = self.repository.is_email_processed(self.account_email, message_id.strip())
             
             if is_processed:
                 self.stats['duplicates_found'] += 1
@@ -119,14 +112,10 @@ class GmailDeduplicationClient(EmailDeduplicationClientInterface):
             raise ValueError("message_id must be a non-empty string")
         
         try:
-            record = ProcessedEmailLog(
-                account_email=self.account_email,
-                message_id=message_id.strip(),
-                processed_at=datetime.utcnow()
+            record = self.repository.mark_email_processed(
+                email_address=self.account_email,
+                message_id=message_id.strip()
             )
-            
-            self.session.add(record)
-            self.session.commit()
             
             self.stats['logged'] += 1
             logger.info(f"✅ Marked email as processed: {self.account_email} -> {message_id}")
@@ -134,12 +123,9 @@ class GmailDeduplicationClient(EmailDeduplicationClientInterface):
             return ProcessedEmailLogModel.model_validate(record)
             
         except IntegrityError as e:
-            # Roll back and let caller decide how to handle duplicates
-            self.session.rollback()
             logger.debug(f"ℹ️ Email already marked as processed (duplicate): {self.account_email} -> {message_id}")
             raise
         except Exception as e:
-            self.session.rollback()
             logger.error(f"❌ Failed to mark email as processed {self.account_email} -> {message_id}: {e}")
             self.stats['errors'] += 1
             raise

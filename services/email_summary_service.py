@@ -59,16 +59,16 @@ class EmailSummaryService:
         
         if use_database:
             try:
-                self.db_service = DatabaseService(
-                    db_path=os.getenv("DATABASE_PATH") or str(self.data_dir / "summaries.db")
-                )
+                # Create a shared MySQL repository instance for all services
+                from repositories.mysql_repository import MySQLRepository
+                shared_repository = MySQLRepository()
+                
+                self.db_service = DatabaseService(repository=shared_repository)
                 logger.info("Database service initialized for email summaries")
                 
-                # Initialize account category service
+                # Initialize account category service with same repository
                 try:
-                    self.account_service = AccountCategoryClient(
-                        db_path=os.getenv("DATABASE_PATH") or str(self.data_dir / "summaries.db")
-                    )
+                    self.account_service = AccountCategoryClient(repository=shared_repository)
                     logger.info("Account category client initialized")
                 except Exception as e:
                     logger.warning(f"Failed to initialize account service: {str(e)}")

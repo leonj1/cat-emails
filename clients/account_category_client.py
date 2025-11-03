@@ -20,6 +20,8 @@ from models.account_models import (
     TopCategoriesResponse, CategoryStats, DatePeriod,
     EmailAccountInfo, AccountListResponse
 )
+from repositories.database_repository_interface import DatabaseRepositoryInterface
+from repositories.mysql_repository import MySQLRepository
 
 logger = get_logger(__name__)
 
@@ -27,25 +29,37 @@ logger = get_logger(__name__)
 class AccountCategoryClient(AccountCategoryClientInterface):
     """Client for managing email accounts and category statistics."""
 
-    def __init__(self, db_session: Optional[Session] = None, db_path: Optional[str] = None):
+    def __init__(self, repository: Optional[DatabaseRepositoryInterface] = None, 
+                 db_session: Optional[Session] = None, db_path: Optional[str] = None):
         """
-        Initialize the AccountCategoryClient.
+        Initialize the AccountCategoryClient with dependency injection.
         
         Args:
-            db_session: Optional existing database session to use
-            db_path: Path to the SQLite database file (used if no session provided)
+            repository: Optional repository implementation. Takes priority over other options
+            db_session: Optional existing database session (legacy, for backward compatibility)
+            db_path: Path to the database file (legacy parameter, not used with MySQL)
         """
-        if db_session:
+        if repository:
+            # Use injected repository - treat it as session-owning source
+            self.repository = repository
+            self.session = None
+            self.owns_session = True  # Repository owns session creation
+            self.engine = getattr(repository, 'engine', None)
+            self.Session = getattr(repository, 'SessionFactory', None)
+        elif db_session:
+            # Legacy: Direct session injection (creates a wrapper repository internally)
+            self.repository = None  # Not using repository pattern in this mode
             self.session = db_session
             self.owns_session = False
             self.engine = None
             self.Session = None
         else:
-            self.db_path = db_path if (isinstance(db_path, str) and db_path.strip()) else os.getenv("DATABASE_PATH") or "./email_summaries/summaries.db"
-            self.engine = init_database(self.db_path)
-            self.Session = sessionmaker(bind=self.engine)
+            # Create default MySQL repository
+            self.repository = MySQLRepository()
             self.session = None
             self.owns_session = True
+            self.engine = getattr(self.repository, 'engine', None)
+            self.Session = getattr(self.repository, 'SessionFactory', None)
         
         logger.info("AccountCategoryClient initialized")
     

@@ -5,6 +5,7 @@ from services.email_deduplication_factory_interface import EmailDeduplicationFac
 from clients.email_deduplication_client_interface import EmailDeduplicationClientInterface
 from clients.gmail_deduplication_client import GmailDeduplicationClient
 from models.database import init_database, get_session
+from repositories.sqlalchemy_repository import SQLAlchemyRepository
 
 
 class EmailDeduplicationFactory(EmailDeduplicationFactoryInterface):
@@ -22,4 +23,5 @@ class EmailDeduplicationFactory(EmailDeduplicationFactoryInterface):
         """
         engine = init_database()
         session = get_session(engine)
-        return GmailDeduplicationClient(session, email_address)
+        repository = SQLAlchemyRepository(session)
+        return GmailDeduplicationClient(repository, email_address, session)

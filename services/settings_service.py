@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from datetime import datetime
 
 from models.database import UserSettings, init_database
+from repositories.database_repository_interface import DatabaseRepositoryInterface
+from repositories.mysql_repository import MySQLRepository
 
 logger = get_logger(__name__)
 
@@ -16,10 +18,45 @@ logger = get_logger(__name__)
 class SettingsService:
     """Service for managing user settings and preferences"""
     
-    def __init__(self, db_path: Optional[str] = None):
-        self.db_path = db_path if (isinstance(db_path, str) and db_path.strip()) else os.getenv("DATABASE_PATH") or "./email_summaries/summaries.db"
-        self.engine = init_database(self.db_path)
-        self.Session = sessionmaker(bind=self.engine)
+    def __init__(self, repository: Optional[DatabaseRepositoryInterface] = None, db_path: Optional[str] = None):
+        """
+        Initialize settings service with dependency injection.
+
+        Args:
+            repository: Optional repository implementation. If not provided, creates MySQLRepository
+            db_path: Optional database path (legacy parameter, not used with MySQL by default)
+
+        Raises:
+            ValueError: If repository is not connected and no valid database path is available
+        """
+        if repository:
+            self.repository = repository
+            # Ensure repository is connected
+            if not self.repository.is_connected():
+                if not db_path:
+                    db_path = os.getenv("DATABASE_PATH")
+                if not db_path:
+                    raise ValueError(
+                        "SettingsService requires a connected repository. "
+                        "Provide a connected repository or specify db_path/DATABASE_PATH."
+                    )
+                self.repository.connect(db_path)
+        else:
+            self.repository = MySQLRepository()
+
+
+        # Maintain backward compatibility
+        self.db_path = getattr(self.repository, 'db_path', None)
+        self.engine = getattr(self.repository, 'engine', None)
+        self.Session = getattr(self.repository, 'SessionFactory', None)
+
+        # Validate that SessionFactory is available
+        if self.Session is None:
+            raise ValueError(
+                "SettingsService requires a connected repository with an available SessionFactory. "
+                "Repository connection may have failed."
+            )
+
         self._initialize_default_settings()
     
     def _initialize_default_settings(self):
@@ -54,52 +91,31 @@ class SettingsService:
     
     def get_setting(self, key: str, default_value: Any = None) -> Any:
         """Get a setting value by key, with type conversion"""
-        with self.Session() as session:
-            setting = session.query(UserSettings).filter_by(setting_key=key).first()
-            
-            if not setting:
-                return default_value
-            
-            # Convert based on setting type
-            if setting.setting_type == 'integer':
-                return int(setting.setting_value)
-            elif setting.setting_type == 'float':
-                return float(setting.setting_value)
-            elif setting.setting_type == 'boolean':
-                return setting.setting_value.lower() in ('true', '1', 'yes')
-            else:
-                return setting.setting_value
+        setting = self.repository.get_setting(key)
+        
+        if not setting:
+            return default_value
+        
+        # Convert based on setting type
+        if setting.setting_type == 'integer':
+            return int(setting.setting_value)
+        elif setting.setting_type == 'float':
+            return float(setting.setting_value)
+        elif setting.setting_type == 'boolean':
+            return setting.setting_value.lower() in ('true', '1', 'yes')
+        else:
+            return setting.setting_value
     
     def set_setting(self, key: str, value: Any, setting_type: str = 'string', description: str = '') -> bool:
         """Set a setting value with automatic type conversion"""
         try:
-            with self.Session() as session:
-                setting = session.query(UserSettings).filter_by(setting_key=key).first()
-                
-                if setting:
-                    # Update existing setting
-                    setting.setting_value = str(value)
-                    setting.setting_type = setting_type
-                    if description:
-                        setting.description = description
-                    setting.updated_at = datetime.utcnow()
-                else:
-                    # Create new setting
-                    setting = UserSettings(
-                        setting_key=key,
-                        setting_value=str(value),
-                        setting_type=setting_type,
-                        description=description
-                    )
-                    session.add(setting)
-                
-                session.commit()
-                logger.info(f"Updated setting: {key} = {value}")
-                return True
-                
+            self.repository.set_setting(key, str(value), setting_type, description)
+            logger.info(f"Updated setting: {key} = {value}")
         except Exception as e:
             logger.error(f"Error setting {key}: {e}")
             return False
+        else:
+            return True
     
     def get_lookback_hours(self) -> int:
         """Get the email lookback hours setting"""
