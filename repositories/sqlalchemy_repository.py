@@ -294,10 +294,13 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
                 summary.senders.append(sender_summary)
             
             # Add domain summaries
-            for domain, count in summary_data.get('domains', {}).items():
+            for domain, stats in summary_data.get('domains', {}).items():
                 domain_summary = DomainSummary(
-                    domain_name=domain,
-                    email_count=count
+                    domain=domain,
+                    email_count=stats['count'],
+                    deleted_count=stats.get('deleted', 0),
+                    archived_count=stats.get('archived', 0),
+                    is_blocked=stats.get('is_blocked', False)
                 )
                 summary.domains.append(domain_summary)
             
