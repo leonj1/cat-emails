@@ -4,11 +4,23 @@ Script to check Gmail accounts in the Railway database.
 """
 import os
 import sys
+from typing import Optional
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 from models.database import init_database, EmailAccount
 from sqlalchemy.orm import sessionmaker
 
-def main():
+
+def mask_password(password: str) -> str:
+    """Mask a password for display, preserving first and last 2 chars."""
+    pwd_len = len(password)
+    if pwd_len > 4:
+        return f"{password[:2]}{'*' * (pwd_len - 4)}{password[-2:]}"
+    else:
+        return "*" * pwd_len
+
+
+def main() -> None:
     """Query and display Gmail accounts from the database."""
 
     print("=" * 60)
@@ -17,6 +29,12 @@ def main():
 
     # Get database path from environment or use default
     db_path = os.getenv("DATABASE_PATH", "./email_summaries/summaries.db")
+
+    # Validate path to prevent directory traversal
+    if not db_path.startswith(('./', '/', os.path.expanduser('~'))):
+        print("❌ Error: Invalid database path")
+        sys.exit(1)
+
     print(f"\n📁 Database Path: {db_path}")
     print(f"📁 Database exists: {os.path.exists(db_path)}")
 
@@ -70,12 +88,8 @@ def main():
                     print(f"   Active: {'✅ Yes' if account.is_active else '❌ No'}")
                     print(f"   Has Password: {'✅ Yes' if account.app_password else '❌ No'}")
                     if account.app_password:
-                        # Mask the password
+                        masked = mask_password(account.app_password)
                         pwd_len = len(account.app_password)
-                        if pwd_len > 4:
-                            masked = f"{account.app_password[:2]}{'*' * (pwd_len - 4)}{account.app_password[-2:]}"
-                        else:
-                            masked = "*" * pwd_len
                         print(f"   Password (masked): {masked} (length: {pwd_len})")
                     print(f"   Last Scan: {account.last_scan_at or 'Never'}")
                     print(f"   Created: {account.created_at}")
@@ -105,8 +119,13 @@ def main():
             if run_count == 0:
                 print("\nNo processing runs found.")
 
-    except Exception as e:
+    except (SQLAlchemyError, OSError) as e:
         print(f"\n❌ Error querying database: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ Unexpected error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

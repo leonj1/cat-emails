@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 #
 # Script to query accounts from the Railway-deployed API service
 #
@@ -8,8 +10,22 @@
 #   ./query_accounts_api.sh https://your-app.railway.app your-api-key
 #
 
+# Check for required tools
+for cmd in curl python3; do
+    if ! command -v "$cmd" &> /dev/null; then
+        echo "❌ Error: $cmd is required but not installed"
+        exit 1
+    fi
+done
+
 API_URL="${1:-https://cat-emails-production.up.railway.app}"
-API_KEY="${2:-${API_KEY}}"
+API_KEY="${2:-${API_KEY:-}}"
+
+# Validate API_URL format
+if [[ ! "$API_URL" =~ ^https?:// ]]; then
+    echo "❌ Error: API_URL must start with http:// or https://"
+    exit 1
+fi
 
 echo "====================================="
 echo "Querying Gmail Accounts from API"
