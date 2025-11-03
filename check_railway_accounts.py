@@ -31,10 +31,18 @@ def main() -> None:
     print("=" * 60)
 
     # Get database path from environment or use default
-    db_path = os.getenv("DATABASE_PATH", "./email_summaries/summaries.db")
+    raw_db_path = os.getenv("DATABASE_PATH", "./email_summaries/summaries.db")
+    db_path = os.path.expanduser(raw_db_path)
+    if not os.path.isabs(db_path):
+        db_path = os.path.abspath(db_path)
 
     # Validate path to prevent directory traversal
-    if not db_path.startswith(('./', '/', os.path.expanduser('~'))):
+    allowed_roots = (
+        os.path.abspath("."),
+        os.path.expanduser("~"),
+        "/",
+    )
+    if not any(db_path.startswith(root) for root in allowed_roots):
         print("❌ Error: Invalid database path")
         sys.exit(1)
 
