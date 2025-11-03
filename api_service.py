@@ -213,7 +213,13 @@ validate_environment()
 BACKGROUND_PROCESSING_ENABLED = os.getenv("BACKGROUND_PROCESSING", "true").lower() == "true"
 BACKGROUND_SCAN_INTERVAL = int(os.getenv("BACKGROUND_SCAN_INTERVAL", "300"))  # 5 minutes default
 BACKGROUND_PROCESS_HOURS = int(os.getenv("BACKGROUND_PROCESS_HOURS", "2"))  # Look back 2 hours default
-BACKGROUND_START_DELAY = int(os.getenv("BACKGROUND_START_DELAY_SECONDS", "5"))  # Delay before starting background processor
+
+# Delay before starting background processor (seconds)
+try:
+    BACKGROUND_START_DELAY = max(1, int(os.getenv("BACKGROUND_START_DELAY_SECONDS", "5")))
+except (ValueError, TypeError):
+    logger.warning("Invalid BACKGROUND_START_DELAY_SECONDS value, using default of 5 seconds")
+    BACKGROUND_START_DELAY = 5
 
 # Global flag for background thread control
 background_thread_running = True
