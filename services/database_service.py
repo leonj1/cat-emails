@@ -16,7 +16,7 @@ from models.database import (
     DomainSummary, ProcessingRun, get_database_url, init_database, ProcessedEmailLog
 )
 from repositories.database_repository_interface import DatabaseRepositoryInterface
-from repositories.sqlalchemy_repository import SQLAlchemyRepository
+from repositories.mysql_repository import MySQLRepository
 
 logger = get_logger(__name__)
 
@@ -29,14 +29,14 @@ class DatabaseService:
         Initialize database service with dependency injection.
         
         Args:
-            repository: Optional repository implementation. If not provided, creates SQLAlchemyRepository
-            db_path: Optional database path (used only if repository is not provided)
+            repository: Optional repository implementation. If not provided, creates MySQLRepository
+            db_path: Optional database path (legacy parameter, not used with MySQL)
         """
         if repository:
             self.repository = repository
         else:
-            # Create default SQLAlchemy repository
-            self.repository = SQLAlchemyRepository(db_path=db_path)
+            # Create default MySQL repository
+            self.repository = MySQLRepository()
         
         # Maintain backward compatibility - expose these for existing code
         self.db_path = getattr(self.repository, 'db_path', None)

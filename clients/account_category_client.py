@@ -21,7 +21,7 @@ from models.account_models import (
     EmailAccountInfo, AccountListResponse
 )
 from repositories.database_repository_interface import DatabaseRepositoryInterface
-from repositories.sqlalchemy_repository import SQLAlchemyRepository
+from repositories.mysql_repository import MySQLRepository
 
 logger = get_logger(__name__)
 
@@ -37,7 +37,7 @@ class AccountCategoryClient(AccountCategoryClientInterface):
         Args:
             repository: Optional repository implementation. Takes priority over other options
             db_session: Optional existing database session (legacy, for backward compatibility)
-            db_path: Path to the SQLite database file (used if repository not provided)
+            db_path: Path to the database file (legacy parameter, not used with MySQL)
         """
         if repository:
             # Use injected repository
@@ -54,8 +54,8 @@ class AccountCategoryClient(AccountCategoryClientInterface):
             self.engine = None
             self.Session = None
         else:
-            # Create default repository
-            self.repository = SQLAlchemyRepository(db_path=db_path)
+            # Create default MySQL repository
+            self.repository = MySQLRepository()
             self.session = None
             self.owns_session = True
             self.engine = getattr(self.repository, 'engine', None)

@@ -10,7 +10,7 @@ from datetime import datetime
 
 from models.database import UserSettings, init_database
 from repositories.database_repository_interface import DatabaseRepositoryInterface
-from repositories.sqlalchemy_repository import SQLAlchemyRepository
+from repositories.mysql_repository import MySQLRepository
 
 logger = get_logger(__name__)
 
@@ -23,13 +23,13 @@ class SettingsService:
         Initialize settings service with dependency injection.
         
         Args:
-            repository: Optional repository implementation. If not provided, creates SQLAlchemyRepository
-            db_path: Optional database path (used only if repository is not provided)
+            repository: Optional repository implementation. If not provided, creates MySQLRepository
+            db_path: Optional database path (legacy parameter, not used with MySQL)
         """
         if repository:
             self.repository = repository
         else:
-            self.repository = SQLAlchemyRepository(db_path=db_path)
+            self.repository = MySQLRepository()
         
         # Maintain backward compatibility
         self.db_path = getattr(self.repository, 'db_path', None)

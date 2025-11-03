@@ -59,9 +59,9 @@ class EmailSummaryService:
         
         if use_database:
             try:
-                # Create a shared repository instance for all services
-                from repositories.sqlalchemy_repository import SQLAlchemyRepository
-                shared_repository = SQLAlchemyRepository()
+                # Create a shared MySQL repository instance for all services
+                from repositories.mysql_repository import MySQLRepository
+                shared_repository = MySQLRepository()
                 
                 self.db_service = DatabaseService(repository=shared_repository)
                 logger.info("Database service initialized for email summaries")
