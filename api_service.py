@@ -214,12 +214,18 @@ BACKGROUND_PROCESSING_ENABLED = os.getenv("BACKGROUND_PROCESSING", "true").lower
 BACKGROUND_SCAN_INTERVAL = int(os.getenv("BACKGROUND_SCAN_INTERVAL", "300"))  # 5 minutes default
 BACKGROUND_PROCESS_HOURS = int(os.getenv("BACKGROUND_PROCESS_HOURS", "2"))  # Look back 2 hours default
 
+# Minimum delay to ensure healthchecks pass (seconds)
+MIN_BACKGROUND_START_DELAY = 1
+
 # Delay before starting background processor (seconds)
 try:
     delay_value = int(os.getenv("BACKGROUND_START_DELAY_SECONDS", "5"))
-    if delay_value < 1:
-        logger.warning(f"BACKGROUND_START_DELAY_SECONDS value {delay_value} is below minimum, using 1 second")
-        BACKGROUND_START_DELAY = 1
+    if delay_value < MIN_BACKGROUND_START_DELAY:
+        logger.warning(
+            f"BACKGROUND_START_DELAY_SECONDS value {delay_value} is below minimum, "
+            f"using {MIN_BACKGROUND_START_DELAY} second"
+        )
+        BACKGROUND_START_DELAY = MIN_BACKGROUND_START_DELAY
     else:
         BACKGROUND_START_DELAY = delay_value
 except (ValueError, TypeError):
