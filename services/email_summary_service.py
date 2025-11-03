@@ -59,16 +59,12 @@ class EmailSummaryService:
         
         if use_database:
             try:
-                self.db_service = DatabaseService(
-                    db_path=os.getenv("DATABASE_PATH") or str(self.data_dir / "summaries.db")
-                )
+                self.db_service = DatabaseService()
                 logger.info("Database service initialized for email summaries")
                 
                 # Initialize account category service
                 try:
-                    self.account_service = AccountCategoryClient(
-                        db_path=os.getenv("DATABASE_PATH") or str(self.data_dir / "summaries.db")
-                    )
+                    self.account_service = AccountCategoryClient()
                     logger.info("Account category client initialized")
                 except Exception as e:
                     logger.warning(f"Failed to initialize account service: {str(e)}")

@@ -248,7 +248,9 @@ def get_database_url(db_path: Optional[str] = None) -> str:
     Priority order for database path:
     1) Explicit db_path parameter (if provided)
     2) DATABASE_PATH environment variable
-    3) Default: <project_root>/email_summaries/summaries.db
+    
+    Raises:
+        ValueError: If neither db_path nor DATABASE_PATH environment variable is provided
     """
     # Determine the database file path
     env_db_path = os.getenv("DATABASE_PATH")
@@ -259,8 +261,10 @@ def get_database_url(db_path: Optional[str] = None) -> str:
     elif isinstance(env_db_path, str) and env_db_path.strip():
         chosen_path = env_db_path
     else:
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        chosen_path = os.path.join(base_dir, "email_summaries", "summaries.db")
+        raise ValueError(
+            "Database path must be provided either via 'db_path' parameter or 'DATABASE_PATH' environment variable. "
+            "No fallback path is configured."
+        )
 
     # Expand user and make absolute
     db_path_abs = os.path.abspath(os.path.expanduser(chosen_path))

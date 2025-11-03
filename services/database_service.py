@@ -23,7 +23,16 @@ class DatabaseService:
     """Service for managing database operations"""
     
     def __init__(self, db_path: Optional[str] = None):
-        self.db_path = db_path if (isinstance(db_path, str) and db_path.strip()) else os.getenv("DATABASE_PATH") or "./email_summaries/summaries.db"
+        env_db_path = os.getenv("DATABASE_PATH")
+        if isinstance(db_path, str) and db_path.strip():
+            self.db_path = db_path
+        elif isinstance(env_db_path, str) and env_db_path.strip():
+            self.db_path = env_db_path
+        else:
+            raise ValueError(
+                "Database path must be provided either via 'db_path' parameter or 'DATABASE_PATH' environment variable. "
+                "No fallback path is configured."
+            )
         self.engine = None
         self.Session = None
         self._ensure_database()
