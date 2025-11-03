@@ -16,9 +16,8 @@ Exit codes:
 import os
 import sys
 import traceback
-from typing import Optional
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
