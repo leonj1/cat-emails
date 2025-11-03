@@ -216,7 +216,12 @@ BACKGROUND_PROCESS_HOURS = int(os.getenv("BACKGROUND_PROCESS_HOURS", "2"))  # Lo
 
 # Delay before starting background processor (seconds)
 try:
-    BACKGROUND_START_DELAY = max(1, int(os.getenv("BACKGROUND_START_DELAY_SECONDS", "5")))
+    delay_value = int(os.getenv("BACKGROUND_START_DELAY_SECONDS", "5"))
+    if delay_value < 1:
+        logger.warning(f"BACKGROUND_START_DELAY_SECONDS value {delay_value} is below minimum, using 1 second")
+        BACKGROUND_START_DELAY = 1
+    else:
+        BACKGROUND_START_DELAY = delay_value
 except (ValueError, TypeError):
     logger.warning("Invalid BACKGROUND_START_DELAY_SECONDS value, using default of 5 seconds")
     BACKGROUND_START_DELAY = 5
