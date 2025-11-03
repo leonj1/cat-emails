@@ -40,10 +40,10 @@ class AccountCategoryClient(AccountCategoryClientInterface):
             db_path: Path to the database file (legacy parameter, not used with MySQL)
         """
         if repository:
-            # Use injected repository
+            # Use injected repository - treat it as session-owning source
             self.repository = repository
             self.session = None
-            self.owns_session = False
+            self.owns_session = True  # Repository owns session creation
             self.engine = getattr(repository, 'engine', None)
             self.Session = getattr(repository, 'SessionFactory', None)
         elif db_session:
