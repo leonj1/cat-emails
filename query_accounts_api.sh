@@ -43,7 +43,14 @@ if [ -z "$API_KEY" ]; then
     echo ""
     ACCOUNTS_RESPONSE=$(curl -s -w "\n%{http_code}" "${API_URL}/api/accounts" 2>/dev/null)
 else
-    echo "Using API Key: ${API_KEY:0:4}****${API_KEY: -4}"
+    # Mask API key safely for display
+    KEY_LEN=${#API_KEY}
+    if [ $KEY_LEN -le 8 ]; then
+        MASKED_KEY="****"
+    else
+        MASKED_KEY="${API_KEY:0:4}****${API_KEY: -4}"
+    fi
+    echo "Using API Key: $MASKED_KEY"
     echo ""
     ACCOUNTS_RESPONSE=$(curl -s -w "\n%{http_code}" -H "X-API-Key: $API_KEY" "${API_URL}/api/accounts" 2>/dev/null)
 fi
