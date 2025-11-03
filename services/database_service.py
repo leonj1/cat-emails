@@ -27,22 +27,48 @@ class DatabaseService:
     def __init__(self, repository: Optional[DatabaseRepositoryInterface] = None, db_path: Optional[str] = None):
         """
         Initialize database service with dependency injection.
-        
+
         Args:
             repository: Optional repository implementation. If not provided, creates MySQLRepository
-            db_path: Optional database path (legacy parameter, not used with MySQL)
+            db_path: Optional database path (legacy parameter, not used with MySQL by default)
+
+        Raises:
+            ValueError: If repository is not connected and connection fails
         """
         if repository:
             self.repository = repository
+            # Ensure repository is connected
+            if not self.repository.is_connected():
+                try:
+                    # Try to connect using available parameters
+                    self.repository.connect()
+                except Exception as e:
+                    logger.error(f"Failed to connect repository: {str(e)}")
+                    raise ValueError(
+                        "DatabaseService requires a connected repository. "
+                        "Ensure DATABASE_* environment variables are set for MySQL connection."
+                    ) from e
         else:
             # Create default MySQL repository
             self.repository = MySQLRepository()
-        
+
+            # Ensure repository is connected
+            if not self.repository.is_connected():
+                try:
+                    # Connect using environment variables
+                    self.repository.connect()
+                except Exception as e:
+                    logger.error(f"Failed to connect MySQL repository: {str(e)}")
+                    raise ValueError(
+                        "DatabaseService requires a connected repository. "
+                        "Ensure DATABASE_* environment variables are set for MySQL connection."
+                    ) from e
+
         # Maintain backward compatibility - expose these for existing code
         self.db_path = getattr(self.repository, 'db_path', None)
         self.engine = getattr(self.repository, 'engine', None)
         self.Session = getattr(self.repository, 'SessionFactory', None)
-        
+
         logger.info(f"Database service initialized with repository: {type(self.repository).__name__}")
     
     def start_processing_run(self, email_address: str) -> str:
