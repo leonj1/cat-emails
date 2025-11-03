@@ -2042,6 +2042,10 @@ async def startup_event():
         )
 
         logger.info("WebSocket manager initialized and background tasks started")
+
+        # Start background processor if enabled
+        start_background_processor()
+
         logger.info("=== API Service Startup Complete ===")
 
     except Exception as e:
@@ -2129,10 +2133,11 @@ if __name__ == "__main__":
         logger.info("API key authentication is enabled")
     else:
         logger.warning("API key authentication is disabled - endpoints are publicly accessible")
-    
-    # Start background processor if enabled
-    start_background_processor()
-    
+
+    # Note: Background processor is now started in startup_event() instead of here to prevent blocking
+    # server startup. This ensures Railway deployment healthchecks can pass before the processor
+    # initializes, allowing the service to be marked as healthy and receive traffic sooner.
+
     try:
         # Run the API
         uvicorn.run(app, host=host, port=port)
