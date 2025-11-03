@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 """
 Script to check Gmail accounts in the Railway database.
+
+Connects to a SQLite database (configurable via DATABASE_PATH environment
+variable) and displays all EmailAccount records with masked passwords,
+plus recent processing_runs.
+
+Usage:
+    DATABASE_PATH=/path/to/db.sqlite python3 check_railway_accounts.py
+
+Exit codes:
+    0: Success
+    1: Error (invalid path, database error, or unexpected exception)
 """
 import os
 import sys
