@@ -2042,6 +2042,11 @@ async def startup_event():
         )
 
         logger.info("WebSocket manager initialized and background tasks started")
+
+        # Start background processor if enabled
+        logger.info("Starting background Gmail processor...")
+        start_background_processor()
+
         logger.info("=== API Service Startup Complete ===")
 
     except Exception as e:
@@ -2129,10 +2134,9 @@ if __name__ == "__main__":
         logger.info("API key authentication is enabled")
     else:
         logger.warning("API key authentication is disabled - endpoints are publicly accessible")
-    
-    # Start background processor if enabled
-    start_background_processor()
-    
+
+    # Note: Background processor is now started in startup_event() to avoid blocking server startup
+
     try:
         # Run the API
         uvicorn.run(app, host=host, port=port)
