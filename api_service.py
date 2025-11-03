@@ -213,12 +213,16 @@ validate_environment()
 BACKGROUND_PROCESSING_ENABLED = os.getenv("BACKGROUND_PROCESSING", "true").lower() == "true"
 BACKGROUND_SCAN_INTERVAL = int(os.getenv("BACKGROUND_SCAN_INTERVAL", "300"))  # 5 minutes default
 BACKGROUND_PROCESS_HOURS = int(os.getenv("BACKGROUND_PROCESS_HOURS", "2"))  # Look back 2 hours default
+BACKGROUND_START_DELAY = int(os.getenv("BACKGROUND_START_DELAY_SECONDS", "5"))  # Delay before starting background processor
 
 # Global flag for background thread control
 background_thread_running = True
 background_thread = None
 next_execution_time = None
 background_processor_service: Optional[BackgroundProcessorService] = None
+
+# Global background processor startup task
+background_startup_task: Optional[asyncio.Task] = None
 
 # Global processing status manager instance
 processing_status_manager = ProcessingStatusManager(max_history=100)
@@ -1998,7 +2002,7 @@ async def force_process_account(
 @app.on_event("startup")
 async def startup_event():
     """Initialize WebSocket manager and start background tasks on server startup"""
-    global websocket_manager
+    global websocket_manager, background_startup_task
 
     logger.info("=== API Service Startup ===")
     logger.info(f"Python version: {sys.version}")
@@ -2055,42 +2059,50 @@ async def startup_event():
     # Start background processor AFTER server is ready to accept requests
     # This prevents healthcheck failures during initialization
     # Schedule background processor to start after a short delay to ensure server is fully ready
-    async def delayed_background_start():
+    async def delayed_background_start() -> None:
         """Start background processor after a delay to ensure server is ready"""
-        await asyncio.sleep(5)  # Wait 5 seconds for server to be fully ready
+        await asyncio.sleep(BACKGROUND_START_DELAY)  # Wait for server to be fully ready
         try:
             logger.info("Starting background processor (delayed start after server ready)...")
             start_background_processor()
             logger.info("Background processor started successfully")
         except Exception as e:
-            logger.error(f"Failed to start background processor: {e}")
-            logger.exception("Full traceback:")
+            logger.exception(f"Failed to start background processor: {e}")
             # Don't exit - allow the API to run even if background processor fails
             logger.warning("API service will continue without background processing")
 
     # Schedule the delayed start as a background task
-    asyncio.create_task(delayed_background_start())
+    background_startup_task = asyncio.create_task(delayed_background_start())
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Gracefully shutdown WebSocket manager, background tasks, and logging service"""
-    global websocket_manager
-    
+    global websocket_manager, background_startup_task
+
     try:
+        # Cancel background startup task if still running
+        if background_startup_task and not background_startup_task.done():
+            logger.info("Cancelling background startup task...")
+            background_startup_task.cancel()
+            try:
+                await background_startup_task
+            except asyncio.CancelledError:
+                logger.info("Background startup task cancelled successfully")
+
         if websocket_manager:
             logger.info("Shutting down WebSocket manager...")
             await websocket_manager.shutdown()
             websocket_manager = None
             logger.info("WebSocket manager shutdown completed")
-        
+
         # Stop background processor if running
         stop_background_processor()
-        
+
         # Gracefully shutdown central logging service
         logger.info("Shutting down central logging service...")
         shutdown_logging(timeout=5.0)
-        
+
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
 
