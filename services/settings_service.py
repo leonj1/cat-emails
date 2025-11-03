@@ -21,21 +21,42 @@ class SettingsService:
     def __init__(self, repository: Optional[DatabaseRepositoryInterface] = None, db_path: Optional[str] = None):
         """
         Initialize settings service with dependency injection.
-        
+
         Args:
             repository: Optional repository implementation. If not provided, creates MySQLRepository
-            db_path: Optional database path (legacy parameter, not used with MySQL)
+            db_path: Optional database path (legacy parameter, not used with MySQL by default)
+
+        Raises:
+            ValueError: If repository is not connected and no valid database path is available
         """
         if repository:
             self.repository = repository
+            # Ensure repository is connected
+            if not self.repository.is_connected():
+                if not db_path:
+                    db_path = os.getenv("DATABASE_PATH")
+                if not db_path:
+                    raise ValueError(
+                        "SettingsService requires a connected repository. "
+                        "Provide a connected repository or specify db_path/DATABASE_PATH."
+                    )
+                self.repository.connect(db_path)
         else:
             self.repository = MySQLRepository()
-        
+
+
         # Maintain backward compatibility
         self.db_path = getattr(self.repository, 'db_path', None)
         self.engine = getattr(self.repository, 'engine', None)
         self.Session = getattr(self.repository, 'SessionFactory', None)
-        
+
+        # Validate that SessionFactory is available
+        if self.Session is None:
+            raise ValueError(
+                "SettingsService requires a connected repository with an available SessionFactory. "
+                "Repository connection may have failed."
+            )
+
         self._initialize_default_settings()
     
     def _initialize_default_settings(self):
@@ -90,10 +111,11 @@ class SettingsService:
         try:
             self.repository.set_setting(key, str(value), setting_type, description)
             logger.info(f"Updated setting: {key} = {value}")
-            return True
         except Exception as e:
             logger.error(f"Error setting {key}: {e}")
             return False
+        else:
+            return True
     
     def get_lookback_hours(self) -> int:
         """Get the email lookback hours setting"""

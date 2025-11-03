@@ -55,18 +55,20 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             if env_db_path and env_db_path.strip():
                 self.db_path = env_db_path
             else:
-                raise ValueError(
-                    "Database path must be provided either via constructor parameter or DATABASE_PATH environment variable. "
-                    "No fallback path is configured."
+                msg = (
+                    "Database path must be provided either via constructor parameter or "
+                    "DATABASE_PATH environment variable. No fallback path is configured."
                 )
+                raise ValueError(msg)
         
         try:
             self.engine = init_database(self.db_path)
             self.SessionFactory = sessionmaker(bind=self.engine)
             logger.info(f"Database repository connected to: {self.db_path}")
         except Exception as e:
-            logger.error(f"Failed to connect to database: {str(e)}")
-            raise ConnectionError(f"Failed to connect to database: {str(e)}") from e
+            logger.exception("Failed to connect to database: %s", e)
+            msg = f"Failed to connect to database: {e!s}"
+            raise ConnectionError(msg) from e
     
     def disconnect(self) -> None:
         """Close database connection"""
@@ -87,7 +89,8 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
     def _get_session(self) -> Session:
         """Get or create a session"""
         if not self.is_connected():
-            raise ConnectionError("Repository not connected. Call connect() first.")
+            msg = "Repository not connected. Call connect() first."
+            raise ConnectionError(msg)
         
         # Use existing session or create new one
         if self._session is None:
@@ -104,15 +107,16 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             session.add(entity)
             session.commit()
             session.refresh(entity)
-            return entity
         except IntegrityError as e:
             session.rollback()
-            logger.error(f"Integrity error adding entity: {str(e)}")
+            logger.exception("Integrity error adding entity: %s", e)
             raise
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Database error adding entity: {str(e)}")
+            logger.exception("Database error adding entity: %s", e)
             raise
+        else:
+            return entity
     
     def add_all(self, entities: List[T]) -> List[T]:
         """Add multiple entities in a single transaction"""
@@ -122,11 +126,12 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             session.commit()
             for entity in entities:
                 session.refresh(entity)
-            return entities
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Database error adding entities: {str(e)}")
+            logger.exception("Database error adding entities: %s", e)
             raise
+        else:
+            return entities
     
     def get_by_id(self, model_class: Type[T], entity_id: Any) -> Optional[T]:
         """Get entity by primary key ID"""
@@ -150,11 +155,12 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             session.merge(entity)
             session.commit()
             session.refresh(entity)
-            return entity
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Database error updating entity: {str(e)}")
+            logger.exception("Database error updating entity: %s", e)
             raise
+        else:
+            return entity
     
     def delete(self, entity: T) -> None:
         """Delete an entity from database"""
@@ -164,7 +170,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             session.commit()
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Database error deleting entity: {str(e)}")
+            logger.exception("Database error deleting entity: %s", e)
             raise
     
     def delete_by_id(self, model_class: Type[T], entity_id: Any) -> bool:
@@ -197,7 +203,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             return f"run-{run.id}"
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Error creating processing run: {str(e)}")
+            logger.exception("Error creating processing run: %s", e)
             raise
     
     def get_processing_run(self, run_id: str) -> Optional[ProcessingRun]:
@@ -216,7 +222,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
                 session.commit()
             except SQLAlchemyError as e:
                 session.rollback()
-                logger.error(f"Error updating processing run: {str(e)}")
+                logger.exception("Error updating processing run: %s", e)
                 raise
     
     def complete_processing_run(
@@ -238,7 +244,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
                 session.commit()
             except SQLAlchemyError as e:
                 session.rollback()
-                logger.error(f"Error completing processing run: {str(e)}")
+                logger.exception("Error completing processing run: %s", e)
                 raise
     
     def get_recent_processing_runs(self, limit: int = 10, email_address: Optional[str] = None) -> List[ProcessingRun]:
@@ -301,7 +307,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             return summary
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Error saving email summary: {str(e)}")
+            logger.exception("Error saving email summary: %s", e)
             raise
     
     def get_summaries_by_date_range(
@@ -375,7 +381,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             return account
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Error creating/updating account: {str(e)}")
+            logger.exception("Error creating/updating account: %s", e)
             raise
     
     def deactivate_account(self, email_address: str) -> bool:
@@ -390,7 +396,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
                 return True
             except SQLAlchemyError as e:
                 session.rollback()
-                logger.error(f"Error deactivating account: {str(e)}")
+                logger.exception("Error deactivating account: %s", e)
                 raise
         return False
     
@@ -436,7 +442,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             return setting
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Error setting value: {str(e)}")
+            logger.exception("Error setting value: %s", e)
             raise
     
     def get_all_settings(self) -> List[UserSettings]:
@@ -500,7 +506,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             return stat
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Error updating category stats: {str(e)}")
+            logger.exception("Error updating category stats: %s", e)
             raise
     
     # ==================== Deduplication Operations ====================
@@ -538,7 +544,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             return self.find_one(ProcessedEmailLog, email_address=email_address, message_id=message_id)
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Error marking email as processed: {str(e)}")
+            logger.exception("Error marking email as processed: %s", e)
             raise
     
     def get_processed_emails_count(
@@ -577,7 +583,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             return deleted_count
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Error cleaning up old records: {str(e)}")
+            logger.exception("Error cleaning up old records: %s", e)
             raise
     
     # ==================== Transaction Management ====================
