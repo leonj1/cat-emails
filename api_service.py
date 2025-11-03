@@ -222,8 +222,8 @@ try:
     delay_value = int(os.getenv("BACKGROUND_START_DELAY_SECONDS", "5"))
     if delay_value < MIN_BACKGROUND_START_DELAY:
         logger.warning(
-            f"BACKGROUND_START_DELAY_SECONDS value {delay_value} is below minimum, "
-            f"using {MIN_BACKGROUND_START_DELAY} second"
+            f"BACKGROUND_START_DELAY_SECONDS value {delay_value} is below minimum {MIN_BACKGROUND_START_DELAY}, "
+            f"using minimum value of {MIN_BACKGROUND_START_DELAY}"
         )
         BACKGROUND_START_DELAY = MIN_BACKGROUND_START_DELAY
     else:
