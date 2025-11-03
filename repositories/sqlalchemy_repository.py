@@ -513,7 +513,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
     
     def is_email_processed(self, email_address: str, message_id: str) -> bool:
         """Check if email has been processed already"""
-        count = self.count(ProcessedEmailLog, email_address=email_address, message_id=message_id)
+        count = self.count(ProcessedEmailLog, account_email=email_address, message_id=message_id)
         return count > 0
     
     def mark_email_processed(
@@ -525,13 +525,11 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
     ) -> ProcessedEmailLog:
         """Mark email as processed to prevent duplicate processing"""
         session = self._get_session()
-        
+
         try:
             record = ProcessedEmailLog(
-                email_address=email_address,
+                account_email=email_address,
                 message_id=message_id,
-                category=category,
-                action_taken=action_taken,
                 processed_at=datetime.utcnow()
             )
             session.add(record)
@@ -541,7 +539,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
         except IntegrityError:
             # Already exists, that's fine
             session.rollback()
-            return self.find_one(ProcessedEmailLog, email_address=email_address, message_id=message_id)
+            return self.find_one(ProcessedEmailLog, account_email=email_address, message_id=message_id)
         except SQLAlchemyError as e:
             session.rollback()
             logger.exception("Error marking email as processed: %s", e)
@@ -554,11 +552,11 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
     ) -> int:
         """Get count of processed emails"""
         session = self._get_session()
-        query = session.query(ProcessedEmailLog).filter_by(email_address=email_address)
-        
+        query = session.query(ProcessedEmailLog).filter_by(account_email=email_address)
+
         if since:
             query = query.filter(ProcessedEmailLog.processed_at >= since)
-        
+
         return query.count()
     
     def cleanup_old_processed_emails(
@@ -569,14 +567,14 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
         """Delete old processed email records"""
         session = self._get_session()
         cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
-        
+
         try:
             query = session.query(ProcessedEmailLog).filter(
                 ProcessedEmailLog.processed_at < cutoff_date
             )
-            
+
             if email_address:
-                query = query.filter_by(email_address=email_address)
+                query = query.filter_by(account_email=email_address)
             
             deleted_count = query.delete()
             session.commit()
