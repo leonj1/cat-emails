@@ -4,11 +4,14 @@ Script to check Gmail accounts in the Railway database.
 """
 import os
 import sys
+import traceback
 from typing import Optional
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
-from models.database import init_database, EmailAccount
 from sqlalchemy.orm import sessionmaker
+
+from models.database import init_database, EmailAccount
 
 
 def mask_password(password: str) -> str:
@@ -100,33 +103,33 @@ def main() -> None:
             print("🏃 Recent Processing Runs:")
             print("=" * 60)
 
+            # Constants
+            MAX_RECENT_RUNS = 10
+
             runs = session.execute(text("""
                 SELECT email_address, start_time, end_time, state, emails_processed
                 FROM processing_runs
                 ORDER BY start_time DESC
-                LIMIT 10
-            """))
+                LIMIT :limit
+            """), {"limit": MAX_RECENT_RUNS})
 
-            run_count = 0
-            for run in runs:
-                run_count += 1
-                print(f"\n{run_count}. Email: {run[0]}")
+            runs_list = list(runs)
+            for idx, run in enumerate(runs_list, 1):
+                print(f"\n{idx}. Email: {run[0]}")
                 print(f"   Started: {run[1]}")
                 print(f"   Ended: {run[2] or 'In Progress'}")
                 print(f"   State: {run[3]}")
                 print(f"   Processed: {run[4] or 0} emails")
 
-            if run_count == 0:
+            if len(runs_list) == 0:
                 print("\nNo processing runs found.")
 
     except (SQLAlchemyError, OSError) as e:
         print(f"\n❌ Error querying database: {e}")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
 
