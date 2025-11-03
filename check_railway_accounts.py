@@ -87,13 +87,18 @@ def main() -> None:
                 for idx, account in enumerate(accounts, 1):
                     print(f"\n{idx}. {account.email_address}")
                     print(f"   ID: {account.id}")
-                    print(f"   Display Name: {account.display_name or 'N/A'}")
-                    print(f"   Active: {'✅ Yes' if account.is_active else '❌ No'}")
-                    print(f"   Has Password: {'✅ Yes' if account.app_password else '❌ No'}")
+                    display_name = account.display_name or 'N/A'
+                    print(f"   Display Name: {display_name}")
+                    is_active = account.is_active
+                    active_status = '✅ Yes' if is_active else '❌ No'
+                    print(f"   Active: {active_status}")
+                    has_pwd = '✅ Yes' if account.app_password else '❌ No'
+                    print(f"   Has Password: {has_pwd}")
                     if account.app_password:
                         masked = mask_password(account.app_password)
                         pwd_len = len(account.app_password)
-                        print(f"   Password (masked): {masked} (length: {pwd_len})")
+                        print(f"   Password (masked): {masked}")
+                        print(f"   Password length: {pwd_len}")
                     print(f"   Last Scan: {account.last_scan_at or 'Never'}")
                     print(f"   Created: {account.created_at}")
                     print(f"   Updated: {account.updated_at}")
@@ -107,7 +112,8 @@ def main() -> None:
             MAX_RECENT_RUNS = 10
 
             runs = session.execute(text("""
-                SELECT email_address, start_time, end_time, state, emails_processed
+                SELECT email_address, start_time, end_time,
+                       state, emails_processed
                 FROM processing_runs
                 ORDER BY start_time DESC
                 LIMIT :limit
