@@ -47,16 +47,6 @@ def main() -> None:
     if not os.path.isabs(db_path):
         db_path = os.path.abspath(db_path)
 
-    # Validate path to prevent directory traversal
-    allowed_roots = (
-        os.path.abspath("."),
-        os.path.expanduser("~"),
-        "/",
-    )
-    if not any(db_path.startswith(root) for root in allowed_roots):
-        print("❌ Error: Invalid database path")
-        sys.exit(1)
-
     print(f"\n📁 Database Path: {db_path}")
     print(f"📁 Database exists: {os.path.exists(db_path)}")
 
