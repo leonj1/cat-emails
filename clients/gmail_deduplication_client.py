@@ -31,7 +31,7 @@ class GmailDeduplicationClient(EmailDeduplicationClientInterface):
     def __init__(self, repository: DatabaseRepositoryInterface, account_email: str, session: Optional[Session] = None):
         """
         Initialize the deduplication service with dependency injection.
-        
+
         Args:
             repository: Database repository for data access
             account_email: Email account being processed (for scoping)
@@ -39,7 +39,14 @@ class GmailDeduplicationClient(EmailDeduplicationClientInterface):
         """
         self.repository = repository
         self.account_email = account_email
+
+        # Session remains required until repository-backed bulk operations are migrated
+        if session is None:
+            raise ValueError(
+                "session remains required until repository-backed bulk operations are migrated"
+            )
         self.session = session  # Keep for backward compatibility with legacy code
+
         self.stats = {
             'checked': 0,
             'duplicates_found': 0,
@@ -47,7 +54,7 @@ class GmailDeduplicationClient(EmailDeduplicationClientInterface):
             'logged': 0,
             'errors': 0
         }
-        
+
         logger.info(f"GmailDeduplicationClient initialized for account {self.account_email}")
     
     def is_email_processed(self, message_id: str) -> bool:

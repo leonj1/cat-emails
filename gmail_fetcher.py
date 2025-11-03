@@ -642,13 +642,13 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         try:
             from clients.gmail_deduplication_client import GmailDeduplicationClient
             with db_svc.Session() as session:
-                deduplication_service = GmailDeduplicationClient(session, email_address)
+                deduplication_service = GmailDeduplicationClient(db_svc.repository, email_address, session)
                 new_emails = deduplication_service.filter_new_emails(recent_emails)
-                
+
                 # Log deduplication stats
                 stats = deduplication_service.get_stats()
                 logger.info(f"📊 Email deduplication stats: {stats}")
-                
+
         except Exception as e:
             logger.error(f"Failed to use GmailDeduplicationClient: {e}")
             raise
@@ -677,7 +677,7 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
             try:
                 from clients.gmail_deduplication_client import GmailDeduplicationClient
                 with db_svc.Session() as session:
-                    dedup_service = GmailDeduplicationClient(session, email_address)
+                    dedup_service = GmailDeduplicationClient(db_svc.repository, email_address, session)
                     successful, errors = dedup_service.bulk_mark_as_processed(processed_message_ids)
                     logger.info(f"✅ Bulk processing completed: {successful} successful, {errors} errors")
             except Exception as e:
