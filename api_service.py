@@ -2044,7 +2044,6 @@ async def startup_event():
         logger.info("WebSocket manager initialized and background tasks started")
 
         # Start background processor if enabled
-        logger.info("Starting background Gmail processor...")
         start_background_processor()
 
         logger.info("=== API Service Startup Complete ===")
@@ -2135,7 +2134,9 @@ if __name__ == "__main__":
     else:
         logger.warning("API key authentication is disabled - endpoints are publicly accessible")
 
-    # Note: Background processor is now started in startup_event() to avoid blocking server startup
+    # Note: Background processor is now started in startup_event() instead of here to prevent blocking
+    # server startup. This ensures Railway deployment healthchecks can pass before the processor
+    # initializes, allowing the service to be marked as healthy and receive traffic sooner.
 
     try:
         # Run the API
