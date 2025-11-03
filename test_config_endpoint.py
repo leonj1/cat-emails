@@ -47,7 +47,7 @@ def test_config_endpoint():
     assert "provider" in llm_config
     assert "model" in llm_config
     assert "api_key_configured" in llm_config
-    assert llm_config["api_key_configured"] == True  # We set REQUESTYAI_API_KEY
+    assert llm_config["api_key_configured"]  # We set REQUESTYAI_API_KEY
     
     # Check background processing config
     bg_config = data["background_processing"]

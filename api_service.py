@@ -67,6 +67,9 @@ initialize_central_logging(
 # Get logger instance - same API as before but now uses CentralLoggingService
 logger = get_logger(__name__)
 
+# API version
+API_VERSION = "1.1.0"
+
 # Create FastAPI app with comprehensive OpenAPI/Swagger configuration
 app = FastAPI(
     title="Cat Emails API",
@@ -97,7 +100,7 @@ X-API-Key: your-api-key-here
 
 Connect to the WebSocket endpoint at `/ws/status` for real-time processing updates.
     """,
-    version="1.1.0",
+    version=API_VERSION,
     contact={
         "name": "Terragon Labs",
         "url": "https://github.com/leonj1/cat-emails",
@@ -407,7 +410,7 @@ async def root():
     """
     return {
         "service": "Cat Emails Summary API with Background Gmail Processing",
-        "version": "1.1.0",
+        "version": API_VERSION,
         "endpoints": {
             "health": "GET /api/health",
             "config": "GET /api/config",
@@ -458,7 +461,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "service": "Cat Emails Summary API",
-        "version": "1.1.0"
+        "version": API_VERSION
     }
 
     # Background processor status
@@ -537,7 +540,7 @@ async def get_configuration(x_api_key: Optional[str] = Header(None)):
         background_processing=background_config,
         api_service=api_config,
         environment=environment,
-        version="1.1.0"
+        version=API_VERSION
     )
 
 
