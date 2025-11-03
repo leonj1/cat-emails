@@ -46,6 +46,10 @@ from models.standard_response import StandardResponse
 from models.error_response import ErrorResponse
 from models.processing_current_status_response import ProcessingCurrentStatusResponse
 from models.force_process_response import ForceProcessResponse, ProcessingInfo
+from models.config_response import (
+    ConfigurationResponse, DatabaseConfig, LLMConfig,
+    BackgroundProcessingConfig, APIServiceConfig
+)
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import date
 from utils.password_utils import mask_password
@@ -62,6 +66,9 @@ initialize_central_logging(
 
 # Get logger instance - same API as before but now uses CentralLoggingService
 logger = get_logger(__name__)
+
+# API version
+API_VERSION = "1.1.0"
 
 # Create FastAPI app with comprehensive OpenAPI/Swagger configuration
 app = FastAPI(
@@ -93,7 +100,7 @@ X-API-Key: your-api-key-here
 
 Connect to the WebSocket endpoint at `/ws/status` for real-time processing updates.
     """,
-    version="1.1.0",
+    version=API_VERSION,
     contact={
         "name": "Terragon Labs",
         "url": "https://github.com/leonj1/cat-emails",
@@ -403,9 +410,10 @@ async def root():
     """
     return {
         "service": "Cat Emails Summary API with Background Gmail Processing",
-        "version": "1.1.0",
+        "version": API_VERSION,
         "endpoints": {
             "health": "GET /api/health",
+            "config": "GET /api/config",
             "background_start": "POST /api/background/start",
             "background_stop": "POST /api/background/stop",
             "background_status": "GET /api/background/status",
@@ -453,7 +461,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "service": "Cat Emails Summary API",
-        "version": "1.1.0"
+        "version": API_VERSION
     }
 
     # Background processor status
@@ -486,6 +494,121 @@ async def health_check():
         health_status["status"] = "degraded"
 
     return health_status
+
+
+@app.get("/api/config", response_model=ConfigurationResponse, tags=["health"])
+async def get_configuration(x_api_key: Optional[str] = Header(None)):
+    """
+    Get complete project configuration
+    
+    Returns all current configuration settings including:
+    - Database type and connection details (MySQL, SQLite local, SQLite cloud)
+    - LLM provider and model information
+    - Background processing settings
+    - API service configuration
+    
+    Requires API key authentication if configured.
+    """
+    verify_api_key(x_api_key)
+    
+    # Determine database configuration
+    database_config = _get_database_config()
+    
+    # Determine LLM configuration
+    llm_config = _get_llm_config()
+    
+    # Background processing configuration
+    background_config = BackgroundProcessingConfig(
+        enabled=BACKGROUND_PROCESSING_ENABLED,
+        scan_interval_seconds=BACKGROUND_SCAN_INTERVAL,
+        lookback_hours=BACKGROUND_PROCESS_HOURS
+    )
+    
+    # API service configuration
+    api_config = APIServiceConfig(
+        host=os.getenv("API_HOST", "0.0.0.0"),
+        port=int(os.getenv("API_PORT", "8001")),
+        api_key_required=API_KEY is not None
+    )
+    
+    # Determine environment
+    environment = os.getenv("ENVIRONMENT", os.getenv("RAILWAY_ENVIRONMENT", "development"))
+    
+    return ConfigurationResponse(
+        database=database_config,
+        llm=llm_config,
+        background_processing=background_config,
+        api_service=api_config,
+        environment=environment,
+        version=API_VERSION
+    )
+
+
+def _get_database_config() -> DatabaseConfig:
+    """Determine database configuration from environment variables."""
+    # Check for MySQL configuration
+    db_host = os.getenv("DATABASE_HOST")
+    db_user = os.getenv("DATABASE_USER")
+    db_url = os.getenv("DATABASE_URL")
+    db_path = os.getenv("DATABASE_PATH")
+    
+    if db_host or db_user or db_url:
+        # MySQL configuration
+        db_port = int(os.getenv("DATABASE_PORT", "3306"))
+        db_name = os.getenv("DATABASE_NAME", "cat_emails")
+        pool_size = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+        
+        return DatabaseConfig(
+            type="mysql",
+            host=db_host,
+            port=db_port,
+            database_name=db_name,
+            connection_pool_size=pool_size
+        )
+    elif db_path:
+        # SQLite configuration
+        if db_path == ":memory:":
+            db_type = "sqlite_local"
+        elif db_path.startswith("sqlitecloud://") or db_path.startswith("http://") or db_path.startswith("https://"):
+            db_type = "sqlite_cloud"
+        else:
+            db_type = "sqlite_local"
+        
+        return DatabaseConfig(
+            type=db_type,
+            path=db_path
+        )
+    else:
+        # Default to MySQL if no explicit config (matches MySQLRepository default in services)
+        return DatabaseConfig(
+            type="mysql",
+            database_name="cat_emails"
+        )
+
+
+def _get_llm_config() -> LLMConfig:
+    """Determine LLM service configuration from environment variables."""
+    requestyai_key = os.getenv("REQUESTYAI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("REQUESTYAI_BASE_URL", "https://api.requesty.ai/openai/v1")
+    
+    if requestyai_key:
+        provider = "RequestYAI"
+        api_key_configured = True
+    elif openai_key:
+        provider = "OpenAI"
+        api_key_configured = True
+        base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    else:
+        provider = "Unknown"
+        api_key_configured = False
+    
+    return LLMConfig(
+        provider=provider,
+        model=LLM_MODEL,
+        base_url=base_url,
+        api_key_configured=api_key_configured
+    )
 
 
 @app.post("/api/background/start", tags=["background-processing"])
