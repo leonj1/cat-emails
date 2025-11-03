@@ -2066,8 +2066,8 @@ async def startup_event():
             logger.info("Starting background processor (delayed start after server ready)...")
             start_background_processor()
             logger.info("Background processor started successfully")
-        except Exception as e:
-            logger.exception(f"Failed to start background processor: {e}")
+        except Exception:
+            logger.exception("Failed to start background processor")
             # Don't exit - allow the API to run even if background processor fails
             logger.warning("API service will continue without background processing")
 
