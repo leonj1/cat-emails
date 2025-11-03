@@ -15,6 +15,8 @@ from models.database import (
     Base, EmailSummary, CategorySummary, SenderSummary, 
     DomainSummary, ProcessingRun, get_database_url, init_database, ProcessedEmailLog
 )
+from repositories.database_repository_interface import DatabaseRepositoryInterface
+from repositories.sqlalchemy_repository import SQLAlchemyRepository
 
 logger = get_logger(__name__)
 
@@ -22,61 +24,43 @@ logger = get_logger(__name__)
 class DatabaseService:
     """Service for managing database operations"""
     
-    def __init__(self, db_path: Optional[str] = None):
-        env_db_path = os.getenv("DATABASE_PATH")
-        if isinstance(db_path, str) and db_path.strip():
-            self.db_path = db_path
-        elif isinstance(env_db_path, str) and env_db_path.strip():
-            self.db_path = env_db_path
-        else:
-            raise ValueError(
-                "Database path must be provided either via 'db_path' parameter or 'DATABASE_PATH' environment variable. "
-                "No fallback path is configured."
-            )
-        self.engine = None
-        self.Session = None
-        self._ensure_database()
-    
-    def _ensure_database(self):
-        """Ensure database exists and is initialized"""
-        # Create directory if it doesn't exist
-        db_dir = os.path.dirname(self.db_path)
-        if db_dir and not os.path.exists(db_dir):
-            os.makedirs(db_dir, exist_ok=True)
+    def __init__(self, repository: Optional[DatabaseRepositoryInterface] = None, db_path: Optional[str] = None):
+        """
+        Initialize database service with dependency injection.
         
-        # Initialize database
-        self.engine = init_database(self.db_path)
-        self.Session = sessionmaker(bind=self.engine)
-        logger.info(f"Database initialized at {self.db_path}")
+        Args:
+            repository: Optional repository implementation. If not provided, creates SQLAlchemyRepository
+            db_path: Optional database path (used only if repository is not provided)
+        """
+        if repository:
+            self.repository = repository
+        else:
+            # Create default SQLAlchemy repository
+            self.repository = SQLAlchemyRepository(db_path=db_path)
+        
+        # Maintain backward compatibility - expose these for existing code
+        self.db_path = getattr(self.repository, 'db_path', None)
+        self.engine = getattr(self.repository, 'engine', None)
+        self.Session = getattr(self.repository, 'SessionFactory', None)
+        
+        logger.info(f"Database service initialized with repository: {type(self.repository).__name__}")
     
     def start_processing_run(self, email_address: str) -> str:
         """Start a new processing run and return its ID (format: 'run-<id>')"""
-        
-        with self.Session() as session:
-            run = ProcessingRun(
-                email_address=email_address,
-                start_time=datetime.utcnow(),
-                state='started'
-            )
-            session.add(run)
-            session.commit()
-            # Use the auto-incrementing DB ID for consistency across the system
-            return f"run-{run.id}"
+        return self.repository.create_processing_run(email_address)
     
     def complete_processing_run(self, run_id: str, metrics: Dict[str, int], 
                                success: bool = True, error_message: Optional[str] = None):
         """Complete a processing run with final metrics"""
-        with self.Session() as session:
-            run = session.query(ProcessingRun).filter_by(id=int(run_id.replace('run-', ''))).first()
-            if run:
-                run.end_time = datetime.utcnow()
-                run.emails_processed = metrics.get('processed', 0)
-                run.state = 'completed' if success else 'error'
-                run.error_message = error_message
-                session.commit()
+        self.repository.complete_processing_run(run_id, metrics, success, error_message)
     
     def save_email_summary(self, summary_data: Dict, account_id: Optional[int] = None):
         """Save email summary to database"""
+        summary = self.repository.save_email_summary(summary_data, account_id)
+        return summary.id if summary else None
+    
+    def _legacy_save_email_summary(self, summary_data: Dict, account_id: Optional[int] = None):
+        """LEGACY: Keep old implementation for reference during migration"""
         with self.Session() as session:
             # Create main summary
             summary = EmailSummary(

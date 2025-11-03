@@ -59,12 +59,16 @@ class EmailSummaryService:
         
         if use_database:
             try:
-                self.db_service = DatabaseService()
+                # Create a shared repository instance for all services
+                from repositories.sqlalchemy_repository import SQLAlchemyRepository
+                shared_repository = SQLAlchemyRepository()
+                
+                self.db_service = DatabaseService(repository=shared_repository)
                 logger.info("Database service initialized for email summaries")
                 
-                # Initialize account category service
+                # Initialize account category service with same repository
                 try:
-                    self.account_service = AccountCategoryClient()
+                    self.account_service = AccountCategoryClient(repository=shared_repository)
                     logger.info("Account category client initialized")
                 except Exception as e:
                     logger.warning(f"Failed to initialize account service: {str(e)}")

@@ -20,6 +20,8 @@ from models.account_models import (
     TopCategoriesResponse, CategoryStats, DatePeriod,
     EmailAccountInfo, AccountListResponse
 )
+from repositories.database_repository_interface import DatabaseRepositoryInterface
+from repositories.sqlalchemy_repository import SQLAlchemyRepository
 
 logger = get_logger(__name__)
 
@@ -27,34 +29,37 @@ logger = get_logger(__name__)
 class AccountCategoryClient(AccountCategoryClientInterface):
     """Client for managing email accounts and category statistics."""
 
-    def __init__(self, db_session: Optional[Session] = None, db_path: Optional[str] = None):
+    def __init__(self, repository: Optional[DatabaseRepositoryInterface] = None, 
+                 db_session: Optional[Session] = None, db_path: Optional[str] = None):
         """
-        Initialize the AccountCategoryClient.
+        Initialize the AccountCategoryClient with dependency injection.
         
         Args:
-            db_session: Optional existing database session to use
-            db_path: Path to the SQLite database file (used if no session provided)
+            repository: Optional repository implementation. Takes priority over other options
+            db_session: Optional existing database session (legacy, for backward compatibility)
+            db_path: Path to the SQLite database file (used if repository not provided)
         """
-        if db_session:
+        if repository:
+            # Use injected repository
+            self.repository = repository
+            self.session = None
+            self.owns_session = False
+            self.engine = getattr(repository, 'engine', None)
+            self.Session = getattr(repository, 'SessionFactory', None)
+        elif db_session:
+            # Legacy: Direct session injection (creates a wrapper repository internally)
+            self.repository = None  # Not using repository pattern in this mode
             self.session = db_session
             self.owns_session = False
             self.engine = None
             self.Session = None
         else:
-            env_db_path = os.getenv("DATABASE_PATH")
-            if isinstance(db_path, str) and db_path.strip():
-                self.db_path = db_path
-            elif isinstance(env_db_path, str) and env_db_path.strip():
-                self.db_path = env_db_path
-            else:
-                raise ValueError(
-                    "Database path must be provided either via 'db_path' parameter or 'DATABASE_PATH' environment variable. "
-                    "No fallback path is configured."
-                )
-            self.engine = init_database(self.db_path)
-            self.Session = sessionmaker(bind=self.engine)
+            # Create default repository
+            self.repository = SQLAlchemyRepository(db_path=db_path)
             self.session = None
             self.owns_session = True
+            self.engine = getattr(self.repository, 'engine', None)
+            self.Session = getattr(self.repository, 'SessionFactory', None)
         
         logger.info("AccountCategoryClient initialized")
     

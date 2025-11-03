@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from datetime import datetime
 
 from models.database import UserSettings, init_database
+from repositories.database_repository_interface import DatabaseRepositoryInterface
+from repositories.sqlalchemy_repository import SQLAlchemyRepository
 
 logger = get_logger(__name__)
 
@@ -16,19 +18,24 @@ logger = get_logger(__name__)
 class SettingsService:
     """Service for managing user settings and preferences"""
     
-    def __init__(self, db_path: Optional[str] = None):
-        env_db_path = os.getenv("DATABASE_PATH")
-        if isinstance(db_path, str) and db_path.strip():
-            self.db_path = db_path
-        elif isinstance(env_db_path, str) and env_db_path.strip():
-            self.db_path = env_db_path
+    def __init__(self, repository: Optional[DatabaseRepositoryInterface] = None, db_path: Optional[str] = None):
+        """
+        Initialize settings service with dependency injection.
+        
+        Args:
+            repository: Optional repository implementation. If not provided, creates SQLAlchemyRepository
+            db_path: Optional database path (used only if repository is not provided)
+        """
+        if repository:
+            self.repository = repository
         else:
-            raise ValueError(
-                "Database path must be provided either via 'db_path' parameter or 'DATABASE_PATH' environment variable. "
-                "No fallback path is configured."
-            )
-        self.engine = init_database(self.db_path)
-        self.Session = sessionmaker(bind=self.engine)
+            self.repository = SQLAlchemyRepository(db_path=db_path)
+        
+        # Maintain backward compatibility
+        self.db_path = getattr(self.repository, 'db_path', None)
+        self.engine = getattr(self.repository, 'engine', None)
+        self.Session = getattr(self.repository, 'SessionFactory', None)
+        
         self._initialize_default_settings()
     
     def _initialize_default_settings(self):
@@ -63,49 +70,27 @@ class SettingsService:
     
     def get_setting(self, key: str, default_value: Any = None) -> Any:
         """Get a setting value by key, with type conversion"""
-        with self.Session() as session:
-            setting = session.query(UserSettings).filter_by(setting_key=key).first()
-            
-            if not setting:
-                return default_value
-            
-            # Convert based on setting type
-            if setting.setting_type == 'integer':
-                return int(setting.setting_value)
-            elif setting.setting_type == 'float':
-                return float(setting.setting_value)
-            elif setting.setting_type == 'boolean':
-                return setting.setting_value.lower() in ('true', '1', 'yes')
-            else:
-                return setting.setting_value
+        setting = self.repository.get_setting(key)
+        
+        if not setting:
+            return default_value
+        
+        # Convert based on setting type
+        if setting.setting_type == 'integer':
+            return int(setting.setting_value)
+        elif setting.setting_type == 'float':
+            return float(setting.setting_value)
+        elif setting.setting_type == 'boolean':
+            return setting.setting_value.lower() in ('true', '1', 'yes')
+        else:
+            return setting.setting_value
     
     def set_setting(self, key: str, value: Any, setting_type: str = 'string', description: str = '') -> bool:
         """Set a setting value with automatic type conversion"""
         try:
-            with self.Session() as session:
-                setting = session.query(UserSettings).filter_by(setting_key=key).first()
-                
-                if setting:
-                    # Update existing setting
-                    setting.setting_value = str(value)
-                    setting.setting_type = setting_type
-                    if description:
-                        setting.description = description
-                    setting.updated_at = datetime.utcnow()
-                else:
-                    # Create new setting
-                    setting = UserSettings(
-                        setting_key=key,
-                        setting_value=str(value),
-                        setting_type=setting_type,
-                        description=description
-                    )
-                    session.add(setting)
-                
-                session.commit()
-                logger.info(f"Updated setting: {key} = {value}")
-                return True
-                
+            self.repository.set_setting(key, str(value), setting_type, description)
+            logger.info(f"Updated setting: {key} = {value}")
+            return True
         except Exception as e:
             logger.error(f"Error setting {key}: {e}")
             return False
