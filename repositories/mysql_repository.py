@@ -86,7 +86,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
         else:
             # Try to connect if environment variables are available
             try:
-                conn_str = self._build_connection_string()
+                self._build_connection_string()
                 self.connect()
             except ValueError:
                 # No credentials available - this is OK, caller should provide them later
