@@ -81,7 +81,7 @@ class SettingsService:
             if mysql_repo.is_connected():
                 logger.info("SettingsService using MySQL repository")
                 return mysql_repo
-        except Exception as e:
+        except (ValueError, OSError, ConnectionError) as e:
             logger.debug(f"MySQL not available, trying SQLite: {e}")
 
         # Fall back to SQLite
@@ -91,8 +91,6 @@ class SettingsService:
         if db_path:
             try:
                 sqlite_repo = SQLAlchemyRepository(db_path)
-                logger.info("SettingsService using SQLite repository")
-                return sqlite_repo
             except Exception as e:
                 logger.exception("Failed to initialize SQLite repository")
                 raise ValueError(
@@ -100,6 +98,9 @@ class SettingsService:
                     "Set MySQL credentials (MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER) "
                     "or DATABASE_PATH for SQLite."
                 ) from e
+            else:
+                logger.info("SettingsService using SQLite repository")
+                return sqlite_repo
         else:
             raise ValueError(
                 "SettingsService requires database configuration. "
