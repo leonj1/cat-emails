@@ -91,16 +91,15 @@ class SettingsService:
         if db_path:
             try:
                 sqlite_repo = SQLAlchemyRepository(db_path)
-            except Exception as e:
+                logger.info("SettingsService using SQLite repository")
+                return sqlite_repo
+            except (ValueError, OSError, ConnectionError) as e:
                 logger.exception("Failed to initialize SQLite repository")
                 raise ValueError(
                     "SettingsService could not initialize any repository. "
                     "Set MySQL credentials (MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER) "
                     "or DATABASE_PATH for SQLite."
                 ) from e
-            else:
-                logger.info("SettingsService using SQLite repository")
-                return sqlite_repo
         else:
             raise ValueError(
                 "SettingsService requires database configuration. "
