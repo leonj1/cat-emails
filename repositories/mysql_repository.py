@@ -79,10 +79,19 @@ class MySQLRepository(DatabaseRepositoryInterface):
         self.engine = None
         self.SessionFactory = None
         self._session: Optional[Session] = None
-        
-        # Auto-connect if credentials provided
+
+        # Auto-connect if credentials provided or available in environment
         if connection_string or (host and database and username):
             self.connect()
+        else:
+            # Try to connect if environment variables are available
+            try:
+                conn_str = self._build_connection_string()
+                if conn_str:
+                    self.connect()
+            except ValueError:
+                # No credentials available - this is OK, caller should provide them later
+                logger.debug("MySQLRepository initialized without credentials - connect() must be called with credentials")
     
     # ==================== Connection Management ====================
     
