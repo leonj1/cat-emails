@@ -232,6 +232,9 @@ except (ValueError, TypeError):
     logger.warning("Invalid BACKGROUND_START_DELAY_SECONDS value, using default of 5 seconds")
     BACKGROUND_START_DELAY = 5
 
+# Default database path when DATABASE_PATH env var is not set
+DEFAULT_DB_PATH = "./email_summaries/summaries.db"
+
 # Global flag for background thread control
 background_thread_running = True
 background_thread = None
@@ -249,7 +252,7 @@ websocket_manager: Optional[StatusWebSocketManager] = None
 
 # Global settings service instance
 # Use DATABASE_PATH from env, or default to ./email_summaries/summaries.db
-default_db_path = os.getenv("DATABASE_PATH", "./email_summaries/summaries.db")
+default_db_path = os.getenv("DATABASE_PATH", DEFAULT_DB_PATH)
 settings_service = SettingsService(db_path=default_db_path)
 
 # Global LLM service factory instance
@@ -2034,7 +2037,7 @@ async def startup_event():
         "LLM_MODEL": LLM_MODEL,
         "BACKGROUND_PROCESSING_ENABLED": BACKGROUND_PROCESSING_ENABLED,
         "BACKGROUND_SCAN_INTERVAL": BACKGROUND_SCAN_INTERVAL,
-        "DATABASE_PATH": os.getenv("DATABASE_PATH", "default"),
+        "DATABASE_PATH": os.getenv("DATABASE_PATH", DEFAULT_DB_PATH),
         "REQUESTYAI_API_KEY": "***" if os.getenv("REQUESTYAI_API_KEY") else None,
         "OPENAI_API_KEY": "***" if os.getenv("OPENAI_API_KEY") else None,
     }
