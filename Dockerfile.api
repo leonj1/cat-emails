@@ -15,8 +15,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all necessary Python files
 COPY api_service.py .
 COPY send_emails.py .
+COPY domain_service.py .
+COPY gmail_fetcher.py .
 COPY models/ ./models/
 COPY services/ ./services/
+COPY repositories/ ./repositories/
+COPY clients/ ./clients/
+COPY utils/ ./utils/
 COPY email_providers/ ./email_providers/
 COPY templates/ ./templates/
 
