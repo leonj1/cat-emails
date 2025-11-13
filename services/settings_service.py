@@ -94,7 +94,7 @@ class SettingsService:
                 logger.info("SettingsService using SQLite repository")
                 return sqlite_repo
             except Exception as e:
-                logger.error(f"Failed to initialize SQLite repository: {e}")
+                logger.exception("Failed to initialize SQLite repository")
                 raise ValueError(
                     "SettingsService could not initialize any repository. "
                     "Set MySQL credentials (MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER) "
