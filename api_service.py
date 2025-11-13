@@ -248,7 +248,9 @@ processing_status_manager = ProcessingStatusManager(max_history=100)
 websocket_manager: Optional[StatusWebSocketManager] = None
 
 # Global settings service instance
-settings_service = SettingsService()
+# Use DATABASE_PATH from env, or default to ./email_summaries/summaries.db
+default_db_path = os.getenv("DATABASE_PATH", "./email_summaries/summaries.db")
+settings_service = SettingsService(db_path=default_db_path)
 
 # Global LLM service factory instance
 llm_service_factory = LLMServiceFactory()
