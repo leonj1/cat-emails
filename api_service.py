@@ -563,7 +563,9 @@ async def get_configuration(x_api_key: Optional[str] = Header(None)):
     # Get total Gmail accounts count
     total_accounts = 0
     try:
-        accounts = settings_service.get_all_accounts(active_only=False)
+        # Use AccountCategoryClient which has the get_all_accounts method
+        account_client = AccountCategoryClient(repository=settings_service.repository)
+        accounts = account_client.get_all_accounts(active_only=False)
         total_accounts = len(accounts)
     except Exception as e:
         logger.error(f"Error getting account count for config: {str(e)}")
