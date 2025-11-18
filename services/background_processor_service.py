@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
 from services.background_processor_interface import BackgroundProcessorInterface
 from clients.account_category_client import AccountCategoryClient
+from repositories.mysql_repository import MySQLRepository
 
 logger = get_logger(__name__)
 
@@ -34,6 +35,11 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
         self.background_enabled = background_enabled
         self.running = True
         self.next_execution_time: Optional[datetime] = None
+        
+        # Create repository once for all cycles to prevent resource leak
+        self.repository = MySQLRepository()
+        if not self.repository.is_connected():
+            self.repository.connect()
 
     def should_continue(self) -> bool:
         """
@@ -81,7 +87,8 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
 
                 # Get list of active Gmail accounts from database
                 try:
-                    service = AccountCategoryClient()
+                    # Use the shared repository instance
+                    service = AccountCategoryClient(repository=self.repository)
                     accounts = service.get_all_accounts()
 
                     if not accounts:
