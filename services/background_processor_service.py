@@ -42,8 +42,8 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
             if not self.repository.is_connected():
                 self.repository.connect()
         except Exception as e:
-            logger.error(f"Failed to connect to repository during BackgroundProcessorService initialization: {e}")
-            raise RuntimeError(f"Repository connection failed: {e}") from e
+            logger.exception("Failed to connect to repository during BackgroundProcessorService initialization")
+            raise RuntimeError("Repository connection failed") from e
 
     def should_continue(self) -> bool:
         """
