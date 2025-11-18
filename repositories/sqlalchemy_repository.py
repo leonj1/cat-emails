@@ -7,7 +7,7 @@ This concrete implementation uses SQLAlchemy ORM to interact with SQLite databas
 import os
 from typing import List, Dict, Optional, Any, TypeVar, Type
 from datetime import datetime, date, timedelta
-from sqlalchemy import create_engine, and_, func
+from sqlalchemy import create_engine, and_, func, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -85,6 +85,48 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
     def is_connected(self) -> bool:
         """Check if repository is connected"""
         return self.engine is not None and self.SessionFactory is not None
+
+    def get_connection_status(self) -> Dict[str, Any]:
+        """Get detailed connection status information"""
+        if not self.engine or not self.SessionFactory:
+            return {
+                "connected": False,
+                "status": "Not connected - database not initialized",
+                "error": "Repository not connected. Call connect() first.",
+                "details": {
+                    "db_path": self.db_path,
+                    "engine_initialized": self.engine is not None,
+                    "session_factory_initialized": self.SessionFactory is not None
+                }
+            }
+
+        # Try to execute a simple query to verify connection
+        try:
+            session = self._get_session()
+            # Execute a simple query to test connection
+            session.execute(text("SELECT 1"))
+            return {
+                "connected": True,
+                "status": "Connected and operational",
+                "error": None,
+                "details": {
+                    "db_path": self.db_path,
+                    "engine_initialized": True,
+                    "session_factory_initialized": True
+                }
+            }
+        except Exception as e:
+            logger.exception("Database connection test failed: %s", e)
+            return {
+                "connected": False,
+                "status": "Connection test failed",
+                "error": str(e),
+                "details": {
+                    "db_path": self.db_path,
+                    "engine_initialized": self.engine is not None,
+                    "session_factory_initialized": self.SessionFactory is not None
+                }
+            }
     
     def _get_session(self) -> Session:
         """Get or create a session"""

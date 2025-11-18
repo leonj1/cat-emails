@@ -43,6 +43,20 @@ class DatabaseRepositoryInterface(ABC):
     def is_connected(self) -> bool:
         """Check if repository is connected to database"""
         pass
+
+    @abstractmethod
+    def get_connection_status(self) -> Dict[str, Any]:
+        """
+        Get detailed connection status information.
+
+        Returns:
+            Dict with keys:
+                - connected (bool): Whether database is connected
+                - status (str): Human-readable status message
+                - error (str, optional): Error message if connection failed
+                - details (dict, optional): Additional connection details
+        """
+        pass
     
     # ==================== Generic CRUD Operations ====================
     

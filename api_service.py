@@ -577,19 +577,44 @@ def _get_database_config() -> DatabaseConfig:
     db_user = os.getenv("DATABASE_USER")
     db_url = os.getenv("DATABASE_URL")
     db_path = os.getenv("DATABASE_PATH")
-    
+
+    # Get connection status from the settings_service repository
+    connection_status = {
+        "connected": False,
+        "status": "Unknown",
+        "error": None
+    }
+
+    try:
+        if settings_service and hasattr(settings_service, 'repository'):
+            status = settings_service.repository.get_connection_status()
+            connection_status = {
+                "connected": status.get("connected", False),
+                "status": status.get("status", "Unknown"),
+                "error": status.get("error")
+            }
+    except Exception as e:
+        connection_status = {
+            "connected": False,
+            "status": "Error checking connection",
+            "error": str(e)
+        }
+
     if db_host or db_user or db_url:
         # MySQL configuration
         db_port = int(os.getenv("DATABASE_PORT", "3306"))
         db_name = os.getenv("DATABASE_NAME", "cat_emails")
         pool_size = int(os.getenv("DATABASE_POOL_SIZE", "5"))
-        
+
         return DatabaseConfig(
             type="mysql",
             host=db_host,
             port=db_port,
             database_name=db_name,
-            connection_pool_size=pool_size
+            connection_pool_size=pool_size,
+            connected=connection_status["connected"],
+            connection_status=connection_status["status"],
+            connection_error=connection_status["error"]
         )
     elif db_path:
         # SQLite configuration
@@ -599,16 +624,22 @@ def _get_database_config() -> DatabaseConfig:
             db_type = "sqlite_cloud"
         else:
             db_type = "sqlite_local"
-        
+
         return DatabaseConfig(
             type=db_type,
-            path=db_path
+            path=db_path,
+            connected=connection_status["connected"],
+            connection_status=connection_status["status"],
+            connection_error=connection_status["error"]
         )
     else:
         # Default to MySQL if no explicit config (matches MySQLRepository default in services)
         return DatabaseConfig(
             type="mysql",
-            database_name="cat_emails"
+            database_name="cat_emails",
+            connected=connection_status["connected"],
+            connection_status=connection_status["status"],
+            connection_error=connection_status["error"]
         )
 
 

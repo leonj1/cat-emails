@@ -31,6 +31,18 @@ class DatabaseConfig(BaseModel):
         None,
         description="Connection pool size (for MySQL)"
     )
+    connected: bool = Field(
+        ...,
+        description="Whether the database is currently connected"
+    )
+    connection_status: str = Field(
+        ...,
+        description="Human-readable connection status message"
+    )
+    connection_error: Optional[str] = Field(
+        None,
+        description="Error message if connection failed"
+    )
 
 
 class LLMConfig(BaseModel):
