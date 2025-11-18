@@ -123,3 +123,7 @@ class ConfigurationResponse(BaseModel):
         ...,
         description="API version"
     )
+    total_gmail_accounts: int = Field(
+        ...,
+        description="Total number of Gmail accounts configured"
+    )

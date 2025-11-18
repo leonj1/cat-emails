@@ -560,13 +560,22 @@ async def get_configuration(x_api_key: Optional[str] = Header(None)):
     # Determine environment
     environment = os.getenv("ENVIRONMENT", os.getenv("RAILWAY_ENVIRONMENT", "development"))
     
+    # Get total Gmail accounts count
+    total_accounts = 0
+    try:
+        accounts = settings_service.get_all_accounts(active_only=False)
+        total_accounts = len(accounts)
+    except Exception as e:
+        logger.error(f"Error getting account count for config: {str(e)}")
+    
     return ConfigurationResponse(
         database=database_config,
         llm=llm_config,
         background_processing=background_config,
         api_service=api_config,
         environment=environment,
-        version=API_VERSION
+        version=API_VERSION,
+        total_gmail_accounts=total_accounts
     )
 
 
