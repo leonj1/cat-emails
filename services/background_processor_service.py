@@ -81,7 +81,14 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
 
                 # Get list of active Gmail accounts from database
                 try:
-                    service = AccountCategoryClient()
+                    from repositories.mysql_repository import MySQLRepository
+                    
+                    # Create and connect repository explicitly
+                    repository = MySQLRepository()
+                    if not repository.is_connected():
+                        repository.connect()
+                    
+                    service = AccountCategoryClient(repository=repository)
                     accounts = service.get_all_accounts()
 
                     if not accounts:
