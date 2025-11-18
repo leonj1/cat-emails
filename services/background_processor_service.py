@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
 from services.background_processor_interface import BackgroundProcessorInterface
 from clients.account_category_client import AccountCategoryClient
-from repositories.mysql_repository import MySQLRepository
 
 logger = get_logger(__name__)
 
@@ -35,11 +34,16 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
         self.background_enabled = background_enabled
         self.running = True
         self.next_execution_time: Optional[datetime] = None
-        
-        # Create repository once for all cycles to prevent resource leak
-        self.repository = MySQLRepository()
-        if not self.repository.is_connected():
-            self.repository.connect()
+
+        # Reuse repository from settings_service to maintain consistency
+        # This uses the same database connection (MySQL if configured, else SQLite)
+        self.repository = settings_service.repository
+        try:
+            if not self.repository.is_connected():
+                self.repository.connect()
+        except Exception as e:
+            logger.exception("Failed to connect to repository during BackgroundProcessorService initialization")
+            raise RuntimeError("Repository connection failed") from e
 
     def should_continue(self) -> bool:
         """

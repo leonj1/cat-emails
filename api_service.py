@@ -284,7 +284,7 @@ def _initialize_account_email_processor():
             email_categorizer=email_categorizer_service,
             api_token=CONTROL_API_TOKEN,
             llm_model=LLM_MODEL,
-            account_category_client=AccountCategoryClient(),
+            account_category_client=AccountCategoryClient(repository=settings_service.repository),
             deduplication_factory=EmailDeduplicationFactory()
             # create_gmail_fetcher defaults to GmailFetcher constructor
         )
@@ -297,7 +297,7 @@ def _initialize_account_email_processor():
 def get_account_service() -> AccountCategoryClientInterface:
     """Dependency to provide AccountCategoryClient instance."""
     try:
-        return AccountCategoryClient()
+        return AccountCategoryClient(repository=settings_service.repository)
     except Exception as e:
         logger.error(f"Failed to create AccountCategoryClient: {str(e)}")
         raise HTTPException(
@@ -512,7 +512,7 @@ async def health_check():
     # Database status
     try:
         from clients.account_category_client import AccountCategoryClient
-        test_client = AccountCategoryClient()
+        test_client = AccountCategoryClient(repository=settings_service.repository)
         health_status["database"] = "connected"
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
@@ -563,7 +563,9 @@ async def get_configuration(x_api_key: Optional[str] = Header(None)):
     # Get total Gmail accounts count
     total_accounts = 0
     try:
-        accounts = settings_service.get_all_accounts(active_only=False)
+        # Use AccountCategoryClient which has the get_all_accounts method
+        account_client = AccountCategoryClient(repository=settings_service.repository)
+        accounts = account_client.get_all_accounts(active_only=False)
         total_accounts = len(accounts)
     except Exception as e:
         logger.error(f"Error getting account count for config: {str(e)}")
@@ -2087,7 +2089,7 @@ async def startup_event():
         # Test database initialization
         logger.info("Testing database connection...")
         from clients.account_category_client import AccountCategoryClient
-        test_client = AccountCategoryClient()
+        test_client = AccountCategoryClient(repository=settings_service.repository)
         logger.info("Database connection successful")
 
         # Initialize WebSocket manager
