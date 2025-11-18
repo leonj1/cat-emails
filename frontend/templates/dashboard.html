@@ -726,7 +726,7 @@
             .then(response => response.json())
             .then(data => {
                 const dbStatus = document.getElementById('databaseStatus');
-                if (data.database && data.database.connected) {
+                if (data?.database?.connected) {
                     // Database is connected - show green badge
                     dbStatus.className = 'badge bg-success ms-auto';
                     dbStatus.innerHTML = '<i class="bi bi-check-circle-fill"></i> Connected';
@@ -735,7 +735,7 @@
                     // Database is not connected - show red badge
                     dbStatus.className = 'badge bg-danger ms-auto';
                     dbStatus.innerHTML = '<i class="bi bi-x-circle-fill"></i> Disconnected';
-                    dbStatus.title = data.database?.connection_error || 'Database connection failed';
+                    dbStatus.title = data?.database?.connection_error || 'Database connection failed';
                 }
             })
             .catch(error => {
