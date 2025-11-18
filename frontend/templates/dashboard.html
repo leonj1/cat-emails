@@ -674,6 +674,13 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="d-flex align-items-center mb-2">
+                                        <i class="bi bi-database-fill text-success me-2"></i>
+                                        <span class="fw-semibold">Database:</span>
+                                        <span class="badge ms-auto" id="databaseStatus">
+                                            <i class="bi bi-hourglass-split"></i> Checking...
+                                        </span>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
                                         <i class="bi bi-gear-fill text-primary me-2"></i>
                                         <span class="fw-semibold">Background Processing:</span>
                                         <span class="badge bg-success ms-auto" id="backgroundStatus">Active</span>
@@ -711,7 +718,34 @@
     // Load settings when modal opens
     $('#settingsModal').on('show.bs.modal', function () {
         loadSettings();
+        loadDatabaseStatus();
     });
+
+    function loadDatabaseStatus() {
+        fetch('/api/config')
+            .then(response => response.json())
+            .then(data => {
+                const dbStatus = document.getElementById('databaseStatus');
+                if (data.database && data.database.connected) {
+                    // Database is connected - show green badge
+                    dbStatus.className = 'badge bg-success ms-auto';
+                    dbStatus.innerHTML = '<i class="bi bi-check-circle-fill"></i> Connected';
+                    dbStatus.title = data.database.connection_status || 'Database connected';
+                } else {
+                    // Database is not connected - show red badge
+                    dbStatus.className = 'badge bg-danger ms-auto';
+                    dbStatus.innerHTML = '<i class="bi bi-x-circle-fill"></i> Disconnected';
+                    dbStatus.title = data.database?.connection_error || 'Database connection failed';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading database status:', error);
+                const dbStatus = document.getElementById('databaseStatus');
+                dbStatus.className = 'badge bg-warning ms-auto';
+                dbStatus.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> Error';
+                dbStatus.title = 'Failed to check database status';
+            });
+    }
 
     function loadSettings() {
         fetch('/api/settings')
