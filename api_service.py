@@ -284,7 +284,7 @@ def _initialize_account_email_processor():
             email_categorizer=email_categorizer_service,
             api_token=CONTROL_API_TOKEN,
             llm_model=LLM_MODEL,
-            account_category_client=AccountCategoryClient(),
+            account_category_client=AccountCategoryClient(repository=settings_service.repository),
             deduplication_factory=EmailDeduplicationFactory()
             # create_gmail_fetcher defaults to GmailFetcher constructor
         )
@@ -297,7 +297,7 @@ def _initialize_account_email_processor():
 def get_account_service() -> AccountCategoryClientInterface:
     """Dependency to provide AccountCategoryClient instance."""
     try:
-        return AccountCategoryClient()
+        return AccountCategoryClient(repository=settings_service.repository)
     except Exception as e:
         logger.error(f"Failed to create AccountCategoryClient: {str(e)}")
         raise HTTPException(
@@ -512,7 +512,7 @@ async def health_check():
     # Database status
     try:
         from clients.account_category_client import AccountCategoryClient
-        test_client = AccountCategoryClient()
+        test_client = AccountCategoryClient(repository=settings_service.repository)
         health_status["database"] = "connected"
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
@@ -2089,7 +2089,7 @@ async def startup_event():
         # Test database initialization
         logger.info("Testing database connection...")
         from clients.account_category_client import AccountCategoryClient
-        test_client = AccountCategoryClient()
+        test_client = AccountCategoryClient(repository=settings_service.repository)
         logger.info("Database connection successful")
 
         # Initialize WebSocket manager

@@ -38,8 +38,12 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
         # Reuse repository from settings_service to maintain consistency
         # This uses the same database connection (MySQL if configured, else SQLite)
         self.repository = settings_service.repository
-        if not self.repository.is_connected():
-            self.repository.connect()
+        try:
+            if not self.repository.is_connected():
+                self.repository.connect()
+        except Exception as e:
+            logger.error(f"Failed to connect to repository during BackgroundProcessorService initialization: {e}")
+            raise RuntimeError(f"Repository connection failed: {e}") from e
 
     def should_continue(self) -> bool:
         """
