@@ -676,7 +676,7 @@
                                     <div class="d-flex align-items-center mb-2">
                                         <i class="bi bi-database-fill text-success me-2"></i>
                                         <span class="fw-semibold">Database:</span>
-                                        <span class="badge ms-auto" id="databaseStatus">
+                                        <span class="badge bg-secondary ms-auto" id="databaseStatus">
                                             <i class="bi bi-hourglass-split"></i> Checking...
                                         </span>
                                     </div>
@@ -722,9 +722,13 @@
     });
 
     function loadDatabaseStatus() {
-        fetch('/api/config')
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        fetch('/api/config', { signal: controller.signal })
             .then(response => response.json())
             .then(data => {
+                clearTimeout(timeoutId);
                 const dbStatus = document.getElementById('databaseStatus');
                 if (data?.database?.connected) {
                     // Database is connected - show green badge
@@ -739,6 +743,7 @@
                 }
             })
             .catch(error => {
+                clearTimeout(timeoutId);
                 console.error('Error loading database status:', error);
                 const dbStatus = document.getElementById('databaseStatus');
                 dbStatus.className = 'badge bg-warning ms-auto';
