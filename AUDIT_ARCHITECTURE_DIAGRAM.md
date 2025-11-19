@@ -2,7 +2,7 @@
 
 ## System Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     BACKGROUND PROCESSOR LOOP                         │
 │              (BackgroundProcessorService.run())                      │
@@ -62,7 +62,7 @@
 
 ## Detailed Flow: Single Processing Run
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 1. START PROCESSING RUN                                              │
 └─────────────────────────────────────────────────────────────────────┘
@@ -225,7 +225,7 @@ AccountEmailProcessorService.process_account()
 
 ## Data Storage Layers
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │ LAYER 1: IN-MEMORY (ProcessingStatusManager)                        │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -296,7 +296,7 @@ AccountEmailProcessorService.process_account()
 
 ## Data Access Patterns
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────┐
 │ API CLIENTS                                                     │
 │ (Browser, Monitoring, Dashboard)                               │
@@ -339,7 +339,7 @@ AccountEmailProcessorService.process_account()
 
 ## ProcessingRun Database Table Lifecycle
 
-```
+```text
 TIME: 10:30:00 AM
 ┌─────────────────────────────────────────────────────────────────┐
 │ CREATE processing run (INSERT)                                   │
@@ -405,7 +405,7 @@ Available for queries:
 
 ## Summary Matrix
 
-```
+```text
 ┌──────────────────────┬──────────────┬──────────────┬────────────────┐
 │ Aspect               │ In-Memory    │ ProcessingRun│ Summary Tables │
 │                      │ (Live)       │ (DB)         │ (DB)           │

@@ -14,7 +14,7 @@ This document summarizes the comprehensive audit exploration of the Cat-Emails c
 
 **Key Finding**: Every background processing run per Gmail account is recorded in the `processing_runs` database table.
 
-```
+```text
 Table: processing_runs
 ├─ id (primary key)
 ├─ email_address (which account)
@@ -30,7 +30,8 @@ Table: processing_runs
 ```
 
 **Example Record**:
-```
+
+```text
 id: 42
 email_address: user@gmail.com
 start_time: 2025-11-19 10:30:00
@@ -45,7 +46,7 @@ error_message: NULL
 
 **Key Finding**: In-memory thread-safe manager tracks current processing status with granular step updates.
 
-```
+```text
 Current Status (during processing):
 ├─ email_address: user@gmail.com
 ├─ state: PROCESSING (enum with 8 states)
@@ -64,7 +65,7 @@ Recent Runs History (in-memory deque, maxlen=50):
 
 **Key Finding**: During processing, the system accumulates detailed action metrics.
 
-```
+```python
 run_metrics = {
     'fetched': 42,     # Total emails from Gmail
     'processed': 35,   # Emails with actions taken
@@ -74,20 +75,20 @@ run_metrics = {
 }
 
 category_stats = {
-    'Marketing': {count: 15, deleted: 15, archived: 0},
-    'Advertising': {count: 10, deleted: 5, archived: 5},
-    'Personal': {count: 10, deleted: 0, archived: 10}
+    'Marketing': {'count': 15, 'deleted': 15, 'archived': 0},
+    'Advertising': {'count': 10, 'deleted': 5, 'archived': 5},
+    'Personal': {'count': 10, 'deleted': 0, 'archived': 10}
 }
 
-sender_stats = {similar per-sender breakdown}
-domain_stats = {similar per-domain breakdown}
+sender_stats = {}  # similar per-sender breakdown
+domain_stats = {}  # similar per-domain breakdown
 ```
 
 ### 4. REST API Access to Audit Data
 
 **Key Finding**: Multiple API endpoints expose audit/history data.
 
-```
+```text
 GET /api/processing/status
    └─ Returns current active processing status (if any)
 
@@ -124,7 +125,7 @@ WS /ws/status
 
 ### Data Flow Chain
 
-```
+```text
 Background Processor Loop
     ├─ ProcessingStatusManager (in-memory start)
     ├─ EmailSummaryService (lifecycle start)
@@ -214,29 +215,33 @@ Background Processor Loop
 ### How to Verify the Audit System
 
 #### 1. Check Database Records
-```bash
-# Using MySQL directly
+
+```sql
+-- Using MySQL directly
 SELECT * FROM processing_runs ORDER BY start_time DESC LIMIT 10;
-SELECT email_address, COUNT(*) as runs, AVG(emails_processed) as avg_processed 
-  FROM processing_runs 
-  WHERE state = 'completed' 
+SELECT email_address, COUNT(*) as runs, AVG(emails_processed) as avg_processed
+  FROM processing_runs
+  WHERE state = 'completed'
   GROUP BY email_address;
 ```
 
 #### 2. Check In-Memory Status
+
 ```bash
-curl http://localhost:8001/api/processing/status
-curl http://localhost:8001/api/processing/history?limit=10
-curl http://localhost:8001/api/processing/statistics
+curl "http://localhost:8001/api/processing/status"
+curl "http://localhost:8001/api/processing/history?limit=10"
+curl "http://localhost:8001/api/processing/statistics"
 ```
 
 #### 3. Monitor During Processing
+
 ```bash
 # Watch real-time updates
-curl http://localhost:8001/api/processing/current-status?include_recent=true
+curl "http://localhost:8001/api/processing/current-status?include_recent=true"
 ```
 
 #### 4. WebSocket Real-Time Monitoring
+
 ```javascript
 ws = new WebSocket('ws://localhost:8001/ws/status');
 ws.onmessage = (e) => console.log(JSON.parse(e.data));
@@ -323,9 +328,9 @@ The current system successfully tracks:
 
 ### Source Code to Review
 
-For deeper understanding, examine:
+For a more thorough understanding, examine:
 
-```
+```text
 Core Audit:
   /root/repo/models/database.py (ProcessingRun class)
   /root/repo/services/processing_status_manager.py (Real-time tracking)

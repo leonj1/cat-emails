@@ -40,6 +40,7 @@
 ## Key Data Structures
 
 ### ProcessingRun Table (Database)
+
 ```sql
 CREATE TABLE processing_runs (
     id INTEGER PRIMARY KEY,
@@ -58,6 +59,7 @@ CREATE TABLE processing_runs (
 ```
 
 ### EmailSummary Table (Related)
+
 ```sql
 CREATE TABLE email_summaries (
     id INTEGER PRIMARY KEY,
@@ -73,6 +75,7 @@ CREATE TABLE email_summaries (
 ```
 
 ### In-Memory Status (ProcessingStatusManager)
+
 ```python
 {
     'email_address': 'user@gmail.com',
@@ -86,6 +89,7 @@ CREATE TABLE email_summaries (
 ```
 
 ## Run Metrics Tracked (Before Persisting)
+
 ```python
 run_metrics = {
     'fetched': 42,      # Total emails from Gmail
@@ -98,7 +102,7 @@ run_metrics = {
 
 ## Data Flow
 
-```
+```text
 1. START RUN
    └─ ProcessingStatusManager.start_processing(email)
    └─ EmailSummaryService.start_processing_run()
@@ -137,14 +141,16 @@ run_metrics = {
 ## Database Performance
 
 ### Indexes on ProcessingRun
-```sql
+
+```text
 idx_processing_runs_email_address      -- Query by account
 idx_processing_runs_start_time          -- Query by date range
 idx_processing_runs_email_start         -- Combined: account + time
 idx_processing_runs_state               -- Filter by state
 ```
 
-Query examples:
+### Query Examples
+
 ```sql
 -- Get latest 10 runs
 SELECT * FROM processing_runs ORDER BY start_time DESC LIMIT 10;

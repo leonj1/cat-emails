@@ -38,6 +38,7 @@ class ProcessingRun(Base):
 ```
 
 ### Indexes for Performance
+
 - `idx_processing_runs_email_address` - Query by account
 - `idx_processing_runs_start_time` - Query by time range
 - `idx_processing_runs_email_start` - Query account + time
@@ -212,14 +213,16 @@ def get_recent_processing_runs(self, limit: int = 10,
 ### Available Endpoints
 
 #### Real-Time Status
+
 ```http
 GET /api/processing/status
 ```
+
 Returns current processing status including active state and current step.
 
 ```json
 {
-  "is_processing": boolean,
+  "is_processing": true,
   "current_status": {
     "email_address": "user@gmail.com",
     "state": "PROCESSING",
@@ -234,9 +237,11 @@ Returns current processing status including active state and current step.
 ```
 
 #### Processing History
+
 ```http
 GET /api/processing/history?limit=10
 ```
+
 Returns list of recent processing runs (default 10, max 100).
 
 ```json
@@ -259,9 +264,11 @@ Returns list of recent processing runs (default 10, max 100).
 ```
 
 #### Processing Statistics
+
 ```http
 GET /api/processing/statistics
 ```
+
 Returns aggregate statistics about recent processing runs.
 
 ```json
@@ -278,9 +285,11 @@ Returns aggregate statistics about recent processing runs.
 ```
 
 #### Comprehensive Status (Polling-Friendly)
+
 ```http
 GET /api/processing/current-status?include_recent=true&recent_limit=5&include_stats=false
 ```
+
 REST fallback for WebSocket functionality with extensive details.
 
 ---
@@ -438,7 +447,7 @@ def run(self) -> None:
 
 ## Summary: Complete Audit Chain
 
-```
+```text
 Background Processor Cycle
     ↓
 Process Account (AccountEmailProcessorService)

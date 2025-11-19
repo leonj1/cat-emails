@@ -155,7 +155,7 @@ CREATE INDEX idx_processing_runs_state ON processing_runs(state);
 
 ## How Data Flows
 
-```
+```text
 Background Processor Loop (every N seconds)
     ↓
 Get All Active Accounts
@@ -179,13 +179,13 @@ In-Memory Records Keep Recent 50 Runs
 ### Option 1: REST API (Current)
 ```bash
 # Get current status
-curl http://localhost:8001/api/processing/status
+curl "http://localhost:8001/api/processing/status"
 
 # Get recent history
-curl http://localhost:8001/api/processing/history?limit=50
+curl "http://localhost:8001/api/processing/history?limit=50"
 
 # Get statistics
-curl http://localhost:8001/api/processing/statistics
+curl "http://localhost:8001/api/processing/statistics"
 ```
 
 ### Option 2: WebSocket (Real-Time)
