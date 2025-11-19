@@ -53,11 +53,13 @@ class ProcessingRun(Base):
 
 ### Key Features
 
-**Thread-Safe Tracking**
+#### Thread-Safe Tracking
+
 - Uses `threading.RLock()` for safe concurrent access
 - Maintains current processing session + recent history (configurable, default 50 runs)
 
-**Processing States**
+#### Processing States
+
 ```python
 class ProcessingState(Enum):
     IDLE = auto()
@@ -70,7 +72,8 @@ class ProcessingState(Enum):
     ERROR = auto()           # Error occurred
 ```
 
-**Status Data Tracked per Run**
+#### Status Data Tracked per Run
+
 ```python
 @dataclass
 class AccountStatus:
@@ -483,9 +486,11 @@ GET /api/processing/current-status?include_recent=true&recent_limit=5&include_st
 ```
 
 ### Option 2: WebSocket (Real-Time Updates)
-```
+
+```text
 WS /ws/status
 ```
+
 For continuous real-time processing updates.
 
 ### Option 3: History Query
