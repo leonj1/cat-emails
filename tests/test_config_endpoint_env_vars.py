@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Unit tests for the /api/config endpoint database env_vars field.
 
@@ -139,7 +138,7 @@ class TestConfigEndpointEnvVars(unittest.TestCase):
         self.assertNotIn("password_value", env_vars_dict)
 
         # Also verify no value contains the password
-        for key, value in env_vars_dict.items():
+        for value in env_vars_dict.values():
             if value is not None:
                 self.assertNotEqual(value, "super_secret")
 
