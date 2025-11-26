@@ -4,17 +4,18 @@ Tests for EmailProcessorService keep/delete decision logic.
 This test module validates the critical business logic that determines whether
 an email should be kept in the inbox or deleted. The decision is based on:
 
-1. Repeat offender patterns - Previous deletions of similar emails
-2. Blocked domains - Domain is on the blocklist
-3. Allowed domains - Domain is on the allowlist (prevents deletion)
-4. Blocked categories - Category is on the blocklist
+1. Blocked domains - Domain is on the blocklist
+2. Allowed domains - Domain is on the allowlist (prevents deletion)
+3. Blocked categories - Category is on the blocklist (after LLM categorization)
 
-Decision Flow:
-- Repeat offender detected -> DELETE
-- Domain is blocked -> DELETE
-- Domain is allowed -> KEEP (skip categorization)
-- Category is blocked -> DELETE
+Decision Flow (tested in this module):
+- Domain is blocked -> DELETE (skips LLM categorization)
+- Domain is allowed -> KEEP (skips LLM categorization)
+- Category is blocked -> DELETE (after LLM categorization)
 - Category is not blocked -> KEEP
+
+Note: Repeat offender patterns (checked before domain/category logic in production)
+are not tested in this module as they require database session mocking.
 """
 import unittest
 from unittest.mock import Mock, MagicMock, patch
