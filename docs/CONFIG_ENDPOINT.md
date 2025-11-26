@@ -23,7 +23,18 @@ The endpoint returns a JSON response with the following structure:
     "port": 3306,
     "database_name": "cat_emails",
     "path": "/path/to/sqlite.db",
-    "connection_pool_size": 5
+    "connection_pool_size": 5,
+    "connected": true,
+    "connection_status": "Connected",
+    "connection_error": null,
+    "env_vars": {
+      "host_var": "DATABASE_HOST",
+      "host_value": "database-host",
+      "name_var": "DATABASE_NAME",
+      "name_value": "cat_emails",
+      "user_var": "DATABASE_USER",
+      "user_value": "app_user"
+    }
   },
   "llm": {
     "provider": "RequestYAI|OpenAI",
@@ -63,6 +74,16 @@ The `database` object shows which database backend is being used:
 - **database_name**: Database name (MySQL only)
 - **path**: File path (SQLite only)
 - **connection_pool_size**: Connection pool size (MySQL only)
+- **connected**: Whether the database connection is active
+- **connection_status**: Human-readable connection status message
+- **connection_error**: Error message if connection failed (null if connected)
+- **env_vars**: Environment variable names and values (MySQL only, excludes password and port for security)
+  - **host_var**: Name of the host environment variable (`DATABASE_HOST`)
+  - **host_value**: Current value of `DATABASE_HOST`
+  - **name_var**: Name of the database name environment variable (`DATABASE_NAME`)
+  - **name_value**: Current value of `DATABASE_NAME`
+  - **user_var**: Name of the user environment variable (`DATABASE_USER`)
+  - **user_value**: Current value of `DATABASE_USER`
 
 #### Database Type Detection Logic
 

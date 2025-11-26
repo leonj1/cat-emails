@@ -41,6 +41,27 @@ def test_config_endpoint():
     db_config = data["database"]
     assert "type" in db_config
     assert db_config["type"] in ["mysql", "sqlite_local", "sqlite_cloud", "unknown"]
+    assert "connected" in db_config
+    assert "connection_status" in db_config
+
+    # Check database env_vars if MySQL type (SQLite doesn't include env_vars)
+    if db_config["type"] == "mysql":
+        assert "env_vars" in db_config
+        env_vars = db_config["env_vars"]
+        assert "host_var" in env_vars
+        assert env_vars["host_var"] == "DATABASE_HOST"
+        assert "host_value" in env_vars
+        assert "name_var" in env_vars
+        assert env_vars["name_var"] == "DATABASE_NAME"
+        assert "name_value" in env_vars
+        assert "user_var" in env_vars
+        assert env_vars["user_var"] == "DATABASE_USER"
+        assert "user_value" in env_vars
+        # Verify password and port are NOT included
+        assert "password_var" not in env_vars
+        assert "password_value" not in env_vars
+        assert "port_var" not in env_vars
+        assert "port_value" not in env_vars
     
     # Check LLM config
     llm_config = data["llm"]

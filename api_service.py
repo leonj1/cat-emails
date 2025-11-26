@@ -47,7 +47,7 @@ from models.error_response import ErrorResponse
 from models.processing_current_status_response import ProcessingCurrentStatusResponse
 from models.force_process_response import ForceProcessResponse, ProcessingInfo
 from models.config_response import (
-    ConfigurationResponse, DatabaseConfig, LLMConfig,
+    ConfigurationResponse, DatabaseConfig, DatabaseEnvVars, LLMConfig,
     BackgroundProcessingConfig, APIServiceConfig
 )
 from sqlalchemy.exc import SQLAlchemyError
@@ -588,6 +588,7 @@ def _get_database_config() -> DatabaseConfig:
     db_user = os.getenv("DATABASE_USER")
     db_url = os.getenv("DATABASE_URL")
     db_path = os.getenv("DATABASE_PATH")
+    db_name = os.getenv("DATABASE_NAME", "cat_emails")
 
     # Get connection status from the settings_service repository
     connection_status = {
@@ -611,10 +612,19 @@ def _get_database_config() -> DatabaseConfig:
             "error": str(e)
         }
 
+    # Build env_vars for MySQL configurations (excludes password and port)
+    env_vars = DatabaseEnvVars(
+        host_var="DATABASE_HOST",
+        host_value=db_host,
+        name_var="DATABASE_NAME",
+        name_value=db_name,
+        user_var="DATABASE_USER",
+        user_value=db_user
+    )
+
     if db_host or db_user or db_url:
         # MySQL configuration
         db_port = int(os.getenv("DATABASE_PORT", "3306"))
-        db_name = os.getenv("DATABASE_NAME", "cat_emails")
         pool_size = int(os.getenv("DATABASE_POOL_SIZE", "5"))
 
         return DatabaseConfig(
@@ -625,7 +635,8 @@ def _get_database_config() -> DatabaseConfig:
             connection_pool_size=pool_size,
             connected=connection_status["connected"],
             connection_status=connection_status["status"],
-            connection_error=connection_status["error"]
+            connection_error=connection_status["error"],
+            env_vars=env_vars
         )
     elif db_path:
         # SQLite configuration
@@ -647,10 +658,11 @@ def _get_database_config() -> DatabaseConfig:
         # Default to MySQL if no explicit config (matches MySQLRepository default in services)
         return DatabaseConfig(
             type="mysql",
-            database_name="cat_emails",
+            database_name=db_name,
             connected=connection_status["connected"],
             connection_status=connection_status["status"],
-            connection_error=connection_status["error"]
+            connection_error=connection_status["error"],
+            env_vars=env_vars
         )
 
 
