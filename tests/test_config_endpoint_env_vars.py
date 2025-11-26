@@ -1,9 +1,9 @@
 """
-Unit tests for the /api/config endpoint database env_vars field.
+Unit tests for _get_database_config() env_vars handling.
 
-Tests that the configuration endpoint correctly returns database environment
-variable names and values (host, name, user) while excluding sensitive
-data (password, port).
+Tests that the database configuration function correctly returns database
+environment variable names and values (host, name, user) while excluding
+sensitive data (password, port).
 """
 import os
 import unittest
@@ -12,7 +12,6 @@ from unittest.mock import patch, MagicMock
 # Set minimal environment variables before importing api_service
 os.environ.setdefault("REQUESTYAI_API_KEY", "test-key")
 
-from fastapi.testclient import TestClient
 from models.config_response import DatabaseConfig, DatabaseEnvVars
 
 
@@ -88,8 +87,8 @@ class TestDatabaseConfigWithEnvVars(unittest.TestCase):
         self.assertIsNone(config.env_vars)
 
 
-class TestConfigEndpointEnvVars(unittest.TestCase):
-    """Integration tests for the /api/config endpoint env_vars field."""
+class TestGetDatabaseConfigEnvVars(unittest.TestCase):
+    """Unit tests for _get_database_config() env_vars handling."""
 
     @patch.dict(os.environ, {
         "DATABASE_HOST": "mysql.example.com",
