@@ -5,6 +5,37 @@ from pydantic import BaseModel, Field
 from typing import Optional, Literal
 
 
+class DatabaseEnvVars(BaseModel):
+    """Database environment variable names and their current values.
+
+    Excludes sensitive values (password) and port for security.
+    """
+    host_var: str = Field(
+        default="DATABASE_HOST",
+        description="Environment variable name for database host"
+    )
+    host_value: Optional[str] = Field(
+        None,
+        description="Current value of the database host environment variable"
+    )
+    name_var: str = Field(
+        default="DATABASE_NAME",
+        description="Environment variable name for database name"
+    )
+    name_value: Optional[str] = Field(
+        None,
+        description="Current value of the database name environment variable"
+    )
+    user_var: str = Field(
+        default="DATABASE_USER",
+        description="Environment variable name for database user"
+    )
+    user_value: Optional[str] = Field(
+        None,
+        description="Current value of the database user environment variable"
+    )
+
+
 class DatabaseConfig(BaseModel):
     """Database configuration details"""
     type: Literal["mysql", "sqlite_local", "sqlite_cloud", "unknown"] = Field(
@@ -42,6 +73,10 @@ class DatabaseConfig(BaseModel):
     connection_error: Optional[str] = Field(
         None,
         description="Error message if connection failed"
+    )
+    env_vars: Optional[DatabaseEnvVars] = Field(
+        None,
+        description="Database environment variable names and their current values (excludes password and port)"
     )
 
 
