@@ -11,7 +11,6 @@ from datetime import datetime
 from models.database import UserSettings, init_database
 from repositories.database_repository_interface import DatabaseRepositoryInterface
 from repositories.mysql_repository import MySQLRepository
-from repositories.sqlalchemy_repository import SQLAlchemyRepository
 
 logger = get_logger(__name__)
 
@@ -66,16 +65,16 @@ class SettingsService:
     def _create_default_repository(self, db_path: Optional[str] = None) -> DatabaseRepositoryInterface:
         """
         Create a default repository based on available configuration.
-        Tries MySQL first, falls back to SQLite if MySQL credentials not available.
+        Only tries MySQL. SQLite fallback has been removed to prevent data loss in production.
 
         Args:
-            db_path: Optional database path for SQLite fallback
+            db_path: Optional database path (unused, kept for compatibility)
 
         Returns:
             DatabaseRepositoryInterface: Connected repository instance
 
         Raises:
-            ValueError: If neither MySQL nor SQLite can be configured
+            ValueError: If MySQL cannot be configured
         """
         # Try MySQL first with retries
         import time
@@ -94,30 +93,11 @@ class SettingsService:
                     logger.warning(f"MySQL connection attempt {attempt+1} failed: {e}. Retrying in {retry_delay}s...")
                     time.sleep(retry_delay)
                 else:
-                    logger.debug(f"MySQL not available after {max_retries} attempts, trying SQLite: {e}")
-
-        # Fall back to SQLite
-        if not db_path:
-            db_path = os.getenv("DATABASE_PATH")
-
-        if db_path:
-            try:
-                sqlite_repo = SQLAlchemyRepository(db_path)
-                logger.info("SettingsService using SQLite repository")
-                return sqlite_repo
-            except (ValueError, ConnectionError) as e:
-                logger.exception("Failed to initialize SQLite repository")
-                raise ValueError(
-                    "SettingsService could not initialize any repository. "
-                    "Set MySQL credentials (MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER) "
-                    "or DATABASE_PATH for SQLite."
-                ) from e
-        else:
-            raise ValueError(
-                "SettingsService requires database configuration. "
-                "Either provide MySQL credentials (MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER) "
-                "or set DATABASE_PATH for SQLite."
-            )
+                    logger.error(f"MySQL not available after {max_retries} attempts: {e}")
+                    raise ValueError(f"Failed to initialize MySQL repository: {e}") from e
+        
+        # Should not be reached due to raise in loop
+        raise ValueError("Failed to initialize MySQL repository")
     
     def _initialize_default_settings(self):
         """Initialize default settings if they don't exist"""

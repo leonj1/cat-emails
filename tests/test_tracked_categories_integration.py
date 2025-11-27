@@ -20,6 +20,7 @@ from services.processing_status_manager import ProcessingStatusManager
 from services.fake_email_deduplication_factory import FakeEmailDeduplicationFactory
 from services.settings_service import SettingsService
 from services.logs_collector_service import LogsCollectorService
+from repositories.sqlalchemy_repository import SQLAlchemyRepository
 
 # Fake implementations for testing
 from tests.fake_gmail_fetcher import FakeGmailFetcher
@@ -39,8 +40,11 @@ class TestTrackedCategoriesIntegration(unittest.TestCase):
         # Initialize database with schema
         self.engine = init_database(self.db_path)
         
-        # Create real account category client with SQLite database
-        self.account_category_client = AccountCategoryClient(db_path=self.db_path)
+        # Create SQLite repository explicitly
+        self.repository = SQLAlchemyRepository(self.db_path)
+        
+        # Create real account category client with injected repository
+        self.account_category_client = AccountCategoryClient(repository=self.repository)
         
         # Create test email account
         self.test_email = "test@example.com"
@@ -55,7 +59,8 @@ class TestTrackedCategoriesIntegration(unittest.TestCase):
         
         # Set up fake services
         self.processing_status_manager = ProcessingStatusManager()
-        self.settings_service = SettingsService(self.engine)
+        # Inject repository into SettingsService
+        self.settings_service = SettingsService(repository=self.repository)
         self.deduplication_factory = FakeEmailDeduplicationFactory()
         self.logs_collector = LogsCollectorService()
         
@@ -235,7 +240,9 @@ class TestTrackedCategoriesIntegration(unittest.TestCase):
         initial_total_emails = initial_response.total_emails
         
         # Create a new client instance to ensure we're reading from DB, not cache
-        new_client = AccountCategoryClient(db_path=self.db_path)
+        # Use a fresh repository instance for the same DB path
+        new_repo = SQLAlchemyRepository(self.db_path)
+        new_client = AccountCategoryClient(repository=new_repo)
         
         # Get stats with new client instance
         persisted_response = new_client.get_top_categories(

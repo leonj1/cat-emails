@@ -4,6 +4,28 @@ Test script for the /api/config endpoint.
 """
 import os
 import sys
+from unittest.mock import MagicMock
+
+# Mock SettingsService before api_service is imported
+mock_settings_module = MagicMock()
+# Configure the mock to return a dictionary with strings when get_connection_status is called
+mock_repo = MagicMock()
+mock_repo.get_connection_status.return_value = {
+    "connected": False,
+    "status": "Mocked Connection",
+    "error": None,
+    "details": {
+        "host": "mock_host",
+        "port": 3306,
+        "database": "mock_db",
+        "pool_size": 5
+    }
+}
+mock_settings_instance = MagicMock()
+mock_settings_instance.repository = mock_repo
+mock_settings_module.SettingsService.return_value = mock_settings_instance
+
+sys.modules['services.settings_service'] = mock_settings_module
 
 # Set minimal environment variables for testing
 os.environ.setdefault("REQUESTYAI_API_KEY", "test-key-for-config-endpoint")
