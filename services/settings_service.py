@@ -31,6 +31,8 @@ class SettingsService:
         Raises:
             ValueError: If no repository can be initialized (no MySQL credentials and no SQLite path)
         """
+        self.mysql_init_error = None
+        
         if repository:
             self.repository = repository
             # Ensure repository is connected
@@ -81,7 +83,8 @@ class SettingsService:
             if mysql_repo.is_connected():
                 logger.info("SettingsService using MySQL repository")
                 return mysql_repo
-        except (ValueError, ConnectionError) as e:
+        except (ValueError, ConnectionError, ImportError, Exception) as e:
+            self.mysql_init_error = str(e)
             logger.debug(f"MySQL not available, trying SQLite: {e}")
 
         # Fall back to SQLite

@@ -686,7 +686,7 @@ def _get_database_config() -> DatabaseConfig:
             path=db_path,
             connected=connection_status["connected"],
             connection_status=connection_status["status"],
-            connection_error=connection_status["error"]
+            connection_error=connection_status["error"] or getattr(settings_service, 'mysql_init_error', None)
         )
     else:
         # Default to MySQL if no explicit config (matches MySQLRepository default in services)
