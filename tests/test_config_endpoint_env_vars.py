@@ -200,17 +200,26 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         self.assertEqual(config.port, 3306)  # Default port
         self.assertEqual(config.connection_pool_size, 5)  # Default pool size
 
+    @patch('api_service.settings_service')
     @patch.dict(os.environ, {
         "DATABASE_PATH": "/var/lib/app/data.db",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
-    def test_sqlite_config_no_env_vars(self):
+    def test_sqlite_config_no_env_vars(self, mock_settings_service):
         """Test that SQLite configuration doesn't include env_vars."""
         # Clear MySQL-related env vars for this test
         env_backup = {}
         for key in ["MYSQL_HOST", "MYSQL_USER", "MYSQL_URL"]:
             if key in os.environ:
                 env_backup[key] = os.environ.pop(key)
+        
+        # Mock repository to report disconnected (since we simulate no credentials)
+        mock_settings_service.repository.get_connection_status.return_value = {
+            "connected": False, 
+            "status": "Not connected", 
+            "error": None,
+            "details": {}
+        }
 
         try:
             from api_service import _get_database_config

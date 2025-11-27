@@ -10,6 +10,7 @@ from datetime import datetime, date, timedelta
 from sqlalchemy import create_engine, and_, func, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import QueuePool
 
 from repositories.database_repository_interface import DatabaseRepositoryInterface
@@ -67,7 +68,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
         """
         self.connection_string = connection_string
         self.host = host
-        self.port = port or 3306
+        # Defer defaulting to 3306 to _build_connection_string so URL parsing
+        # can fill self.port when only a connection string is provided.
+        self.port = port
         self.database = database
         self.username = username
         self.password = password
@@ -129,6 +132,23 @@ class MySQLRepository(DatabaseRepositoryInterface):
         
         # Build connection string
         conn_str = self._build_connection_string()
+        
+        # Parse connection string to populate missing attributes (e.g. if using MYSQL_URL)
+        try:
+            url = make_url(conn_str)
+        except (SQLAlchemyError, ValueError) as exc:
+            # Best-effort enrichment only; connection validity is checked by create_engine
+            # Do not log conn_str as it may contain credentials
+            logger.debug("Failed to parse MySQL connection string: %s", exc)
+        else:
+            if not self.host and url.host:
+                self.host = url.host
+            if not self.port and url.port:
+                self.port = url.port
+            if not self.database and url.database:
+                self.database = url.database
+            if not self.username and url.username:
+                self.username = url.username
         
         try:
             # Create engine with connection pooling

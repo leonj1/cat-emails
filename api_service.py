@@ -581,6 +581,27 @@ async def get_configuration(x_api_key: Optional[str] = Header(None)):
     )
 
 
+def _safe_int_env(var_name: str, default: int) -> int:
+    """
+    Safely parse an integer environment variable.
+    
+    Args:
+        var_name: Name of the environment variable
+        default: Default value to return if variable is missing or invalid
+        
+    Returns:
+        Integer value of the environment variable or default
+    """
+    value = os.getenv(var_name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning("Invalid value for %s=%r; falling back to %d", var_name, value, default)
+        return default
+
+
 def _get_database_config() -> DatabaseConfig:
     """Determine database configuration from environment variables."""
     # Check for MySQL configuration (MYSQL_* env vars only)
@@ -594,7 +615,8 @@ def _get_database_config() -> DatabaseConfig:
     connection_status = {
         "connected": False,
         "status": "Unknown",
-        "error": None
+        "error": None,
+        "details": {}
     }
 
     try:
@@ -603,13 +625,16 @@ def _get_database_config() -> DatabaseConfig:
             connection_status = {
                 "connected": status.get("connected", False),
                 "status": status.get("status", "Unknown"),
-                "error": status.get("error")
+                "error": status.get("error"),
+                "details": status.get("details", {})
             }
     except Exception as e:
+        logger.exception("Error checking database connection status for /api/config")
         connection_status = {
             "connected": False,
             "status": "Error checking connection",
-            "error": str(e)
+            "error": str(e),
+            "details": {}
         }
 
     # Build env_vars for MySQL configurations (excludes password and port)
@@ -622,17 +647,24 @@ def _get_database_config() -> DatabaseConfig:
         user_value=db_user
     )
 
-    if db_host or db_user or db_url:
+    # Check if MySQL is active (either via env vars or successful connection)
+    is_mysql_connected = connection_status["connected"] and connection_status.get("details", {}).get("engine_initialized", False)
+    
+    if db_host or db_user or db_url or is_mysql_connected:
         # MySQL configuration
-        # Use 'or' to handle empty string values (Railway may set vars to '')
-        db_port = int(os.getenv("MYSQL_PORT") or "3306")
-        pool_size = int(os.getenv("MYSQL_POOL_SIZE") or "5")
+        details = connection_status.get("details", {})
+        
+        # Use values from active connection if available (handles MYSQL_URL case), otherwise env vars
+        final_host = details.get("host") or db_host
+        final_port = details.get("port") or _safe_int_env("MYSQL_PORT", 3306)
+        final_database = details.get("database") or db_name
+        pool_size = details.get("pool_size") or _safe_int_env("MYSQL_POOL_SIZE", 5)
 
         return DatabaseConfig(
             type="mysql",
-            host=db_host,
-            port=db_port,
-            database_name=db_name,
+            host=final_host,
+            port=final_port,
+            database_name=final_database,
             connection_pool_size=pool_size,
             connected=connection_status["connected"],
             connection_status=connection_status["status"],
