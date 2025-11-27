@@ -583,12 +583,12 @@ async def get_configuration(x_api_key: Optional[str] = Header(None)):
 
 def _get_database_config() -> DatabaseConfig:
     """Determine database configuration from environment variables."""
-    # Check for MySQL configuration
-    db_host = os.getenv("DATABASE_HOST")
-    db_user = os.getenv("DATABASE_USER")
-    db_url = os.getenv("DATABASE_URL")
+    # Check for MySQL configuration (MYSQL_* env vars only)
+    db_host = os.getenv("MYSQL_HOST")
+    db_user = os.getenv("MYSQL_USER")
+    db_url = os.getenv("MYSQL_URL")
     db_path = os.getenv("DATABASE_PATH")
-    db_name = os.getenv("DATABASE_NAME", "cat_emails")
+    db_name = os.getenv("MYSQL_DATABASE", "cat_emails")
 
     # Get connection status from the settings_service repository
     connection_status = {
@@ -614,18 +614,18 @@ def _get_database_config() -> DatabaseConfig:
 
     # Build env_vars for MySQL configurations (excludes password and port)
     env_vars = DatabaseEnvVars(
-        host_var="DATABASE_HOST",
+        host_var="MYSQL_HOST",
         host_value=db_host,
-        name_var="DATABASE_NAME",
+        name_var="MYSQL_DATABASE",
         name_value=db_name,
-        user_var="DATABASE_USER",
+        user_var="MYSQL_USER",
         user_value=db_user
     )
 
     if db_host or db_user or db_url:
         # MySQL configuration
-        db_port = int(os.getenv("DATABASE_PORT", "3306"))
-        pool_size = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+        db_port = int(os.getenv("MYSQL_PORT", "3306"))
+        pool_size = int(os.getenv("MYSQL_POOL_SIZE", "5"))
 
         return DatabaseConfig(
             type="mysql",

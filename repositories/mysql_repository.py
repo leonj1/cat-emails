@@ -158,24 +158,24 @@ class MySQLRepository(DatabaseRepositoryInterface):
         if self.connection_string:
             return self.connection_string
         
-        conn_str = os.getenv("MYSQL_URL") or os.getenv("DATABASE_URL")
+        conn_str = os.getenv("MYSQL_URL")
         if conn_str and conn_str.strip():
             return conn_str
-        
-        # Build from individual parameters
-        host = self.host or os.getenv("MYSQL_HOST") or os.getenv("DATABASE_HOST")
-        port = self.port or os.getenv("MYSQL_PORT") or os.getenv("DATABASE_PORT") or 3306
-        database = self.database or os.getenv("MYSQL_DATABASE") or os.getenv("DATABASE_NAME")
-        username = self.username or os.getenv("MYSQL_USER") or os.getenv("DATABASE_USER")
-        password = self.password or os.getenv("MYSQL_PASSWORD") or os.getenv("DATABASE_PASSWORD")
-        
+
+        # Build from individual parameters (MYSQL_* env vars only)
+        host = self.host or os.getenv("MYSQL_HOST")
+        port = self.port or os.getenv("MYSQL_PORT") or 3306
+        database = self.database or os.getenv("MYSQL_DATABASE")
+        username = self.username or os.getenv("MYSQL_USER")
+        password = self.password or os.getenv("MYSQL_PASSWORD")
+
         # Validate required parameters
         if not all([host, database, username]):
             raise ValueError(
                 "MySQL connection requires either:\n"
-                "  1. connection_string parameter or MYSQL_URL/DATABASE_URL env var, OR\n"
+                "  1. connection_string parameter or MYSQL_URL env var, OR\n"
                 "  2. host, database, and username parameters or corresponding env vars:\n"
-                "     MYSQL_HOST/DATABASE_HOST, MYSQL_DATABASE/DATABASE_NAME, MYSQL_USER/DATABASE_USER"
+                "     MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER"
             )
         
         # Build connection string
