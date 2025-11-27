@@ -139,8 +139,9 @@ class ProcessingCurrentStatusResponse(BaseModel):
 Update `get_current_processing_status()` endpoint to include failure summary:
 
 ```python
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
+import logging
 from fastapi import Query, Header
 from models.processing_current_status_response import (
     ProcessingCurrentStatusResponse,
@@ -148,6 +149,8 @@ from models.processing_current_status_response import (
     CurrentProcessingStatus,
     ProcessingFailureSummary
 )
+
+logger = logging.getLogger(__name__)
 
 @app.get("/api/processing/current-status", response_model=ProcessingCurrentStatusResponse, tags=["processing-status"])
 async def get_current_processing_status(
@@ -166,10 +169,15 @@ async def get_current_processing_status(
     is_processing = processing_status_manager.is_processing()
     current_status_dict = processing_status_manager.get_current_status()
 
-    # Convert dict to typed model
+    # Convert dict to typed model with validation
     current_status = None
     if current_status_dict:
-        current_status = CurrentProcessingStatus(**current_status_dict)
+        try:
+            current_status = CurrentProcessingStatus(**current_status_dict)
+        except (TypeError, ValueError) as e:
+            logger.warning(f"Failed to convert current_status_dict to model: {e}")
+            # Fallback: return raw dict if model conversion fails
+            current_status = current_status_dict
 
     # Get recent runs and convert to typed models
     recent_runs = None
@@ -183,14 +191,23 @@ async def get_current_processing_status(
         statistics = processing_status_manager.get_statistics()
 
     # Build failure summary from typed models
+    # Explicitly check both flags and data availability for clarity
     failure_summary = None
-    if include_failure_summary and recent_runs:
-        failures = [run for run in recent_runs if run.final_state == 'ERROR']
-        failure_summary = ProcessingFailureSummary(
-            has_recent_failures=len(failures) > 0,
-            failure_count=len(failures),
-            most_recent_failure=failures[0] if failures else None
-        )
+    if include_failure_summary:
+        if recent_runs and len(recent_runs) > 0:
+            failures = [run for run in recent_runs if run.final_state == 'ERROR']
+            failure_summary = ProcessingFailureSummary(
+                has_recent_failures=len(failures) > 0,
+                failure_count=len(failures),
+                most_recent_failure=failures[0] if failures else None
+            )
+        else:
+            # No recent runs available - return empty failure summary
+            failure_summary = ProcessingFailureSummary(
+                has_recent_failures=False,
+                failure_count=0,
+                most_recent_failure=None
+            )
 
     # Check if WebSocket is available
     websocket_available = websocket_manager is not None
@@ -200,7 +217,7 @@ async def get_current_processing_status(
         current_status=current_status,
         recent_runs=recent_runs,
         statistics=statistics,
-        timestamp=datetime.now().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),  # Use UTC for consistency
         websocket_available=websocket_available,
         failure_summary=failure_summary  # NEW
     )
@@ -505,7 +522,7 @@ class ProcessingFailureDetail(BaseModel):
 Add a new endpoint specifically for querying processing failures:
 
 ```python
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import Query, Header
 from models.processing_failure_detail import ProcessingFailureDetail
@@ -566,7 +583,7 @@ async def get_processing_failures(
     return {
         'failures': [f.model_dump() for f in failures],
         'total_failures': len(failures),
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now(timezone.utc).isoformat()  # Use UTC for consistency
     }
 ```
 
