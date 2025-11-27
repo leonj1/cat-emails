@@ -130,6 +130,18 @@ class MySQLRepository(DatabaseRepositoryInterface):
         # Build connection string
         conn_str = self._build_connection_string()
         
+        # Parse connection string to populate missing attributes (e.g. if using MYSQL_URL)
+        try:
+            from sqlalchemy.engine.url import make_url
+            url = make_url(conn_str)
+            if not self.host and url.host: self.host = url.host
+            if not self.port and url.port: self.port = url.port
+            if not self.database and url.database: self.database = url.database
+            if not self.username and url.username: self.username = url.username
+        except Exception:
+            # Ignore parsing errors - we'll fail at create_engine if it's invalid
+            pass
+        
         try:
             # Create engine with connection pooling
             self.engine = create_engine(
