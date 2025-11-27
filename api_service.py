@@ -581,6 +581,27 @@ async def get_configuration(x_api_key: Optional[str] = Header(None)):
     )
 
 
+def _safe_int_env(var_name: str, default: int) -> int:
+    """
+    Safely parse an integer environment variable.
+    
+    Args:
+        var_name: Name of the environment variable
+        default: Default value to return if variable is missing or invalid
+        
+    Returns:
+        Integer value of the environment variable or default
+    """
+    value = os.getenv(var_name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning("Invalid value for %s=%r; falling back to %d", var_name, value, default)
+        return default
+
+
 def _get_database_config() -> DatabaseConfig:
     """Determine database configuration from environment variables."""
     # Check for MySQL configuration (MYSQL_* env vars only)
@@ -608,6 +629,7 @@ def _get_database_config() -> DatabaseConfig:
                 "details": status.get("details", {})
             }
     except Exception as e:
+        logger.error("Error checking database connection status for /api/config: %s", e)
         connection_status = {
             "connected": False,
             "status": "Error checking connection",
@@ -634,9 +656,9 @@ def _get_database_config() -> DatabaseConfig:
         
         # Use values from active connection if available (handles MYSQL_URL case), otherwise env vars
         final_host = details.get("host") or db_host
-        final_port = details.get("port") or int(os.getenv("MYSQL_PORT") or "3306")
+        final_port = details.get("port") or _safe_int_env("MYSQL_PORT", 3306)
         final_database = details.get("database") or db_name
-        pool_size = details.get("pool_size") or int(os.getenv("MYSQL_POOL_SIZE") or "5")
+        pool_size = details.get("pool_size") or _safe_int_env("MYSQL_POOL_SIZE", 5)
 
         return DatabaseConfig(
             type="mysql",

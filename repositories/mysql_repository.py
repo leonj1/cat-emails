@@ -67,7 +67,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
         """
         self.connection_string = connection_string
         self.host = host
-        self.port = port or 3306
+        # Defer defaulting to 3306 to _build_connection_string so URL parsing
+        # can fill self.port when only a connection string is provided.
+        self.port = port
         self.database = database
         self.username = username
         self.password = password
@@ -134,13 +136,18 @@ class MySQLRepository(DatabaseRepositoryInterface):
         try:
             from sqlalchemy.engine.url import make_url
             url = make_url(conn_str)
-            if not self.host and url.host: self.host = url.host
-            if not self.port and url.port: self.port = url.port
-            if not self.database and url.database: self.database = url.database
-            if not self.username and url.username: self.username = url.username
-        except Exception:
-            # Ignore parsing errors - we'll fail at create_engine if it's invalid
-            pass
+        except Exception as exc:
+            # Best-effort enrichment only; connection validity is checked by create_engine
+            logger.debug("Failed to parse MySQL connection string '%s': %s", conn_str, exc)
+        else:
+            if not self.host and url.host:
+                self.host = url.host
+            if not self.port and url.port:
+                self.port = url.port
+            if not self.database and url.database:
+                self.database = url.database
+            if not self.username and url.username:
+                self.username = url.username
         
         try:
             # Create engine with connection pooling
