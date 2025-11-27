@@ -85,8 +85,8 @@ class GmailConnectionService(GmailConnectionInterface):
                     "(not your regular password), 16 characters, no spaces, and that 2-Step Verification is enabled. "
                     "If you pasted the password from Google, remove all spaces."
                 )
-                logger.error(f"Failed to connect to Gmail: {err_msg}. {guidance}")
+                logger.error(f"Gmail authentication failed for account '{email}': {err_msg}. {guidance}")
                 raise Exception(f"Failed to connect to Gmail: {err_msg}. {guidance}")
         except (imaplib.IMAP4.error, UnicodeEncodeError) as e:
-            logger.error(f"Failed to connect to Gmail: {str(e)}")
+            logger.error(f"Gmail connection error for account '{self.email_address}': {str(e)}")
             raise Exception(f"Failed to connect to Gmail: {str(e)}")
