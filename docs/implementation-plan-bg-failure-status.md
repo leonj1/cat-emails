@@ -130,6 +130,22 @@ class ProcessingCurrentStatusResponse(BaseModel):
         None,
         description="Summary of recent processing failures for easy frontend consumption"
     )
+
+
+class ProcessingFailuresResponse(BaseModel):
+    """Response model for processing failures endpoint"""
+    failures: List['ProcessingFailureDetail'] = Field(
+        ...,
+        description="List of processing failures with detailed error information"
+    )
+    total_failures: int = Field(
+        ...,
+        description="Total number of failures returned"
+    )
+    timestamp: str = Field(
+        ...,
+        description="UTC timestamp when response was generated"
+    )
 ```
 
 ### Phase 2: Enhance API Endpoint
@@ -526,19 +542,21 @@ from datetime import datetime, timezone
 from typing import Optional
 from fastapi import Query, Header
 from models.processing_failure_detail import ProcessingFailureDetail
+from models.processing_current_status_response import ProcessingFailuresResponse
 from models.error_classification import classify_error, is_authentication_error, is_retryable_error
 
-@app.get("/api/processing/failures", tags=["processing-status"])
+@app.get("/api/processing/failures", response_model=ProcessingFailuresResponse, tags=["processing-status"])
 async def get_processing_failures(
     email_address: Optional[str] = Query(None, description="Filter by specific email address"),
     limit: int = Query(10, ge=1, le=100, description="Maximum failures to return"),
     x_api_key: Optional[str] = Header(None)
-):
+) -> ProcessingFailuresResponse:
     """
     Get recent processing failures with detailed error information
 
     Returns:
-        List of failed processing runs with error messages, classification, and remediation guidance
+        ProcessingFailuresResponse with list of failed processing runs, error messages,
+        classification, and remediation guidance
 
     Use Cases:
         - Display error notifications in frontend dashboard
@@ -580,11 +598,11 @@ async def get_processing_failures(
             if len(failures) >= limit:
                 break
 
-    return {
-        'failures': [f.model_dump() for f in failures],
-        'total_failures': len(failures),
-        'timestamp': datetime.now(timezone.utc).isoformat()  # Use UTC for consistency
-    }
+    return ProcessingFailuresResponse(
+        failures=failures,
+        total_failures=len(failures),
+        timestamp=datetime.now(timezone.utc).isoformat()  # Use UTC for consistency
+    )
 ```
 
 ### Phase 5: Enhance WebSocket Updates
@@ -628,6 +646,7 @@ async def broadcast_status(self) -> None:
 - [ ] Create `ProcessingRunDetails` model
 - [ ] Create `CurrentProcessingStatus` model
 - [ ] Create `ProcessingFailureSummary` model
+- [ ] Create `ProcessingFailuresResponse` model
 - [ ] Update `ProcessingCurrentStatusResponse` model
 - [ ] Add unit tests for new models
 
@@ -649,9 +668,10 @@ async def broadcast_status(self) -> None:
 
 ### Task 4: Add Failures Endpoint with Typed Models
 - [ ] Create `ProcessingFailureDetail` model extending ProcessingRunDetails
-- [ ] Create `/api/processing/failures` endpoint
+- [ ] Create `/api/processing/failures` endpoint with `ProcessingFailuresResponse` return type
 - [ ] Integrate error classification into endpoint
 - [ ] Convert dict runs to ProcessingFailureDetail typed models
+- [ ] Return typed `ProcessingFailuresResponse` instead of plain dict
 - [ ] Add endpoint to route documentation
 - [ ] Add unit and integration tests
 
