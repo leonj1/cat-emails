@@ -138,7 +138,8 @@ class MySQLRepository(DatabaseRepositoryInterface):
             url = make_url(conn_str)
         except (SQLAlchemyError, ValueError) as exc:
             # Best-effort enrichment only; connection validity is checked by create_engine
-            logger.debug("Failed to parse MySQL connection string '%s': %s", conn_str, exc)
+            # Do not log conn_str as it may contain credentials
+            logger.debug("Failed to parse MySQL connection string: %s", exc)
         else:
             if not self.host and url.host:
                 self.host = url.host
