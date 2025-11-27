@@ -9,9 +9,10 @@ class DatabaseEnvVars(BaseModel):
     """Database environment variable names and their current values.
 
     Excludes sensitive values (password) and port for security.
+    Uses MYSQL_* environment variable naming convention.
     """
     host_var: str = Field(
-        default="DATABASE_HOST",
+        default="MYSQL_HOST",
         description="Environment variable name for database host"
     )
     host_value: Optional[str] = Field(
@@ -19,7 +20,7 @@ class DatabaseEnvVars(BaseModel):
         description="Current value of the database host environment variable"
     )
     name_var: str = Field(
-        default="DATABASE_NAME",
+        default="MYSQL_DATABASE",
         description="Environment variable name for database name"
     )
     name_value: Optional[str] = Field(
@@ -27,7 +28,7 @@ class DatabaseEnvVars(BaseModel):
         description="Current value of the database name environment variable"
     )
     user_var: str = Field(
-        default="DATABASE_USER",
+        default="MYSQL_USER",
         description="Environment variable name for database user"
     )
     user_value: Optional[str] = Field(

@@ -4,6 +4,9 @@ Unit tests for _get_database_config() env_vars handling.
 Tests that the database configuration function correctly returns database
 environment variable names and values (host, name, user) while excluding
 sensitive data (password, port).
+
+IMPORTANT: This project uses MYSQL_* environment variables ONLY.
+The DATABASE_* naming convention is NOT supported.
 """
 import os
 import unittest
@@ -19,11 +22,11 @@ class TestDatabaseEnvVarsModel(unittest.TestCase):
     """Test the DatabaseEnvVars Pydantic model."""
 
     def test_database_env_vars_default_values(self):
-        """Test that DatabaseEnvVars has correct default variable names."""
+        """Test that DatabaseEnvVars has correct default variable names (MYSQL_* only)."""
         env_vars = DatabaseEnvVars()
-        self.assertEqual(env_vars.host_var, "DATABASE_HOST")
-        self.assertEqual(env_vars.name_var, "DATABASE_NAME")
-        self.assertEqual(env_vars.user_var, "DATABASE_USER")
+        self.assertEqual(env_vars.host_var, "MYSQL_HOST")
+        self.assertEqual(env_vars.name_var, "MYSQL_DATABASE")
+        self.assertEqual(env_vars.user_var, "MYSQL_USER")
         self.assertIsNone(env_vars.host_value)
         self.assertIsNone(env_vars.name_value)
         self.assertIsNone(env_vars.user_value)
@@ -35,12 +38,29 @@ class TestDatabaseEnvVarsModel(unittest.TestCase):
             name_value="my_database",
             user_value="db_user"
         )
-        self.assertEqual(env_vars.host_var, "DATABASE_HOST")
+        self.assertEqual(env_vars.host_var, "MYSQL_HOST")
         self.assertEqual(env_vars.host_value, "db.example.com")
-        self.assertEqual(env_vars.name_var, "DATABASE_NAME")
+        self.assertEqual(env_vars.name_var, "MYSQL_DATABASE")
         self.assertEqual(env_vars.name_value, "my_database")
-        self.assertEqual(env_vars.user_var, "DATABASE_USER")
+        self.assertEqual(env_vars.user_var, "MYSQL_USER")
         self.assertEqual(env_vars.user_value, "db_user")
+
+    def test_only_mysql_env_vars_in_model(self):
+        """Test that only MYSQL_* env var names are used, not DATABASE_*."""
+        env_vars = DatabaseEnvVars()
+        env_vars_dict = env_vars.model_dump()
+
+        # Verify all *_var fields use MYSQL_ prefix
+        for key, value in env_vars_dict.items():
+            if key.endswith("_var"):
+                self.assertTrue(
+                    value.startswith("MYSQL_"),
+                    f"Expected {key} to use MYSQL_ prefix, got: {value}"
+                )
+                self.assertFalse(
+                    value.startswith("DATABASE_"),
+                    f"DATABASE_* env vars are not supported, found: {value}"
+                )
 
     def test_database_env_vars_excludes_password_and_port(self):
         """Test that DatabaseEnvVars model doesn't include password or port fields."""
@@ -91,11 +111,11 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
     """Unit tests for _get_database_config() env_vars handling."""
 
     @patch.dict(os.environ, {
-        "DATABASE_HOST": "mysql.example.com",
-        "DATABASE_NAME": "production_db",
-        "DATABASE_USER": "prod_user",
-        "DATABASE_PASSWORD": "secret_password",  # Should NOT appear in response
-        "DATABASE_PORT": "3307",  # Should NOT appear in env_vars
+        "MYSQL_HOST": "mysql.example.com",
+        "MYSQL_DATABASE": "production_db",
+        "MYSQL_USER": "prod_user",
+        "MYSQL_PASSWORD": "secret_password",  # Should NOT appear in response
+        "MYSQL_PORT": "3307",  # Should NOT appear in env_vars
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
     def test_mysql_config_includes_env_vars(self):
@@ -108,10 +128,10 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         self.assertEqual(config.type, "mysql")
         self.assertIsNotNone(config.env_vars)
 
-        # Check env var names
-        self.assertEqual(config.env_vars.host_var, "DATABASE_HOST")
-        self.assertEqual(config.env_vars.name_var, "DATABASE_NAME")
-        self.assertEqual(config.env_vars.user_var, "DATABASE_USER")
+        # Check env var names are MYSQL_* only
+        self.assertEqual(config.env_vars.host_var, "MYSQL_HOST")
+        self.assertEqual(config.env_vars.name_var, "MYSQL_DATABASE")
+        self.assertEqual(config.env_vars.user_var, "MYSQL_USER")
 
         # Check env var values
         self.assertEqual(config.env_vars.host_value, "mysql.example.com")
@@ -119,8 +139,8 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         self.assertEqual(config.env_vars.user_value, "prod_user")
 
     @patch.dict(os.environ, {
-        "DATABASE_HOST": "mysql.example.com",
-        "DATABASE_PASSWORD": "super_secret",
+        "MYSQL_HOST": "mysql.example.com",
+        "MYSQL_PASSWORD": "super_secret",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
     def test_env_vars_excludes_password(self):
@@ -142,8 +162,8 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
                 self.assertNotEqual(value, "super_secret")
 
     @patch.dict(os.environ, {
-        "DATABASE_HOST": "mysql.example.com",
-        "DATABASE_PORT": "3307",
+        "MYSQL_HOST": "mysql.example.com",
+        "MYSQL_PORT": "3307",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
     def test_env_vars_excludes_port(self):
@@ -167,7 +187,7 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         """Test that SQLite configuration doesn't include env_vars."""
         # Clear MySQL-related env vars for this test
         env_backup = {}
-        for key in ["DATABASE_HOST", "DATABASE_USER", "DATABASE_URL"]:
+        for key in ["MYSQL_HOST", "MYSQL_USER", "MYSQL_URL"]:
             if key in os.environ:
                 env_backup[key] = os.environ.pop(key)
 
@@ -183,7 +203,7 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
             os.environ.update(env_backup)
 
     @patch.dict(os.environ, {
-        "DATABASE_USER": "only_user_set",
+        "MYSQL_USER": "only_user_set",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
     def test_partial_env_vars_handled(self):
@@ -199,6 +219,31 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         self.assertEqual(config.env_vars.user_value, "only_user_set")
         # Host should be None since not set
         self.assertIsNone(config.env_vars.host_value)
+
+    @patch.dict(os.environ, {
+        "MYSQL_HOST": "mysql.example.com",
+        "MYSQL_DATABASE": "test_db",
+        "MYSQL_USER": "test_user",
+        "REQUESTYAI_API_KEY": "test-key"
+    }, clear=False)
+    def test_only_mysql_env_vars_in_config_response(self):
+        """Test that only MYSQL_* env vars are returned in config, not DATABASE_*."""
+        from api_service import _get_database_config
+
+        config = _get_database_config()
+
+        self.assertEqual(config.type, "mysql")
+        self.assertIsNotNone(config.env_vars)
+
+        # Verify all var names use MYSQL_ prefix
+        self.assertTrue(config.env_vars.host_var.startswith("MYSQL_"))
+        self.assertTrue(config.env_vars.name_var.startswith("MYSQL_"))
+        self.assertTrue(config.env_vars.user_var.startswith("MYSQL_"))
+
+        # Verify no DATABASE_* prefix is used
+        self.assertFalse(config.env_vars.host_var.startswith("DATABASE_"))
+        self.assertFalse(config.env_vars.name_var.startswith("DATABASE_"))
+        self.assertFalse(config.env_vars.user_var.startswith("DATABASE_"))
 
 
 if __name__ == "__main__":

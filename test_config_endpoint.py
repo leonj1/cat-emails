@@ -49,13 +49,13 @@ def test_config_endpoint():
         assert "env_vars" in db_config
         env_vars = db_config["env_vars"]
         assert "host_var" in env_vars
-        assert env_vars["host_var"] == "DATABASE_HOST"
+        assert env_vars["host_var"] == "MYSQL_HOST"
         assert "host_value" in env_vars
         assert "name_var" in env_vars
-        assert env_vars["name_var"] == "DATABASE_NAME"
+        assert env_vars["name_var"] == "MYSQL_DATABASE"
         assert "name_value" in env_vars
         assert "user_var" in env_vars
-        assert env_vars["user_var"] == "DATABASE_USER"
+        assert env_vars["user_var"] == "MYSQL_USER"
         assert "user_value" in env_vars
         # Verify password and port are NOT included
         assert "password_var" not in env_vars
