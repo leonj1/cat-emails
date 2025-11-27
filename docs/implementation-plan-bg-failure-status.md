@@ -8,7 +8,7 @@ When background email processing fails (e.g., Gmail authentication errors), the 
 3. Display actionable error messages to users
 
 **Example error from logs:**
-```text
+```log
 Processing error for public.test@gmail.com: Processing failed: Failed to connect to Gmail:
 [AUTHENTICATIONFAILED] Invalid credentials (Failure); LOGIN error: b'[AUTHENTICATIONFAILED]
 Invalid credentials (Failure)'. Gmail authentication failed. Ensure GMAIL_PASSWORD is a
@@ -139,6 +139,16 @@ class ProcessingCurrentStatusResponse(BaseModel):
 Update `get_current_processing_status()` endpoint to include failure summary:
 
 ```python
+from datetime import datetime
+from typing import Optional
+from fastapi import Query, Header
+from models.processing_current_status_response import (
+    ProcessingCurrentStatusResponse,
+    ProcessingRunDetails,
+    CurrentProcessingStatus,
+    ProcessingFailureSummary
+)
+
 @app.get("/api/processing/current-status", response_model=ProcessingCurrentStatusResponse, tags=["processing-status"])
 async def get_current_processing_status(
     include_recent: bool = Query(True, description="Include recent processing runs"),
@@ -204,11 +214,16 @@ async def get_current_processing_status(
 
 Create an extensible error classification system:
 
+**Python Version Requirement**: This implementation uses Python 3.9+ type hint syntax (`list[str]`, `dict[...]`). If the project uses Python 3.8 or earlier, replace with `typing.List`, `typing.Dict`, etc.
+
 ```python
 from enum import Enum
-from typing import Optional, Pattern
+from typing import Optional, Pattern, List, Dict, Tuple
 import re
+import logging
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorCategory(str, Enum):
@@ -225,9 +240,10 @@ class ErrorCategory(str, Enum):
 class ErrorPattern(BaseModel):
     """Pattern matching configuration for error classification"""
     category: ErrorCategory
-    patterns: list[str] = Field(..., description="Regex patterns to match")
+    patterns: List[str] = Field(..., description="Regex patterns to match")
     suggested_action: str = Field(..., description="User-friendly remediation guidance")
     priority: int = Field(default=100, description="Lower number = higher priority when multiple matches")
+    retry_strategy: Optional[str] = Field(None, description="Recommended retry strategy (e.g., 'exponential_backoff')")
 
 
 # Error classification rules (ordered by priority)
@@ -286,7 +302,8 @@ ERROR_CLASSIFICATION_RULES = [
             r"429"
         ],
         suggested_action="Gmail API rate limit reached. Processing will automatically retry after the rate limit window expires.",
-        priority=25
+        priority=25,
+        retry_strategy="exponential_backoff"  # Recommended: start with 60s, double each retry, max 3600s
     ),
     ErrorPattern(
         category=ErrorCategory.GMAIL_SERVICE,
@@ -303,9 +320,22 @@ ERROR_CLASSIFICATION_RULES = [
 
 
 class ErrorClassifier:
-    """Classifier for processing error messages"""
+    """
+    Classifier for processing error messages.
 
-    def __init__(self, rules: list[ErrorPattern] = None):
+    Retry Strategy Recommendations:
+    - RATE_LIMIT errors: Use exponential backoff (60s, 120s, 240s, max 3600s)
+    - CONNECTION errors: Use exponential backoff with jitter (5s, 10s, 20s, max 300s)
+    - GMAIL_SERVICE errors: Linear backoff (60s intervals, max 5 retries)
+    - AUTHENTICATION errors: Do not retry automatically (requires user intervention)
+
+    Logging Best Practices:
+    - Avoid logging full error messages containing PII (email addresses, passwords)
+    - Use structured logging with sanitized fields
+    - Log error categories and patterns matched instead of raw messages when possible
+    """
+
+    def __init__(self, rules: List[ErrorPattern] = None):
         """
         Initialize error classifier with rules.
 
@@ -317,14 +347,14 @@ class ErrorClassifier:
         self.rules.sort(key=lambda r: r.priority)
 
         # Compile regex patterns for performance
-        self._compiled_patterns: dict[ErrorCategory, list[Pattern]] = {}
+        self._compiled_patterns: Dict[ErrorCategory, List[Pattern]] = {}
         for rule in self.rules:
             self._compiled_patterns[rule.category] = [
                 re.compile(pattern, re.IGNORECASE)
                 for pattern in rule.patterns
             ]
 
-    def classify(self, error_message: str) -> tuple[ErrorCategory, str]:
+    def classify(self, error_message: str) -> Tuple[ErrorCategory, str]:
         """
         Classify an error message and return category with suggested action.
 
@@ -344,7 +374,13 @@ class ErrorClassifier:
                 if pattern.search(error_message):
                     return rule.category, rule.suggested_action
 
-        # No match found
+        # No match found - log for pattern improvement (sanitize PII first)
+        # Only log first 100 chars to avoid PII leakage
+        sanitized_msg = error_message[:100] + "..." if len(error_message) > 100 else error_message
+        logger.warning(
+            f"Unclassified error pattern detected",
+            extra={"error_preview": sanitized_msg, "category": "UNKNOWN"}
+        )
         return ErrorCategory.UNKNOWN, "An unexpected error occurred. Review the error details and contact support if the issue persists."
 
     def is_authentication_error(self, error_message: str) -> bool:
@@ -366,7 +402,7 @@ class ErrorClassifier:
 _error_classifier = ErrorClassifier()
 
 
-def classify_error(error_message: str) -> tuple[ErrorCategory, str]:
+def classify_error(error_message: str) -> Tuple[ErrorCategory, str]:
     """
     Convenience function to classify an error using the global classifier.
 
@@ -421,6 +457,9 @@ class ProcessingFailureDetail(BaseModel):
 Add a new endpoint specifically for querying processing failures:
 
 ```python
+from datetime import datetime
+from typing import Optional
+from fastapi import Query, Header
 from models.processing_failure_detail import ProcessingFailureDetail
 from models.error_classification import classify_error, is_authentication_error, is_retryable_error
 
@@ -490,6 +529,9 @@ async def get_processing_failures(
 Update `broadcast_status()` to include explicit failure notification:
 
 ```python
+from datetime import datetime, timezone
+import time
+
 async def broadcast_status(self) -> None:
     """Broadcast current processing status to all connected clients."""
     # ... existing code ...
@@ -665,12 +707,34 @@ async def broadcast_status(self) -> None:
 3. **E2E Tests**: Test WebSocket failure broadcasts
 4. **Manual Testing**: Trigger actual auth failures and verify frontend display
 
+## Backward Compatibility Matrix
+
+| Component | Change | Existing Clients | New Clients | Notes |
+|-----------|--------|------------------|-------------|-------|
+| `ProcessingCurrentStatusResponse` | Added `failure_summary` field | ✅ Compatible | ✅ Enhanced | Optional field, defaults to `None` |
+| `GET /api/processing/current-status` | Added `include_failure_summary` param | ✅ Compatible | ✅ Enhanced | Optional param, defaults to `True` |
+| `ProcessingRunDetails` | Changed from `Dict` to typed model | ✅ Compatible | ✅ Enhanced | Pydantic auto-converts dicts to models |
+| `CurrentProcessingStatus` | Changed from `Dict` to typed model | ✅ Compatible | ✅ Enhanced | Pydantic auto-converts dicts to models |
+| WebSocket `status_update` | Added `has_failures`, `failure_count`, `most_recent_failure` | ✅ Compatible | ✅ Enhanced | Additive fields, existing fields unchanged |
+| `GET /api/processing/failures` | New endpoint | N/A | ✅ New | No impact on existing clients |
+
+**Pydantic Version Compatibility:**
+- **Pydantic v2**: Use `.model_dump()` for serialization
+- **Pydantic v1**: Use `.dict()` for serialization
+- Code examples in this plan use Pydantic v2 syntax
+
+**Python Version Compatibility:**
+- **Python 3.9+**: Modern type hints (`list[str]`, `dict[...]`) work natively
+- **Python 3.8 and earlier**: Replace with `typing.List`, `typing.Dict`, `typing.Tuple`
+
 ## Migration Notes
 
 - All changes are backward compatible
-- Existing API consumers will continue to work
-- New fields are optional with sensible defaults
+- Existing API consumers will continue to work without modification
+- New fields are optional with sensible defaults (`None` or `False`)
 - Frontend can progressively adopt new failure fields
+- No breaking changes to request/response contracts
+- WebSocket clients can ignore new fields they don't recognize
 
 ## Success Criteria
 
