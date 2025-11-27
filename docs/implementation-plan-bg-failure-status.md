@@ -8,7 +8,7 @@ When background email processing fails (e.g., Gmail authentication errors), the 
 3. Display actionable error messages to users
 
 **Example error from logs:**
-```
+```text
 Processing error for public.test@gmail.com: Processing failed: Failed to connect to Gmail:
 [AUTHENTICATIONFAILED] Invalid credentials (Failure); LOGIN error: b'[AUTHENTICATIONFAILED]
 Invalid credentials (Failure)'. Gmail authentication failed. Ensure GMAIL_PASSWORD is a
@@ -150,17 +150,40 @@ async def get_current_processing_status(
     """
     Get comprehensive current processing status with explicit failure information
     """
-    # ... existing code ...
+    verify_api_key(x_api_key)
 
-    # Build failure summary
+    # Get current processing status
+    is_processing = processing_status_manager.is_processing()
+    current_status_dict = processing_status_manager.get_current_status()
+
+    # Convert dict to typed model
+    current_status = None
+    if current_status_dict:
+        current_status = CurrentProcessingStatus(**current_status_dict)
+
+    # Get recent runs and convert to typed models
+    recent_runs = None
+    if include_recent:
+        recent_runs_dicts = processing_status_manager.get_recent_runs(limit=recent_limit)
+        recent_runs = [ProcessingRunDetails(**run) for run in recent_runs_dicts]
+
+    # Get statistics if requested
+    statistics = None
+    if include_stats:
+        statistics = processing_status_manager.get_statistics()
+
+    # Build failure summary from typed models
     failure_summary = None
     if include_failure_summary and recent_runs:
-        failures = [run for run in recent_runs if run.get('final_state') == 'ERROR']
+        failures = [run for run in recent_runs if run.final_state == 'ERROR']
         failure_summary = ProcessingFailureSummary(
             has_recent_failures=len(failures) > 0,
             failure_count=len(failures),
-            most_recent_failure=ProcessingRunDetails(**failures[0]) if failures else None
+            most_recent_failure=failures[0] if failures else None
         )
+
+    # Check if WebSocket is available
+    websocket_available = websocket_manager is not None
 
     response = ProcessingCurrentStatusResponse(
         is_processing=is_processing,
@@ -171,15 +194,236 @@ async def get_current_processing_status(
         websocket_available=websocket_available,
         failure_summary=failure_summary  # NEW
     )
+
+    return response
 ```
 
-### Phase 3: Add Dedicated Failure Endpoint
+### Phase 3: Error Classification System
+
+**File: `models/error_classification.py`** (NEW)
+
+Create an extensible error classification system:
+
+```python
+from enum import Enum
+from typing import Optional, Pattern
+import re
+from pydantic import BaseModel, Field
+
+
+class ErrorCategory(str, Enum):
+    """Categorization of processing errors"""
+    AUTHENTICATION = "authentication"
+    CONNECTION = "connection"
+    ACCOUNT_NOT_FOUND = "account_not_found"
+    CONFIGURATION = "configuration"
+    RATE_LIMIT = "rate_limit"
+    GMAIL_SERVICE = "gmail_service"
+    UNKNOWN = "unknown"
+
+
+class ErrorPattern(BaseModel):
+    """Pattern matching configuration for error classification"""
+    category: ErrorCategory
+    patterns: list[str] = Field(..., description="Regex patterns to match")
+    suggested_action: str = Field(..., description="User-friendly remediation guidance")
+    priority: int = Field(default=100, description="Lower number = higher priority when multiple matches")
+
+
+# Error classification rules (ordered by priority)
+ERROR_CLASSIFICATION_RULES = [
+    ErrorPattern(
+        category=ErrorCategory.AUTHENTICATION,
+        patterns=[
+            r"AUTHENTICATIONFAILED",
+            r"Invalid credentials",
+            r"authentication failed",
+            r"LOGIN error",
+            r"credentials.*invalid"
+        ],
+        suggested_action="Verify that the Gmail App Password is correct (16 characters, no spaces) and that 2-Step Verification is enabled on the Gmail account. Generate a new App Password if needed.",
+        priority=10
+    ),
+    ErrorPattern(
+        category=ErrorCategory.ACCOUNT_NOT_FOUND,
+        patterns=[
+            r"Account.*not found",
+            r"No account found",
+            r"account.*does not exist"
+        ],
+        suggested_action="The account may have been deleted or deactivated. Re-register the account via POST /api/accounts.",
+        priority=20
+    ),
+    ErrorPattern(
+        category=ErrorCategory.CONNECTION,
+        patterns=[
+            r"connection.*refused",
+            r"connection.*timeout",
+            r"network.*error",
+            r"failed to connect",
+            r"socket.*error"
+        ],
+        suggested_action="Check network connectivity. Gmail's IMAP service may be temporarily unavailable. Retry in a few minutes.",
+        priority=30
+    ),
+    ErrorPattern(
+        category=ErrorCategory.CONFIGURATION,
+        patterns=[
+            r"No app password",
+            r"missing.*password",
+            r"configuration.*error",
+            r"invalid.*configuration"
+        ],
+        suggested_action="Account configuration is incomplete. Update the account with a valid Gmail App Password via POST /api/accounts.",
+        priority=15
+    ),
+    ErrorPattern(
+        category=ErrorCategory.RATE_LIMIT,
+        patterns=[
+            r"rate limit",
+            r"too many requests",
+            r"quota exceeded",
+            r"429"
+        ],
+        suggested_action="Gmail API rate limit reached. Processing will automatically retry after the rate limit window expires.",
+        priority=25
+    ),
+    ErrorPattern(
+        category=ErrorCategory.GMAIL_SERVICE,
+        patterns=[
+            r"IMAP.*unavailable",
+            r"Gmail.*service.*error",
+            r"temporary.*failure",
+            r"503.*Service Unavailable"
+        ],
+        suggested_action="Gmail IMAP service is temporarily unavailable. This is usually temporary; processing will retry automatically.",
+        priority=40
+    )
+]
+
+
+class ErrorClassifier:
+    """Classifier for processing error messages"""
+
+    def __init__(self, rules: list[ErrorPattern] = None):
+        """
+        Initialize error classifier with rules.
+
+        Args:
+            rules: List of ErrorPattern rules (defaults to ERROR_CLASSIFICATION_RULES)
+        """
+        self.rules = rules or ERROR_CLASSIFICATION_RULES
+        # Sort by priority (lower number first)
+        self.rules.sort(key=lambda r: r.priority)
+
+        # Compile regex patterns for performance
+        self._compiled_patterns: dict[ErrorCategory, list[Pattern]] = {}
+        for rule in self.rules:
+            self._compiled_patterns[rule.category] = [
+                re.compile(pattern, re.IGNORECASE)
+                for pattern in rule.patterns
+            ]
+
+    def classify(self, error_message: str) -> tuple[ErrorCategory, str]:
+        """
+        Classify an error message and return category with suggested action.
+
+        Args:
+            error_message: The error message to classify
+
+        Returns:
+            Tuple of (ErrorCategory, suggested_action)
+        """
+        if not error_message:
+            return ErrorCategory.UNKNOWN, "No error message provided. Contact support."
+
+        # Check each rule in priority order
+        for rule in self.rules:
+            patterns = self._compiled_patterns[rule.category]
+            for pattern in patterns:
+                if pattern.search(error_message):
+                    return rule.category, rule.suggested_action
+
+        # No match found
+        return ErrorCategory.UNKNOWN, "An unexpected error occurred. Review the error details and contact support if the issue persists."
+
+    def is_authentication_error(self, error_message: str) -> bool:
+        """Check if error is authentication-related"""
+        category, _ = self.classify(error_message)
+        return category == ErrorCategory.AUTHENTICATION
+
+    def is_retryable_error(self, error_message: str) -> bool:
+        """Check if error is likely to be resolved by retrying"""
+        category, _ = self.classify(error_message)
+        return category in {
+            ErrorCategory.CONNECTION,
+            ErrorCategory.RATE_LIMIT,
+            ErrorCategory.GMAIL_SERVICE
+        }
+
+
+# Global classifier instance
+_error_classifier = ErrorClassifier()
+
+
+def classify_error(error_message: str) -> tuple[ErrorCategory, str]:
+    """
+    Convenience function to classify an error using the global classifier.
+
+    Args:
+        error_message: The error message to classify
+
+    Returns:
+        Tuple of (ErrorCategory, suggested_action)
+    """
+    return _error_classifier.classify(error_message)
+
+
+def is_authentication_error(error_message: str) -> bool:
+    """Convenience function to check if error is authentication-related"""
+    return _error_classifier.is_authentication_error(error_message)
+
+
+def is_retryable_error(error_message: str) -> bool:
+    """Convenience function to check if error is retryable"""
+    return _error_classifier.is_retryable_error(error_message)
+```
+
+### Phase 4: Add Dedicated Failure Endpoint
+
+**File: `models/processing_failure_detail.py`** (NEW)
+
+Create a detailed failure response model:
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional
+from models.error_classification import ErrorCategory
+
+
+class ProcessingFailureDetail(BaseModel):
+    """Detailed information about a processing failure"""
+    email_address: str = Field(..., description="Email address that failed processing")
+    error_message: str = Field(..., description="Full error message")
+    error_time: Optional[str] = Field(None, description="ISO timestamp when error occurred")
+    failed_step: Optional[str] = Field(None, description="Processing step where failure occurred")
+    duration_seconds: Optional[float] = Field(None, description="Duration before failure (seconds)")
+
+    # Classification fields
+    error_category: ErrorCategory = Field(..., description="Classified error category")
+    is_auth_error: bool = Field(..., description="True if authentication-related error")
+    is_retryable: bool = Field(..., description="True if error may be resolved by retrying")
+    suggested_action: str = Field(..., description="User-friendly remediation guidance")
+```
 
 **File: `api_service.py`**
 
 Add a new endpoint specifically for querying processing failures:
 
 ```python
+from models.processing_failure_detail import ProcessingFailureDetail
+from models.error_classification import classify_error, is_authentication_error, is_retryable_error
+
 @app.get("/api/processing/failures", tags=["processing-status"])
 async def get_processing_failures(
     email_address: Optional[str] = Query(None, description="Filter by specific email address"),
@@ -190,60 +434,56 @@ async def get_processing_failures(
     Get recent processing failures with detailed error information
 
     Returns:
-        List of failed processing runs with error messages and context
+        List of failed processing runs with error messages, classification, and remediation guidance
 
     Use Cases:
         - Display error notifications in frontend dashboard
         - Diagnose authentication issues for specific accounts
         - Generate error reports for system administrators
+        - Determine if errors are retryable or require manual intervention
     """
     verify_api_key(x_api_key)
 
-    recent_runs = processing_status_manager.get_recent_runs(limit=limit * 2)  # Get more to filter
+    # Get recent runs (fetch more than needed to allow filtering)
+    recent_runs_dicts = processing_status_manager.get_recent_runs(limit=limit * 2)
 
     failures = []
-    for run in recent_runs:
-        if run.get('final_state') == 'ERROR':
-            if email_address and run.get('email_address', '').lower() != email_address.lower():
+    for run_dict in recent_runs_dicts:
+        if run_dict.get('final_state') == 'ERROR':
+            # Filter by email address if specified
+            if email_address and run_dict.get('email_address', '').lower() != email_address.lower():
                 continue
-            failures.append({
-                'email_address': run.get('email_address'),
-                'error_message': run.get('error_message'),
-                'error_time': run.get('end_time'),
-                'failed_step': run.get('final_step'),
-                'duration_seconds': run.get('duration_seconds'),
-                'is_auth_error': _is_authentication_error(run.get('error_message', '')),
-                'suggested_action': _get_suggested_action(run.get('error_message', ''))
-            })
+
+            # Classify the error
+            error_msg = run_dict.get('error_message', '')
+            error_category, suggested_action = classify_error(error_msg)
+
+            # Build typed failure detail
+            failure = ProcessingFailureDetail(
+                email_address=run_dict.get('email_address', 'unknown'),
+                error_message=error_msg,
+                error_time=run_dict.get('end_time'),
+                failed_step=run_dict.get('final_step'),
+                duration_seconds=run_dict.get('duration_seconds'),
+                error_category=error_category,
+                is_auth_error=is_authentication_error(error_msg),
+                is_retryable=is_retryable_error(error_msg),
+                suggested_action=suggested_action
+            )
+
+            failures.append(failure)
+
             if len(failures) >= limit:
                 break
 
     return {
-        'failures': failures,
+        'failures': [f.model_dump() for f in failures],
         'total_failures': len(failures),
         'timestamp': datetime.now().isoformat()
     }
-
-
-def _is_authentication_error(error_message: str) -> bool:
-    """Check if error is related to authentication"""
-    auth_keywords = ['AUTHENTICATIONFAILED', 'Invalid credentials', 'authentication failed', 'LOGIN error']
-    return any(keyword.lower() in error_message.lower() for keyword in auth_keywords)
-
-
-def _get_suggested_action(error_message: str) -> str:
-    """Provide user-friendly suggested action based on error type"""
-    if _is_authentication_error(error_message):
-        return "Verify that the Gmail App Password is correct (16 characters, no spaces) and that 2-Step Verification is enabled on the Gmail account."
-    elif 'not found' in error_message.lower():
-        return "The account may have been deleted or deactivated. Re-register the account."
-    elif 'connection' in error_message.lower():
-        return "Check network connectivity. Gmail's IMAP service may be temporarily unavailable."
-    else:
-        return "Review the error details and contact support if the issue persists."
 ```
 
-### Phase 4: Enhance WebSocket Updates
+### Phase 5: Enhance WebSocket Updates
 
 **File: `services/websocket_handler.py`**
 
@@ -286,28 +526,39 @@ async def broadcast_status(self) -> None:
 
 ### Task 2: Enhance Current Status Endpoint
 - [ ] Add `include_failure_summary` query parameter
-- [ ] Build failure summary from recent runs
-- [ ] Map Dict responses to typed models
+- [ ] Convert dict responses to typed models (ProcessingRunDetails, CurrentProcessingStatus)
+- [ ] Build failure summary from typed recent runs
 - [ ] Update OpenAPI documentation
 - [ ] Add integration tests
 
-### Task 3: Add Failures Endpoint
+### Task 3: Create Error Classification System
+- [ ] Create `ErrorCategory` enum with error types
+- [ ] Create `ErrorPattern` model for classification rules
+- [ ] Implement `ErrorClassifier` class with regex pattern matching
+- [ ] Define `ERROR_CLASSIFICATION_RULES` with priorities
+- [ ] Add convenience functions: `classify_error()`, `is_authentication_error()`, `is_retryable_error()`
+- [ ] Add unit tests for error classification edge cases
+- [ ] Add logger statement when errors don't match known patterns
+
+### Task 4: Add Failures Endpoint with Typed Models
+- [ ] Create `ProcessingFailureDetail` model extending ProcessingRunDetails
 - [ ] Create `/api/processing/failures` endpoint
-- [ ] Implement `_is_authentication_error()` helper
-- [ ] Implement `_get_suggested_action()` helper
+- [ ] Integrate error classification into endpoint
+- [ ] Convert dict runs to ProcessingFailureDetail typed models
 - [ ] Add endpoint to route documentation
 - [ ] Add unit and integration tests
 
-### Task 4: Enhance WebSocket Handler
+### Task 5: Enhance WebSocket Handler
 - [ ] Update `broadcast_status()` with failure info
 - [ ] Add failure notification message type
 - [ ] Update WebSocket documentation
 - [ ] Add WebSocket tests for failure scenarios
 
-### Task 5: Frontend Integration (Out of Scope)
+### Task 6: Frontend Integration (Out of Scope)
 - [ ] Display failure notifications in dashboard
-- [ ] Show actionable error messages
+- [ ] Show actionable error messages with `suggested_action`
 - [ ] Add "Verify Password" action button for auth errors
+- [ ] Display error category badges (authentication, connection, etc.)
 
 ## API Response Examples
 
@@ -369,12 +620,14 @@ async def broadcast_status(self) -> None:
   "failures": [
     {
       "email_address": "public.test@gmail.com",
-      "error_message": "Failed to connect to Gmail: [AUTHENTICATIONFAILED] Invalid credentials...",
-      "error_time": "2025-11-27T22:16:03Z",
+      "error_message": "Failed to connect to Gmail: [AUTHENTICATIONFAILED] Invalid credentials (Failure); LOGIN error: b'[AUTHENTICATIONFAILED] Invalid credentials (Failure)'. Gmail authentication failed. Ensure GMAIL_PASSWORD is a Gmail App Password (not your regular password), 16 characters, no spaces, and that 2-Step Verification is enabled.",
+      "error_time": "2025-11-27T22:16:03.971000+00:00",
       "failed_step": "Processing failed: Failed to connect to Gmail",
-      "duration_seconds": 3.2,
+      "duration_seconds": 3.97,
+      "error_category": "authentication",
       "is_auth_error": true,
-      "suggested_action": "Verify that the Gmail App Password is correct (16 characters, no spaces) and that 2-Step Verification is enabled on the Gmail account."
+      "is_retryable": false,
+      "suggested_action": "Verify that the Gmail App Password is correct (16 characters, no spaces) and that 2-Step Verification is enabled on the Gmail account. Generate a new App Password if needed."
     }
   ],
   "total_failures": 1,
