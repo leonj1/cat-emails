@@ -651,53 +651,26 @@ def _get_database_config() -> DatabaseConfig:
     # Check if MySQL is active (either via env vars or successful connection)
     is_mysql_connected = connection_status["connected"] and connection_status.get("details", {}).get("engine_initialized", False)
     
-    if db_host or db_user or db_url or is_mysql_connected:
-        # MySQL configuration
-        details = connection_status.get("details", {})
-        
-        # Use values from active connection if available (handles MYSQL_URL case), otherwise env vars
-        final_host = details.get("host") or db_host
-        final_port = details.get("port") or _safe_int_env("MYSQL_PORT", 3306)
-        final_database = details.get("database") or db_name
-        pool_size = details.get("pool_size") or _safe_int_env("MYSQL_POOL_SIZE", 5)
+    # Always default to MySQL configuration since SQLite fallback is removed
+    details = connection_status.get("details", {})
+    
+    # Use values from active connection if available (handles MYSQL_URL case), otherwise env vars
+    final_host = details.get("host") or db_host
+    final_port = details.get("port") or _safe_int_env("MYSQL_PORT", 3306)
+    final_database = details.get("database") or db_name
+    pool_size = details.get("pool_size") or _safe_int_env("MYSQL_POOL_SIZE", 5)
 
-        return DatabaseConfig(
-            type="mysql",
-            host=final_host,
-            port=final_port,
-            database_name=final_database,
-            connection_pool_size=pool_size,
-            connected=connection_status["connected"],
-            connection_status=connection_status["status"],
-            connection_error=connection_status["error"],
-            env_vars=env_vars
-        )
-    elif db_path:
-        # SQLite configuration
-        if db_path == ":memory:":
-            db_type = "sqlite_local"
-        elif db_path.startswith("sqlitecloud://") or db_path.startswith("http://") or db_path.startswith("https://"):
-            db_type = "sqlite_cloud"
-        else:
-            db_type = "sqlite_local"
-
-        return DatabaseConfig(
-            type=db_type,
-            path=db_path,
-            connected=connection_status["connected"],
-            connection_status=connection_status["status"],
-            connection_error=connection_status["error"] or getattr(settings_service, 'mysql_init_error', None)
-        )
-    else:
-        # Default to MySQL if no explicit config (matches MySQLRepository default in services)
-        return DatabaseConfig(
-            type="mysql",
-            database_name=db_name,
-            connected=connection_status["connected"],
-            connection_status=connection_status["status"],
-            connection_error=connection_status["error"],
-            env_vars=env_vars
-        )
+    return DatabaseConfig(
+        type="mysql",
+        host=final_host,
+        port=final_port,
+        database_name=final_database,
+        connection_pool_size=pool_size,
+        connected=connection_status["connected"],
+        connection_status=connection_status["status"],
+        connection_error=connection_status["error"],
+        env_vars=env_vars
+    )
 
 
 def _get_llm_config() -> LLMConfig:

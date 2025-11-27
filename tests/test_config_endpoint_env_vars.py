@@ -11,6 +11,34 @@ The DATABASE_* naming convention is NOT supported.
 import os
 import unittest
 from unittest.mock import patch, MagicMock
+import sys
+
+# Mock SettingsService before api_service is imported
+# NOTE: We use sys.modules manipulation here because api_service.py instantiates
+# SettingsService at the module level (global scope). To prevent the real SettingsService
+# from attempting to connect to the database (which would fail in this test environment),
+# we must inject a mock into sys.modules BEFORE api_service is imported.
+# This ensures that 'from services.settings_service import SettingsService' inside
+# api_service uses our mock class.
+mock_settings_module = MagicMock()
+# Configure the mock to return a dictionary with strings when get_connection_status is called
+mock_repo = MagicMock()
+mock_repo.get_connection_status.return_value = {
+    "connected": False,
+    "status": "Mocked Connection",
+    "error": None,
+    "details": {
+        "host": "mock_host",
+        "port": 3306,
+        "database": "mock_db",
+        "pool_size": 5
+    }
+}
+mock_settings_instance = MagicMock()
+mock_settings_instance.repository = mock_repo
+mock_settings_module.SettingsService.return_value = mock_settings_instance
+
+sys.modules['services.settings_service'] = mock_settings_module
 
 # Set minimal environment variables before importing api_service
 os.environ.setdefault("REQUESTYAI_API_KEY", "test-key")
@@ -205,15 +233,15 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         "DATABASE_PATH": "/var/lib/app/data.db",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
-    def test_sqlite_config_no_env_vars(self, mock_settings_service):
-        """Test that SQLite configuration doesn't include env_vars."""
+    def test_sqlite_config_no_longer_supported(self, mock_settings_service):
+        """Test that SQLite configuration is no longer supported and defaults to MySQL."""
         # Clear MySQL-related env vars for this test
         env_backup = {}
         for key in ["MYSQL_HOST", "MYSQL_USER", "MYSQL_URL"]:
             if key in os.environ:
                 env_backup[key] = os.environ.pop(key)
         
-        # Mock repository to report disconnected (since we simulate no credentials)
+        # Mock repository to report disconnected
         mock_settings_service.repository.get_connection_status.return_value = {
             "connected": False, 
             "status": "Not connected", 
@@ -226,8 +254,10 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
 
             config = _get_database_config()
 
-            self.assertEqual(config.type, "sqlite_local")
-            self.assertIsNone(config.env_vars)
+            # Should return mysql type even without MySQL env vars (default behavior)
+            self.assertEqual(config.type, "mysql")
+            # Should still have env_vars object (empty/default)
+            self.assertIsNotNone(config.env_vars)
         finally:
             # Restore env vars
             os.environ.update(env_backup)
