@@ -77,15 +77,24 @@ class SettingsService:
         Raises:
             ValueError: If neither MySQL nor SQLite can be configured
         """
-        # Try MySQL first
-        try:
-            mysql_repo = MySQLRepository()
-            if mysql_repo.is_connected():
-                logger.info("SettingsService using MySQL repository")
-                return mysql_repo
-        except (ValueError, ConnectionError, ImportError, Exception) as e:
-            self.mysql_init_error = str(e)
-            logger.debug(f"MySQL not available, trying SQLite: {e}")
+        # Try MySQL first with retries
+        import time
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                mysql_repo = MySQLRepository()
+                if mysql_repo.is_connected():
+                    logger.info("SettingsService using MySQL repository")
+                    return mysql_repo
+            except (ValueError, ConnectionError, ImportError, Exception) as e:
+                self.mysql_init_error = str(e)
+                if attempt < max_retries - 1:
+                    logger.warning(f"MySQL connection attempt {attempt+1} failed: {e}. Retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                else:
+                    logger.debug(f"MySQL not available after {max_retries} attempts, trying SQLite: {e}")
 
         # Fall back to SQLite
         if not db_path:
