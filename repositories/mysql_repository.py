@@ -176,10 +176,20 @@ class MySQLRepository(DatabaseRepositoryInterface):
         """Build MySQL connection string from parameters or environment variables"""
         # Check for full connection string first
         if self.connection_string:
+            # Fix for environments providing mysql:// (defaults to MySQLdb) when we want pymysql
+            if self.connection_string.startswith("mysql://"):
+                return self.connection_string.replace("mysql://", "mysql+pymysql://", 1)
             return self.connection_string
         
         conn_str = os.getenv("MYSQL_URL")
+        if not conn_str:
+            # Fallback to DATABASE_URL as documented and common in Railway
+            conn_str = os.getenv("DATABASE_URL")
+
         if conn_str and conn_str.strip():
+            # Fix for environments providing mysql:// (defaults to MySQLdb) when we want pymysql
+            if conn_str.startswith("mysql://"):
+                return conn_str.replace("mysql://", "mysql+pymysql://", 1)
             return conn_str
 
         # Build from individual parameters (MYSQL_* env vars only)
