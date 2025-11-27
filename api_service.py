@@ -584,16 +584,17 @@ async def get_configuration(x_api_key: Optional[str] = Header(None)):
 def _safe_int_env(var_name: str, default: int) -> int:
     """
     Safely parse an integer environment variable.
-    
+
     Args:
         var_name: Name of the environment variable
         default: Default value to return if variable is missing or invalid
-        
+
     Returns:
         Integer value of the environment variable or default
     """
     value = os.getenv(var_name)
-    if value is None:
+    if not value or value.strip() == "":
+        # Railway sometimes sets env vars to empty string; treat same as unset
         return default
     try:
         return int(value)
