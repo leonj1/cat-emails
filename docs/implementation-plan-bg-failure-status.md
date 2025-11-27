@@ -315,6 +315,42 @@ ERROR_CLASSIFICATION_RULES = [
         ],
         suggested_action="Gmail IMAP service is temporarily unavailable. This is usually temporary; processing will retry automatically.",
         priority=40
+    ),
+    ErrorPattern(
+        category=ErrorCategory.CONNECTION,
+        patterns=[
+            r"SSL.*certificate",
+            r"certificate.*verify",
+            r"certificate.*expired",
+            r"certificate.*invalid",
+            r"TLS.*error",
+            r"SSL.*handshake"
+        ],
+        suggested_action="SSL/TLS certificate verification failed. Check system certificates are up to date. Contact support if issue persists.",
+        priority=35
+    ),
+    ErrorPattern(
+        category=ErrorCategory.GMAIL_SERVICE,
+        patterns=[
+            r"quota.*exceeded",
+            r"mailbox.*full",
+            r"storage.*exceeded",
+            r"out of storage"
+        ],
+        suggested_action="Gmail mailbox storage quota exceeded. Free up space in the Gmail account or upgrade storage.",
+        priority=50
+    ),
+    ErrorPattern(
+        category=ErrorCategory.CONNECTION,
+        patterns=[
+            r"\btimeout\b",
+            r"timed out",
+            r"operation.*timeout",
+            r"read.*timeout"
+        ],
+        suggested_action="Connection timeout occurred. Check network stability. This error is retryable with exponential backoff.",
+        priority=45,
+        retry_strategy="exponential_backoff"  # Recommended: 5s, 10s, 20s, max 300s
     )
 ]
 
@@ -323,11 +359,23 @@ class ErrorClassifier:
     """
     Classifier for processing error messages.
 
+    Error Coverage:
+    - AUTHENTICATION: Invalid credentials, app password issues
+    - CONNECTION: Network errors, timeouts, SSL/TLS certificate issues
+    - ACCOUNT_NOT_FOUND: Missing or deactivated accounts
+    - CONFIGURATION: Missing app password, invalid configuration
+    - RATE_LIMIT: API quota exceeded, too many requests
+    - GMAIL_SERVICE: IMAP unavailable, mailbox quota exceeded, service errors
+    - UNKNOWN: Unclassified errors (logged for pattern improvement)
+
     Retry Strategy Recommendations:
     - RATE_LIMIT errors: Use exponential backoff (60s, 120s, 240s, max 3600s)
-    - CONNECTION errors: Use exponential backoff with jitter (5s, 10s, 20s, max 300s)
-    - GMAIL_SERVICE errors: Linear backoff (60s intervals, max 5 retries)
+    - CONNECTION errors (timeout, network): Use exponential backoff with jitter (5s, 10s, 20s, max 300s)
+    - CONNECTION errors (SSL/certificate): Do not retry (requires system fix)
+    - GMAIL_SERVICE errors (service): Linear backoff (60s intervals, max 5 retries)
+    - GMAIL_SERVICE errors (quota): Do not retry (requires user action)
     - AUTHENTICATION errors: Do not retry automatically (requires user intervention)
+    - CONFIGURATION errors: Do not retry (requires configuration update)
 
     Logging Best Practices:
     - Avoid logging full error messages containing PII (email addresses, passwords)
