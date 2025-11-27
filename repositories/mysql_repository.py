@@ -176,11 +176,13 @@ class MySQLRepository(DatabaseRepositoryInterface):
         """Build MySQL connection string from parameters or environment variables"""
         # Check for full connection string first
         if self.connection_string:
-            return self.connection_string
+            return self._normalize_mysql_url(self.connection_string)
         
-        conn_str = os.getenv("MYSQL_URL")
-        if conn_str and conn_str.strip():
-            return conn_str
+        conn_str = os.getenv("MYSQL_URL") or os.getenv("DATABASE_URL")
+        if conn_str:
+            conn_str = conn_str.strip()
+            if conn_str:
+                return self._normalize_mysql_url(conn_str)
 
         # Build from individual parameters (MYSQL_* env vars only)
         host = self.host or os.getenv("MYSQL_HOST")
@@ -193,7 +195,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
         if not all([host, database, username]):
             raise ValueError(
                 "MySQL connection requires either:\n"
-                "  1. connection_string parameter or MYSQL_URL env var, OR\n"
+                "  1. connection_string parameter, MYSQL_URL or DATABASE_URL env var, OR\n"
                 "  2. host, database, and username parameters or corresponding env vars:\n"
                 "     MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER"
             )
@@ -202,6 +204,18 @@ class MySQLRepository(DatabaseRepositoryInterface):
         # Format: mysql+pymysql://user:password@host:port/database
         password_part = f":{password}" if password else ""
         return f"mysql+pymysql://{username}{password_part}@{host}:{port}/{database}"
+
+    def _normalize_mysql_url(self, url: str) -> str:
+        """
+        Normalize MySQL connection URL to ensure PyMySQL driver is used.
+        
+        Replaces 'mysql://' with 'mysql+pymysql://' (case-insensitive) to avoid 
+        using the default MySQLdb driver which may not be available in all environments.
+        """
+        if url and url.lower().startswith("mysql://"):
+            # Preserve original case for the rest of the URL
+            return "mysql+pymysql://" + url[8:]
+        return url
     
     def disconnect(self) -> None:
         """Close MySQL database connection"""
