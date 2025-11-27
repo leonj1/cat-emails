@@ -593,7 +593,7 @@ def _safe_int_env(var_name: str, default: int) -> int:
         Integer value of the environment variable or default
     """
     value = os.getenv(var_name)
-    if value is None or value == "":
+    if not value or value.strip() == "":
         # Railway sometimes sets env vars to empty string; treat same as unset
         return default
     try:
