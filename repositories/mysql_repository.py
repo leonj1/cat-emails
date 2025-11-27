@@ -211,11 +211,12 @@ class MySQLRepository(DatabaseRepositoryInterface):
         """
         Normalize MySQL connection URL to ensure PyMySQL driver is used.
         
-        Replaces 'mysql://' with 'mysql+pymysql://' to avoid using the default
-        MySQLdb driver which may not be available in all environments.
+        Replaces 'mysql://' with 'mysql+pymysql://' (case-insensitive) to avoid 
+        using the default MySQLdb driver which may not be available in all environments.
         """
-        if url and url.startswith("mysql://"):
-            return url.replace("mysql://", "mysql+pymysql://", 1)
+        if url and url.lower().startswith("mysql://"):
+            # Preserve original case for the rest of the URL
+            return "mysql+pymysql://" + url[8:]
         return url
     
     def disconnect(self) -> None:
