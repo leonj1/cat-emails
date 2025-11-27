@@ -629,7 +629,7 @@ def _get_database_config() -> DatabaseConfig:
                 "details": status.get("details", {})
             }
     except Exception as e:
-        logger.error("Error checking database connection status for /api/config: %s", e)
+        logger.exception("Error checking database connection status for /api/config")
         connection_status = {
             "connected": False,
             "status": "Error checking connection",

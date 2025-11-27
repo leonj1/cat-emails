@@ -10,6 +10,7 @@ from datetime import datetime, date, timedelta
 from sqlalchemy import create_engine, and_, func, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import QueuePool
 
 from repositories.database_repository_interface import DatabaseRepositoryInterface
@@ -134,9 +135,8 @@ class MySQLRepository(DatabaseRepositoryInterface):
         
         # Parse connection string to populate missing attributes (e.g. if using MYSQL_URL)
         try:
-            from sqlalchemy.engine.url import make_url
             url = make_url(conn_str)
-        except Exception as exc:
+        except (SQLAlchemyError, ValueError) as exc:
             # Best-effort enrichment only; connection validity is checked by create_engine
             logger.debug("Failed to parse MySQL connection string '%s': %s", conn_str, exc)
         else:
