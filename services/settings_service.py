@@ -23,12 +23,12 @@ class SettingsService:
         Initialize settings service with dependency injection.
 
         Args:
-            repository: Optional repository implementation. If not provided, auto-detects
-                       MySQL (if credentials available) or falls back to SQLite
-            db_path: Optional database path (used for SQLite fallback)
+            repository: Optional repository implementation. If not provided, 
+                       attempts MySQL connection (SQLite fallback has been removed)
+            db_path: Optional database path (unused, kept for compatibility)
 
         Raises:
-            ValueError: If no repository can be initialized (no MySQL credentials and no SQLite path)
+            ValueError: If no repository can be initialized (no MySQL credentials)
         """
         self.mysql_init_error = None
         
@@ -87,13 +87,13 @@ class SettingsService:
                 if mysql_repo.is_connected():
                     logger.info("SettingsService using MySQL repository")
                     return mysql_repo
-            except (ValueError, ConnectionError, ImportError, Exception) as e:
+            except Exception as e:
                 self.mysql_init_error = str(e)
                 if attempt < max_retries - 1:
                     logger.warning(f"MySQL connection attempt {attempt+1} failed: {e}. Retrying in {retry_delay}s...")
                     time.sleep(retry_delay)
                 else:
-                    logger.error(f"MySQL not available after {max_retries} attempts: {e}")
+                    logger.exception(f"MySQL not available after {max_retries} attempts: {e}")
                     raise ValueError(f"Failed to initialize MySQL repository: {e}") from e
         
         # Should not be reached due to raise in loop

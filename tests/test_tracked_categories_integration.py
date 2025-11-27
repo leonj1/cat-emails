@@ -1,7 +1,7 @@
 """
 Integration test to verify that tracked categories are properly recorded when processing emails.
 
-This test uses real SQLite database for persistence and fake classes for Gmail interaction,
+This test uses repository-based persistence and fake classes for Gmail interaction,
 ensuring that category statistics are correctly stored and retrieved.
 """
 import os

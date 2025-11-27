@@ -14,6 +14,12 @@ from unittest.mock import patch, MagicMock
 import sys
 
 # Mock SettingsService before api_service is imported
+# NOTE: We use sys.modules manipulation here because api_service.py instantiates
+# SettingsService at the module level (global scope). To prevent the real SettingsService
+# from attempting to connect to the database (which would fail in this test environment),
+# we must inject a mock into sys.modules BEFORE api_service is imported.
+# This ensures that 'from services.settings_service import SettingsService' inside
+# api_service uses our mock class.
 mock_settings_module = MagicMock()
 # Configure the mock to return a dictionary with strings when get_connection_status is called
 mock_repo = MagicMock()
