@@ -199,7 +199,14 @@ async def get_current_processing_status(
     recent_runs = None
     if include_recent:
         recent_runs_dicts = processing_status_manager.get_recent_runs(limit=recent_limit)
-        recent_runs = [ProcessingRunDetails(**run) for run in recent_runs_dicts]
+        recent_runs = []
+        for run in recent_runs_dicts:
+            try:
+                recent_runs.append(ProcessingRunDetails(**run))
+            except (TypeError, ValueError) as e:
+                logger.warning(f"Failed to convert run dict to ProcessingRunDetails: {e}")
+                # Fallback: return raw dict if model conversion fails
+                recent_runs.append(run)
 
     # Get statistics if requested
     statistics = None
