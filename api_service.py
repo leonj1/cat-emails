@@ -624,8 +624,9 @@ def _get_database_config() -> DatabaseConfig:
 
     if db_host or db_user or db_url:
         # MySQL configuration
-        db_port = int(os.getenv("MYSQL_PORT", "3306"))
-        pool_size = int(os.getenv("MYSQL_POOL_SIZE", "5"))
+        # Use 'or' to handle empty string values (Railway may set vars to '')
+        db_port = int(os.getenv("MYSQL_PORT") or "3306")
+        pool_size = int(os.getenv("MYSQL_POOL_SIZE") or "5")
 
         return DatabaseConfig(
             type="mysql",

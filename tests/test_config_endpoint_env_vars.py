@@ -180,6 +180,27 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         self.assertNotIn("port_value", env_vars_dict)
 
     @patch.dict(os.environ, {
+        "MYSQL_HOST": "mysql.example.com",
+        "MYSQL_PORT": "",  # Empty string - Railway sets this
+        "MYSQL_POOL_SIZE": "",  # Empty string
+        "REQUESTYAI_API_KEY": "test-key"
+    }, clear=False)
+    def test_empty_string_port_uses_default(self):
+        """Test that empty string MYSQL_PORT falls back to default 3306.
+
+        Railway may set environment variables to empty strings instead of
+        leaving them unset, which would cause int('') to fail.
+        """
+        from api_service import _get_database_config
+
+        # This should NOT raise ValueError: invalid literal for int() with base 10: ''
+        config = _get_database_config()
+
+        self.assertEqual(config.type, "mysql")
+        self.assertEqual(config.port, 3306)  # Default port
+        self.assertEqual(config.connection_pool_size, 5)  # Default pool size
+
+    @patch.dict(os.environ, {
         "DATABASE_PATH": "/var/lib/app/data.db",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
