@@ -178,13 +178,11 @@ class MySQLRepository(DatabaseRepositoryInterface):
         if self.connection_string:
             return self._normalize_mysql_url(self.connection_string)
         
-        conn_str = os.getenv("MYSQL_URL")
-        if not conn_str:
-            # Fallback to DATABASE_URL as documented and common in Railway
-            conn_str = os.getenv("DATABASE_URL")
-
-        if conn_str and conn_str.strip():
-            return self._normalize_mysql_url(conn_str)
+        conn_str = os.getenv("MYSQL_URL") or os.getenv("DATABASE_URL")
+        if conn_str:
+            conn_str = conn_str.strip()
+            if conn_str:
+                return self._normalize_mysql_url(conn_str)
 
         # Build from individual parameters (MYSQL_* env vars only)
         host = self.host or os.getenv("MYSQL_HOST")
