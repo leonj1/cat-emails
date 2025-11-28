@@ -290,13 +290,14 @@ recommendation_service: Optional[BlockingRecommendationService] = None
 
 # Global category aggregation components (initialized on startup if enabled)
 category_aggregator = None
+category_tally_repository: Optional[CategoryTallyRepository] = None
 tally_cleanup_service = None
 
 
 # Initialize category aggregation components
 def _initialize_category_aggregation():
     """Initialize category aggregation components if enabled."""
-    global category_aggregator, tally_cleanup_service
+    global category_aggregator, category_tally_repository, tally_cleanup_service
 
     if not ENABLE_CATEGORY_AGGREGATION:
         logger.info("⏸️  Category aggregation is disabled")
@@ -311,20 +312,20 @@ def _initialize_category_aggregation():
         # Initialize repository for tallies using the SQLAlchemy session
         # CategoryTallyRepository requires a Session object, not a db_path string
         session = settings_service.repository._get_session()
-        repository = CategoryTallyRepository(session)
+        category_tally_repository = CategoryTallyRepository(session)
 
         # Initialize config
         config = CategoryAggregationConfig()
 
         # Initialize aggregator
         category_aggregator = CategoryAggregator(
-            repository=repository,
+            repository=category_tally_repository,
             buffer_size=CATEGORY_AGGREGATION_BUFFER_SIZE
         )
 
         # Initialize cleanup service
         tally_cleanup_service = TallyCleanupService(
-            repository=repository,
+            repository=category_tally_repository,
             config=config
         )
 
@@ -332,7 +333,7 @@ def _initialize_category_aggregation():
         return category_aggregator
 
     except Exception as e:
-        logger.error(f"Failed to initialize category aggregation: {str(e)}")
+        logger.exception("Failed to initialize category aggregation")
         return None
 
 
@@ -396,12 +397,23 @@ def get_recommendation_service() -> BlockingRecommendationService:
                 domain_service=domain_service
             )
         except Exception as e:
-            logger.error(f"Failed to create BlockingRecommendationService: {str(e)}")
+            logger.exception("Failed to create BlockingRecommendationService")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Recommendation service unavailable"
-            )
+            ) from e
     return recommendation_service
+
+
+def get_category_tally_repository() -> CategoryTallyRepository:
+    """Dependency to provide CategoryTallyRepository instance."""
+    global category_tally_repository
+    if not category_tally_repository:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Category aggregation service not available"
+        )
+    return category_tally_repository
 
 
 def _make_llm_service(model: str) -> LLMServiceInterface:
@@ -2249,13 +2261,13 @@ async def get_blocking_recommendations(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_msg
-        )
+        ) from e
     except Exception as e:
-        logger.error(f"Error in get_blocking_recommendations: {str(e)}")
+        logger.exception("Error in get_blocking_recommendations")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate recommendations"
-        )
+        ) from e
 
 
 @app.get(
@@ -2332,13 +2344,13 @@ async def get_recommendation_details(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_msg
-        )
+        ) from e
     except Exception as e:
-        logger.error(f"Error in get_recommendation_details: {str(e)}")
+        logger.exception("Error in get_recommendation_details")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate recommendation details"
-        )
+        ) from e
 
 
 @app.get(
@@ -2350,7 +2362,8 @@ async def get_category_statistics(
     email_address: str = Path(..., description="Gmail email address"),
     days: int = Query(7, ge=1, le=365, description="Number of days to analyze (1-365, default: 7)"),
     x_api_key: Optional[str] = Header(None),
-    service: AccountCategoryClientInterface = Depends(get_account_service)
+    service: AccountCategoryClientInterface = Depends(get_account_service),
+    tally_repo: CategoryTallyRepository = Depends(get_category_tally_repository)
 ):
     """
     Get raw category statistics for an email account
@@ -2372,6 +2385,7 @@ async def get_category_statistics(
         400: Invalid parameters
         401: Invalid or missing API key
         404: Account not found
+        503: Category aggregation service not available
         500: Internal server error
     """
     verify_api_key(x_api_key)
@@ -2390,12 +2404,8 @@ async def get_category_statistics(
         end_date = date.today()
         start_date = end_date - timedelta(days=days - 1)
 
-        # Get aggregated stats from CategoryTallyRepository
-        # Must use CategoryTallyRepository, not settings_service.repository
-        # which is DatabaseRepositoryInterface and doesn't have get_aggregated_tallies()
+        # Get aggregated stats from global CategoryTallyRepository instance
         logger.info(f"Getting category stats for {email_address} (days={days})")
-        session = settings_service.repository._get_session()
-        tally_repo = CategoryTallyRepository(session)
         stats = tally_repo.get_aggregated_tallies(
             email_address,
             start_date,
@@ -2416,13 +2426,13 @@ async def get_category_statistics(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_msg
-        )
+        ) from e
     except Exception as e:
-        logger.error(f"Error in get_category_statistics: {str(e)}")
+        logger.exception("Error in get_category_statistics")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve category statistics"
-        )
+        ) from e
 
 
 @app.on_event("startup")
@@ -2532,7 +2542,7 @@ async def shutdown_event():
                 category_aggregator.flush()
                 logger.info("Category aggregator flushed successfully")
             except Exception as e:
-                logger.error(f"Error flushing category aggregator: {e}")
+                logger.exception("Error flushing category aggregator")
 
         # Gracefully shutdown central logging service
         logger.info("Shutting down central logging service...")
