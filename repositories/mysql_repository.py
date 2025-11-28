@@ -65,6 +65,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
             MYSQL_USER or DATABASE_USER
             MYSQL_PASSWORD or DATABASE_PASSWORD
             MYSQL_URL or DATABASE_URL (full connection string)
+            MYSQL_POOL_SIZE (default: 5)
+            MYSQL_MAX_OVERFLOW (default: 10)
+            MYSQL_POOL_RECYCLE (default: 3600)
         """
         self.connection_string = connection_string
         self.host = host
@@ -74,9 +77,51 @@ class MySQLRepository(DatabaseRepositoryInterface):
         self.database = database
         self.username = username
         self.password = password
-        self.pool_size = pool_size
-        self.max_overflow = max_overflow
-        self.pool_recycle = pool_recycle
+        
+        # Load pool settings from env vars if provided (takes precedence over constructor arguments)
+        env_pool_size = os.getenv("MYSQL_POOL_SIZE")
+        if env_pool_size is not None:
+            try:
+                self.pool_size = int(env_pool_size)
+            except ValueError:
+                logger.warning(f"Invalid MYSQL_POOL_SIZE: {env_pool_size}, using {pool_size}")
+                self.pool_size = pool_size
+        else:
+            self.pool_size = pool_size
+
+        env_max_overflow = os.getenv("MYSQL_MAX_OVERFLOW")
+        if env_max_overflow is not None:
+            try:
+                self.max_overflow = int(env_max_overflow)
+            except ValueError:
+                logger.warning(f"Invalid MYSQL_MAX_OVERFLOW: {env_max_overflow}, using {max_overflow}")
+                self.max_overflow = max_overflow
+        else:
+            self.max_overflow = max_overflow
+
+        env_pool_recycle = os.getenv("MYSQL_POOL_RECYCLE")
+        if env_pool_recycle is not None:
+            try:
+                self.pool_recycle = int(env_pool_recycle)
+            except ValueError:
+                logger.warning(f"Invalid MYSQL_POOL_RECYCLE: {env_pool_recycle}, using {pool_recycle}")
+                self.pool_recycle = pool_recycle
+        else:
+            self.pool_recycle = pool_recycle
+            
+        # Validate pool settings
+        if self.pool_size <= 0:
+            logger.warning(f"Invalid pool_size {self.pool_size}, resetting to default 5")
+            self.pool_size = 5
+            
+        if self.max_overflow < 0:
+            logger.warning(f"Invalid max_overflow {self.max_overflow}, resetting to default 10")
+            self.max_overflow = 10
+
+        if self.pool_recycle <= 0:
+            logger.warning(f"Invalid pool_recycle {self.pool_recycle}, resetting to default 3600")
+            self.pool_recycle = 3600
+
         self.echo = echo
         
         self.engine = None
@@ -265,7 +310,8 @@ class MySQLRepository(DatabaseRepositoryInterface):
                     "engine_initialized": True,
                     "session_factory_initialized": True,
                     "pool_size": self.pool_size,
-                    "max_overflow": self.max_overflow
+                    "max_overflow": self.max_overflow,
+                    "pool_recycle": self.pool_recycle
                 }
             }
         except Exception as e:
