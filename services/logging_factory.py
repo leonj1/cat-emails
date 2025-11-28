@@ -29,6 +29,7 @@ def create_logging_service(
         LOGS_COLLECTOR_API: Base URL of the central logging API
         LOGS_COLLECTOR_TOKEN: Bearer token for authentication
         APP_NAME: Application name (default: "cat-emails")
+        DISABLE_REMOTE_LOGS: Set to "true", "1", or "yes" to disable remote logging
 
     Args:
         logger_name: Name for the local logger
@@ -57,6 +58,10 @@ def create_logging_service(
         client = RemoteLogsCollectorClient(...)
         logger = create_logging_service(logs_collector_client=client)
     """
+    # Check for feature flag to disable remote logging
+    disable_remote_logs = os.getenv("DISABLE_REMOTE_LOGS", "").lower() in ("true", "1", "yes")
+    if disable_remote_logs:
+        enable_remote = False
     # If client is provided, use it directly
     if logs_collector_client is not None:
         return CentralLoggingService(

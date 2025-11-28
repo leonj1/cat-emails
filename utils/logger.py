@@ -39,26 +39,34 @@ def initialize_central_logging(
 ) -> CentralLoggingService:
     """
     Initialize the central logging service.
-    
+
     This should be called once at application startup before any logging occurs.
     If not called explicitly, it will be initialized with default settings on first use.
-    
+
     Args:
         log_level: Default logging level (default: logging.INFO)
-        enable_remote: Enable sending logs to remote collector (default: True)
+        enable_remote: Preferred default for sending logs to the remote collector
+            when DISABLE_REMOTE_LOGS is not set (default: True)
         queue_maxsize: Maximum size of remote logging queue (default: 1000)
         force: Force re-initialization even if already initialized
-        
+
     Returns:
         The initialized CentralLoggingService instance
+
+    Environment Variables:
+        DISABLE_REMOTE_LOGS: When set to a truthy value ("true", "1", or "yes",
+            case-insensitive), remote logging is forcibly disabled regardless
+            of the enable_remote argument.
     """
     global _central_logging_service, _initialized
-    
+
     with _lock:
         if _initialized and not force:
             return _central_logging_service
-        
+
         # Create the central logging service
+        # Note: DISABLE_REMOTE_LOGS env var is checked in create_logging_service(),
+        # and will forcibly disable remote logging even if enable_remote=True here.
         _central_logging_service = create_logging_service(
             logger_name="cat-emails",
             log_level=log_level,
