@@ -189,9 +189,10 @@ class IBlockingRecommendationService(ABC):
         """
         Retrieve the list of categories already blocked for an account.
 
-        This method retrieves the blocked categories from the Control API
-        (via domain_service.get_blocked_categories()) for the given email account.
-        Returns an empty list if the account has no blocked categories.
+        This method retrieves the blocked categories from the Control API via
+        domain_service.fetch_blocked_categories(). Returns an empty list if:
+        - The account has no blocked categories
+        - The Control API is unavailable or returns an error
         """
         pass
 ```
@@ -372,8 +373,8 @@ class BlockingRecommendationResult(BaseModel):
     """Result containing all blocking recommendations for an account."""
 
     email_address: str
-    period_start: date
-    period_end: date
+    start_date: date
+    end_date: date
     total_emails_analyzed: int
     recommendations: List[BlockingRecommendation] = Field(default_factory=list)
     already_blocked: List[str] = Field(
@@ -386,8 +387,8 @@ class BlockingRecommendationResult(BaseModel):
         json_schema_extra = {
             "example": {
                 "email_address": "user@gmail.com",
-                "period_start": "2025-11-21",
-                "period_end": "2025-11-28",
+                "start_date": "2025-11-21",
+                "end_date": "2025-11-28",
                 "total_emails_analyzed": 695,
                 "recommendations": [
                     {
@@ -632,8 +633,8 @@ CLASS BlockingRecommendationService IMPLEMENTS IBlockingRecommendationService:
         IF aggregated.total_emails == 0:
             RETURN BlockingRecommendationResult(
                 email_address=email_address,
-                period_start=start_date,
-                period_end=end_date,
+                start_date=start_date,
+                end_date=end_date,
                 total_emails_analyzed=0,
                 recommendations=[]
             )
@@ -683,8 +684,8 @@ CLASS BlockingRecommendationService IMPLEMENTS IBlockingRecommendationService:
 
         RETURN BlockingRecommendationResult(
             email_address=email_address,
-            period_start=start_date,
-            period_end=end_date,
+            start_date=start_date,
+            end_date=end_date,
             total_emails_analyzed=aggregated.total_emails,
             recommendations=recommendations,
             already_blocked=already_blocked
@@ -857,8 +858,8 @@ GET /api/accounts/user@gmail.com/recommendations?days=7
 ```json
 {
     "email_address": "user@gmail.com",
-    "period_start": "2025-11-21",
-    "period_end": "2025-11-28",
+    "start_date": "2025-11-21",
+    "end_date": "2025-11-28",
     "total_emails_analyzed": 695,
     "recommendations": [
         {
