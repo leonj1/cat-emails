@@ -44,6 +44,7 @@ class AccountCategoryClient(AccountCategoryClientInterface):
             self.repository = repository
             self.session = None
             self.owns_session = True  # Repository owns session creation
+            self.owns_repository = False
             self.engine = getattr(repository, 'engine', None)
             self.Session = getattr(repository, 'SessionFactory', None)
         elif db_session:
@@ -51,6 +52,7 @@ class AccountCategoryClient(AccountCategoryClientInterface):
             self.repository = None  # Not using repository pattern in this mode
             self.session = db_session
             self.owns_session = False
+            self.owns_repository = False
             self.engine = None
             self.Session = None
         else:
@@ -58,10 +60,19 @@ class AccountCategoryClient(AccountCategoryClientInterface):
             self.repository = MySQLRepository()
             self.session = None
             self.owns_session = True
+            self.owns_repository = True
             self.engine = getattr(self.repository, 'engine', None)
             self.Session = getattr(self.repository, 'SessionFactory', None)
         
         logger.info("AccountCategoryClient initialized")
+    
+    def close(self) -> None:
+        """Close repository connection if owned by this client."""
+        if getattr(self, 'owns_repository', False) and self.repository:
+            if hasattr(self.repository, 'disconnect'):
+                self.repository.disconnect()
+                logger.info("Closed owned repository connection")
+
     
     def _get_session(self) -> Session:
         """Get a database session (either provided or create new one)."""

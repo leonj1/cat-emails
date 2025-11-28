@@ -65,6 +65,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
             MYSQL_USER or DATABASE_USER
             MYSQL_PASSWORD or DATABASE_PASSWORD
             MYSQL_URL or DATABASE_URL (full connection string)
+            MYSQL_POOL_SIZE (default: 5)
+            MYSQL_MAX_OVERFLOW (default: 10)
+            MYSQL_POOL_RECYCLE (default: 3600)
         """
         self.connection_string = connection_string
         self.host = host
@@ -74,9 +77,40 @@ class MySQLRepository(DatabaseRepositoryInterface):
         self.database = database
         self.username = username
         self.password = password
-        self.pool_size = pool_size
-        self.max_overflow = max_overflow
-        self.pool_recycle = pool_recycle
+        
+        # Load pool settings from env vars if not provided or using defaults
+        # We check if the passed values are the defaults to know if we should override from env
+        # This is a bit heuristic but safe since we're adding env var support
+        env_pool_size = os.getenv("MYSQL_POOL_SIZE")
+        if env_pool_size is not None:
+            try:
+                self.pool_size = int(env_pool_size)
+            except ValueError:
+                logger.warning(f"Invalid MYSQL_POOL_SIZE: {env_pool_size}, using {pool_size}")
+                self.pool_size = pool_size
+        else:
+            self.pool_size = pool_size
+
+        env_max_overflow = os.getenv("MYSQL_MAX_OVERFLOW")
+        if env_max_overflow is not None:
+            try:
+                self.max_overflow = int(env_max_overflow)
+            except ValueError:
+                logger.warning(f"Invalid MYSQL_MAX_OVERFLOW: {env_max_overflow}, using {max_overflow}")
+                self.max_overflow = max_overflow
+        else:
+            self.max_overflow = max_overflow
+
+        env_pool_recycle = os.getenv("MYSQL_POOL_RECYCLE")
+        if env_pool_recycle is not None:
+            try:
+                self.pool_recycle = int(env_pool_recycle)
+            except ValueError:
+                logger.warning(f"Invalid MYSQL_POOL_RECYCLE: {env_pool_recycle}, using {pool_recycle}")
+                self.pool_recycle = pool_recycle
+        else:
+            self.pool_recycle = pool_recycle
+
         self.echo = echo
         
         self.engine = None
