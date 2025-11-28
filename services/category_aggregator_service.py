@@ -4,9 +4,13 @@ Category Aggregator Service.
 This service aggregates email category counts in memory before persisting
 them to the repository. It implements buffering to reduce database writes
 and improve performance.
+
+Thread-safe implementation using threading.Lock for concurrent access
+from background processor and main application threads.
 """
 from datetime import datetime, date
 from typing import Dict, Tuple
+import threading
 
 from services.interfaces.category_aggregator_interface import ICategoryAggregator
 from repositories.category_tally_repository_interface import ICategoryTallyRepository
@@ -14,12 +18,17 @@ from repositories.category_tally_repository_interface import ICategoryTallyRepos
 
 class CategoryAggregator(ICategoryAggregator):
     """
-    Implementation of ICategoryAggregator that buffers category counts in memory.
+    Thread-safe implementation of ICategoryAggregator that buffers category counts in memory.
 
     The aggregator maintains a buffer keyed by (email_address, date) tuples,
     with each entry containing a dictionary of category counts. When the total
     buffer size reaches the configured limit, it automatically flushes to the
     repository.
+
+    Thread Safety:
+        All buffer operations are protected by a threading.Lock to prevent
+        race conditions during concurrent access from background processing
+        and main application threads.
 
     Buffer structure:
         {
@@ -47,6 +56,7 @@ class CategoryAggregator(ICategoryAggregator):
         self._repository = repository
         self._buffer_size = buffer_size
         self._buffer: Dict[Tuple[str, date], Dict[str, int]] = {}
+        self._lock = threading.Lock()  # Thread synchronization for buffer operations
 
     def record_category(
         self,
@@ -57,24 +67,27 @@ class CategoryAggregator(ICategoryAggregator):
         """
         Record a single email categorization event.
 
+        Thread-safe: Protected by internal lock.
+
         Args:
             email_address: Email account address
             category: Category name for the email
             timestamp: When the email was categorized
         """
-        tally_date = timestamp.date()
-        key = (email_address, tally_date)
+        with self._lock:
+            tally_date = timestamp.date()
+            key = (email_address, tally_date)
 
-        # Initialize buffer entry if it doesn't exist
-        if key not in self._buffer:
-            self._buffer[key] = {}
+            # Initialize buffer entry if it doesn't exist
+            if key not in self._buffer:
+                self._buffer[key] = {}
 
-        # Increment category count
-        self._buffer[key][category] = self._buffer[key].get(category, 0) + 1
+            # Increment category count
+            self._buffer[key][category] = self._buffer[key].get(category, 0) + 1
 
-        # Check if we need to auto-flush
-        if self._get_total_buffer_size() >= self._buffer_size:
-            self.flush()
+            # Check if we need to auto-flush
+            if self._get_total_buffer_size() >= self._buffer_size:
+                self._flush_internal()
 
     def record_batch(
         self,
@@ -85,29 +98,34 @@ class CategoryAggregator(ICategoryAggregator):
         """
         Record a batch of category counts at once.
 
+        Thread-safe: Protected by internal lock.
+
         Args:
             email_address: Email account address
             category_counts: Dictionary of category names to counts
             timestamp: When these emails were categorized
         """
-        tally_date = timestamp.date()
-        key = (email_address, tally_date)
+        with self._lock:
+            tally_date = timestamp.date()
+            key = (email_address, tally_date)
 
-        # Initialize buffer entry if it doesn't exist
-        if key not in self._buffer:
-            self._buffer[key] = {}
+            # Initialize buffer entry if it doesn't exist
+            if key not in self._buffer:
+                self._buffer[key] = {}
 
-        # Merge category counts
-        for category, count in category_counts.items():
-            self._buffer[key][category] = self._buffer[key].get(category, 0) + count
+            # Merge category counts
+            for category, count in category_counts.items():
+                self._buffer[key][category] = self._buffer[key].get(category, 0) + count
 
-        # Check if we need to auto-flush
-        if self._get_total_buffer_size() >= self._buffer_size:
-            self.flush()
+            # Check if we need to auto-flush
+            if self._get_total_buffer_size() >= self._buffer_size:
+                self._flush_internal()
 
     def flush(self) -> None:
         """
-        Flush all buffered category counts to the repository.
+        Flush all buffered category counts to the repository (public method).
+
+        Thread-safe: Acquires lock before flushing.
 
         For each buffered entry:
         1. Retrieve existing tally from repository to calculate correct total_emails
@@ -117,6 +135,15 @@ class CategoryAggregator(ICategoryAggregator):
 
         Note: The repository's save_daily_tally implements incremental merge semantics
         for category_counts but expects total_emails as the final absolute value.
+        """
+        with self._lock:
+            self._flush_internal()
+
+    def _flush_internal(self) -> None:
+        """
+        Internal flush implementation (called while lock is held).
+
+        Must only be called when self._lock is already acquired.
         """
         # Empty flush is a no-op
         if not self._buffer:
@@ -153,6 +180,8 @@ class CategoryAggregator(ICategoryAggregator):
         """
         Calculate total buffer size as sum of all category counts.
 
+        MUST be called while self._lock is held (internal helper).
+
         Returns:
             Total count across all buffered entries
         """
@@ -167,7 +196,7 @@ class CategoryAggregator(ICategoryAggregator):
         """
         Get the total count of buffered items for a specific account.
 
-        This is a testing helper method.
+        Thread-safe testing helper method.
 
         Args:
             email_address: Email account address
@@ -175,26 +204,28 @@ class CategoryAggregator(ICategoryAggregator):
         Returns:
             Sum of all category counts for this account across all dates
         """
-        total = 0
-        for (buffered_email, _), category_counts in self._buffer.items():
-            if buffered_email == email_address:
-                total += sum(category_counts.values())
-        return total
+        with self._lock:
+            total = 0
+            for (buffered_email, _), category_counts in self._buffer.items():
+                if buffered_email == email_address:
+                    total += sum(category_counts.values())
+            return total
 
     def get_buffer_contents(self) -> Dict[Tuple[str, date], Dict[str, int]]:
         """
         Get the current buffer contents.
 
-        This is a testing helper method.
+        Thread-safe testing helper method.
 
         Returns:
             Copy of the buffer dictionary
         """
-        # Return a copy to prevent external modification
-        return {
-            key: counts.copy()
-            for key, counts in self._buffer.items()
-        }
+        with self._lock:
+            # Return a copy to prevent external modification
+            return {
+                key: counts.copy()
+                for key, counts in self._buffer.items()
+            }
 
     def get_buffer_total_for_account_date(
         self,
@@ -204,7 +235,7 @@ class CategoryAggregator(ICategoryAggregator):
         """
         Get the total count for a specific account and date in the buffer.
 
-        This is a testing helper method.
+        Thread-safe testing helper method.
 
         Args:
             email_address: Email account address
@@ -213,7 +244,8 @@ class CategoryAggregator(ICategoryAggregator):
         Returns:
             Sum of all category counts for this account/date combination
         """
-        key = (email_address, tally_date)
-        if key not in self._buffer:
-            return 0
-        return sum(self._buffer[key].values())
+        with self._lock:
+            key = (email_address, tally_date)
+            if key not in self._buffer:
+                return 0
+            return sum(self._buffer[key].values())

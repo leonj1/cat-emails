@@ -6,7 +6,7 @@ Tests follow TDD approach - written before implementation.
 """
 import unittest
 from datetime import date, datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from models.recommendation_models import (
     BlockingRecommendation,
@@ -62,7 +62,7 @@ class MockCategoryTallyRepository(ICategoryTallyRepository):
         self,
         email_address: str,
         tally_date: date
-    ) -> DailyCategoryTally | None:
+    ) -> Optional[DailyCategoryTally]:
         return self.tallies.get((email_address, tally_date))
 
     def get_tallies_for_period(

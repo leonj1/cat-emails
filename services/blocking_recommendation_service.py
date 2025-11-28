@@ -262,15 +262,21 @@ class BlockingRecommendationService(IBlockingRecommendationService):
         email_address: str
     ) -> List[str]:
         """
-        Get list of categories already blocked for an account.
+        Get list of categories blocked globally (not per-account).
 
-        Queries the domain service to fetch current blocked categories.
+        NOTE: Current implementation returns GLOBAL blocked categories from
+        the Control API. The email_address parameter is part of the interface
+        contract but is currently unused since the domain_service does not
+        support per-account category blocking. Future enhancement could add
+        account-specific blocking by passing email_address to domain service.
 
         Args:
-            email_address: Email account address
+            email_address: Email account address (currently unused - returns global categories)
 
         Returns:
-            List of category names that are currently blocked
+            List of category names that are globally blocked
         """
+        # email_address is unused because fetch_blocked_categories() returns global config
+        # This is intentional - interface designed for future per-account blocking support
         blocked_categories_list = self._domain_service.fetch_blocked_categories()
         return [bc.category for bc in blocked_categories_list]

@@ -89,7 +89,7 @@ Feature: Email Category Blocking Recommendations
       | Other                | 295   |
     When the user requests blocking recommendations
     Then "Appointment-Reminder" should not appear in recommendations
-    Because the count is below the minimum threshold of 10
+    # Because the count is below the minimum threshold of 10
 
   Scenario: Categories below percentage threshold are not recommended
     Given a user "test@gmail.com" has processed emails over 7 days
@@ -101,7 +101,7 @@ Feature: Email Category Blocking Recommendations
       | Other       | 500   |
     When the user requests blocking recommendations
     Then "Marketing" should not appear in recommendations
-    Because the percentage is below the threshold of 10 percent
+    # Because the percentage is below the threshold of 10 percent
 
   Scenario: Multiple recommendations are sorted by strength and count
     Given a user "test@gmail.com" has processed emails over 7 days

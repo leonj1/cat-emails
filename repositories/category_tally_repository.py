@@ -61,8 +61,8 @@ class CategoryTallyRepository(ICategoryTallyRepository):
             ).first()
 
             if existing:
-                # Update existing record
-                existing.count = count
+                # Merge counts instead of replacing (incremental accumulation)
+                existing.count = existing.count + count
                 existing.total_emails = total_emails
                 existing.updated_at = now
             else:
@@ -78,6 +78,7 @@ class CategoryTallyRepository(ICategoryTallyRepository):
                 )
                 self.session.add(new_tally)
 
+        # Commit once after all category updates for better transaction management
         self.session.commit()
 
         # Return the consolidated tally
