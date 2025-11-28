@@ -284,10 +284,30 @@ class GmailFetcher:
             raise Exception(f"Failed to connect to Gmail: {str(e)}")
 
     def disconnect(self) -> None:
-        """Close the IMAP connection."""
+        """Close the IMAP connection and cleanup all services."""
+        # Close summary service
+        if self.summary_service:
+            try:
+                if hasattr(self.summary_service, 'close'):
+                    self.summary_service.close()
+                    logger.debug("Successfully closed summary_service")
+            except Exception as e:
+                logger.error(f"Error closing summary_service: {str(e)}")
+
+        # Close account service
+        if self.account_service:
+            try:
+                if hasattr(self.account_service, 'close'):
+                    self.account_service.close()
+                    logger.debug("Successfully closed account_service")
+            except Exception as e:
+                logger.error(f"Error closing account_service: {str(e)}")
+
+        # Close IMAP connection
         if self.conn:
             try:
                 self.conn.logout()
+                logger.debug("Successfully closed IMAP connection")
             except (ssl.SSLError, imaplib.IMAP4.abort) as e:
                 logger.error(f"SSL/Socket error during disconnect: {str(e)}")
             except Exception as e:

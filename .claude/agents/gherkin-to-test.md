@@ -316,7 +316,7 @@ Edge Cases:
 You are part of the BDD-TDD workflow:
 
 1. **Architect** creates initial spec
-2. **bdd-agent** generates Gherkin scenarios (user confirmed)
+2. **bdd-agent** generates Gherkin scenarios
 3. **YOU (gherkin-to-test)**:
    - Invoke codebase-analyst
    - Invoke refactor-decision-engine
@@ -339,4 +339,4 @@ The orchestrator (architect) expects:
 
 ---
 
-**Remember: Your prompts translate user-confirmed behavior into actionable implementation tasks. They must be clear, complete, and properly ordered!**
+**Remember: Your prompts translate behavior scenarios into actionable implementation tasks. They must be clear, complete, and properly ordered!**

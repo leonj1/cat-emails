@@ -7,18 +7,17 @@ This project uses Claude Code with specialized agents and hooks for orchestrated
 ### `/architect` - BDD-TDD Development Workflow
 Use this command to create implementation prompts following BDD and TDD best practices:
 - Creates greenfield specification for the feature
-- Generates Gherkin BDD scenarios for product owner confirmation
-- User (product owner) confirms scenarios capture intended behavior
-- Converts confirmed scenarios to TDD prompts
+- Generates Gherkin BDD scenarios
+- Converts scenarios to TDD prompts
 - Tests are written from Gherkin scenarios (Red phase)
 - Implementation follows to make tests pass (Green phase)
 - Full quality gates: standards checks and testing
 
-**When to use**: For new features where you want user confirmation of behavior before implementation.
+**When to use**: For new features where you want comprehensive BDD test coverage.
 
 **Example**: `/architect Build a user authentication system with JWT`
 
-**Flow**: architect → bdd-agent → (user confirms) → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → coder → standards → tester → bdd-test-runner
+**Flow**: architect → bdd-agent → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → coder → standards → tester → bdd-test-runner
 
 ### `/coder` - Orchestrated Development
 Use this command when you want to implement features with full orchestration:
@@ -97,7 +96,7 @@ This project uses Claude Code hooks to automatically enforce quality gates:
 
 ### Configured Hooks
 
-1. **post-bdd-agent.sh** - Signals gherkin-to-test after BDD scenarios confirmed
+1. **post-bdd-agent.sh** - Signals gherkin-to-test after BDD scenarios generated
 2. **post-gherkin-to-test.sh** - Signals run-prompt after prompts created
 3. **post-coder-standards-check.sh** - Triggers coding standards check after coder completes
 4. **post-standards-testing.sh** - Triggers testing after standards check passes
@@ -114,13 +113,12 @@ Hooks create state files in `.claude/.state/` to track workflow completion.
 ## Workflow Comparison
 
 ### BDD-TDD Workflow (`/architect`)
-**Best for**: New features with user confirmation, comprehensive test coverage, behavior-driven development
+**Best for**: New features with comprehensive test coverage, behavior-driven development
 
 **Flow**:
 1. `/architect` creates greenfield spec
 2. `bdd-agent` generates Gherkin scenarios
-3. **User confirms** scenarios capture intended behavior (up to 5 clarification attempts)
-4. `gherkin-to-test` invokes codebase-analyst and creates prompts
+3. `gherkin-to-test` invokes codebase-analyst and creates prompts
 5. `run-prompt` executes prompts sequentially
 6. For each prompt:
    - `test-creator` writes tests from Gherkin
@@ -130,7 +128,6 @@ Hooks create state files in `.claude/.state/` to track workflow completion.
    - `bdd-test-runner` validates test infrastructure (Dockerfile.test, Makefile, `make test`)
 
 **Benefits**:
-- User confirms behavior BEFORE implementation
 - Tests derived from business-readable Gherkin scenarios
 - Clear traceability from requirements to tests to code
 - Full quality gates

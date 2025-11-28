@@ -1220,7 +1220,7 @@ async def create_sample_data(x_api_key: Optional[str] = Header(None), report_typ
         
         # Initialize summary service
         gmail_email = os.getenv('GMAIL_EMAIL')
-        summary_service = EmailSummaryService(gmail_email=gmail_email)
+        summary_service = EmailSummaryService(gmail_email=gmail_email, repository=settings_service.repository)
         
         # Determine number of emails based on report type
         if report_type == "Monthly":
@@ -2543,6 +2543,14 @@ async def shutdown_event():
                 logger.info("Category aggregator flushed successfully")
             except Exception as e:
                 logger.exception("Error flushing category aggregator")
+
+        # Disconnect settings service repository to dispose of MySQL connection pool
+        try:
+            logger.info("Disconnecting settings service repository...")
+            settings_service.repository.disconnect()
+            logger.info("Settings service repository disconnected successfully")
+        except Exception as e:
+            logger.exception("Error disconnecting settings service repository")
 
         # Gracefully shutdown central logging service
         logger.info("Shutting down central logging service...")

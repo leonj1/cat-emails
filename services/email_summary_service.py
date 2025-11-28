@@ -30,7 +30,8 @@ class EmailSummaryService:
     """Service for tracking processed emails and generating summaries."""
     
     def __init__(self, data_dir: str = "./email_summaries", use_database: bool = True,
-                 gmail_email: Optional[str] = None, logs_collector: Optional[LogsCollectorService] = None):
+                 gmail_email: Optional[str] = None, logs_collector: Optional[LogsCollectorService] = None,
+                 repository=None):
         """
         Initialize the summary service.
 
@@ -39,6 +40,7 @@ class EmailSummaryService:
             use_database: Whether to persist summaries to database
             gmail_email: Gmail account email for account tracking (optional)
             logs_collector: LogsCollectorService instance (optional, creates new if not provided)
+            repository: MySQLRepository instance for dependency injection (optional, creates new if not provided)
         """
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
@@ -56,16 +58,29 @@ class EmailSummaryService:
         self.use_database = use_database
         self.db_service = None
         self.account_service = None
-        
+
+        # Track if we own the repository (created it) so we know if we should clean it up
+        self._owns_repository = False
+        self._repository = None
+
         if use_database:
             try:
-                # Create a shared MySQL repository instance for all services
-                from repositories.mysql_repository import MySQLRepository
-                shared_repository = MySQLRepository()
-                
+                # Use provided repository or create a new one
+                if repository is not None:
+                    shared_repository = repository
+                    logger.info("Using provided repository instance for email summaries")
+                else:
+                    from repositories.mysql_repository import MySQLRepository
+                    shared_repository = MySQLRepository()
+                    self._owns_repository = True
+                    logger.info("Created new repository instance for email summaries")
+
+                # Store reference to repository
+                self._repository = shared_repository
+
                 self.db_service = DatabaseService(repository=shared_repository)
                 logger.info("Database service initialized for email summaries")
-                
+
                 # Initialize account category service with same repository
                 try:
                     self.account_service = AccountCategoryClient(repository=shared_repository)
@@ -73,7 +88,7 @@ class EmailSummaryService:
                 except Exception as e:
                     logger.warning(f"Failed to initialize account service: {str(e)}")
                     # Continue without account service for backward compatibility
-                    
+
             except Exception as e:
                 logger.error(f"Failed to initialize database service: {str(e)}")
                 self.use_database = False
@@ -611,7 +626,7 @@ class EmailSummaryService:
     def get_performance_metrics(self) -> Dict[str, Any]:
         """
         Calculate and return performance metrics.
-        
+
         Returns:
             Dictionary with performance metrics
         """
@@ -622,24 +637,42 @@ class EmailSummaryService:
             'peak_processing_time': 0,
             'min_processing_time': 0
         }
-        
+
         # Calculate total duration
         if self.performance_metrics['start_time'] and self.performance_metrics['end_time']:
-            duration = (self.performance_metrics['end_time'] - 
+            duration = (self.performance_metrics['end_time'] -
                        self.performance_metrics['start_time']).total_seconds()
             metrics['total_duration_minutes'] = duration / 60
-            
+
             # Calculate emails per minute
             if duration > 0 and self.performance_metrics['total_emails'] > 0:
                 metrics['emails_per_minute'] = (
                     self.performance_metrics['total_emails'] / (duration / 60)
                 )
-        
+
         # Calculate processing time stats
         if self.performance_metrics['email_processing_times']:
             processing_times = [t[1] for t in self.performance_metrics['email_processing_times']]
             metrics['avg_processing_time'] = sum(processing_times) / len(processing_times)
             metrics['peak_processing_time'] = max(processing_times)
             metrics['min_processing_time'] = min(processing_times)
-        
+
         return metrics
+
+    def close(self) -> None:
+        """
+        Clean up resources. Only disconnects the repository if this service created it.
+
+        If a repository was injected via the constructor, it's the caller's responsibility
+        to manage its lifecycle.
+        """
+        if self._owns_repository and self._repository is not None:
+            try:
+                self._repository.disconnect()
+                logger.info("Disconnected repository (owned by EmailSummaryService)")
+            except Exception as e:
+                logger.error(f"Failed to disconnect repository: {str(e)}")
+            finally:
+                self._repository = None
+        elif self._repository is not None:
+            logger.debug("Repository not owned by EmailSummaryService, skipping disconnect")
