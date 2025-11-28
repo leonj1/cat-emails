@@ -107,6 +107,7 @@ MORNING_HOUR=5  # Morning summary hour (0-23, default: 5 for 5:30 AM)
 MORNING_MINUTE=30  # Morning summary minute (0-59, default: 30)
 EVENING_HOUR=16  # Evening summary hour (0-23, default: 16 for 4:30 PM)
 EVENING_MINUTE=30  # Evening summary minute (0-59, default: 30)
+DISABLE_REMOTE_LOGS=false  # Set to "true", "1", or "yes" to disable remote logging
 ```
 
 ### Setting Up Gmail Access
