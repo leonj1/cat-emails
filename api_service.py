@@ -308,8 +308,10 @@ def _initialize_category_aggregation():
     try:
         logger.info("🎬 Initializing category aggregation components...")
 
-        # Initialize repository for tallies
-        repository = CategoryTallyRepository(settings_service.repository.db_path)
+        # Initialize repository for tallies using the SQLAlchemy session
+        # CategoryTallyRepository requires a Session object, not a db_path string
+        session = settings_service.repository._get_session()
+        repository = CategoryTallyRepository(session)
 
         # Initialize config
         config = CategoryAggregationConfig()
@@ -2388,9 +2390,13 @@ async def get_category_statistics(
         end_date = date.today()
         start_date = end_date - timedelta(days=days - 1)
 
-        # Get aggregated stats from repository
+        # Get aggregated stats from CategoryTallyRepository
+        # Must use CategoryTallyRepository, not settings_service.repository
+        # which is DatabaseRepositoryInterface and doesn't have get_aggregated_tallies()
         logger.info(f"Getting category stats for {email_address} (days={days})")
-        stats = settings_service.repository.get_aggregated_tallies(
+        session = settings_service.repository._get_session()
+        tally_repo = CategoryTallyRepository(session)
+        stats = tally_repo.get_aggregated_tallies(
             email_address,
             start_date,
             end_date
