@@ -55,8 +55,29 @@ class ICategoryTallyRepository(ABC):
     """Interface for storing and retrieving category tallies."""
 
     @abstractmethod
-    def save_daily_tally(self, tally: 'DailyCategoryTally') -> None:
-        """Save or update a daily category tally."""
+    def save_daily_tally(
+        self,
+        email_address: str,
+        tally_date: date,
+        category_counts: dict,
+        total_emails: int
+    ) -> 'DailyCategoryTally':
+        """
+        Save or update a daily category tally for an account.
+
+        This method implements upsert semantics: if a tally exists for the
+        given email_address and tally_date, it will be updated; otherwise,
+        a new tally will be created.
+
+        Args:
+            email_address: Email account address
+            tally_date: Date for this tally
+            category_counts: Dictionary of category names to counts
+            total_emails: Total emails across all categories
+
+        Returns:
+            The saved DailyCategoryTally
+        """
         pass
 
     @abstractmethod
@@ -89,8 +110,17 @@ class ICategoryTallyRepository(ABC):
         pass
 
     @abstractmethod
-    def delete_tallies_before(self, cutoff_date: date) -> int:
-        """Delete tallies older than the cutoff date. Returns count deleted."""
+    def delete_tallies_before(self, email_address: str, cutoff_date: date) -> int:
+        """
+        Delete all tallies for an account before a cutoff date.
+
+        Args:
+            email_address: Email account to delete tallies for
+            cutoff_date: Delete tallies before this date
+
+        Returns:
+            Number of tally records deleted
+        """
         pass
 ```
 
@@ -860,7 +890,7 @@ GET /api/accounts/user@gmail.com/category-stats?days=7
     "period_end": "2025-11-28",
     "total_emails": 695,
     "days_with_data": 7,
-    "categories": [
+    "category_summaries": [
         {
             "category": "Marketing",
             "total_count": 245,
@@ -924,12 +954,14 @@ class BlockingRecommendationService(IBlockingRecommendationService):
     def __init__(
         self,
         repository: ICategoryTallyRepository,
-        config: ICategoryAggregationConfig
+        config: ICategoryAggregationConfig,
+        domain_service: DomainService
     ):
         """
         Args:
             repository: Repository for retrieving tallies
             config: Configuration for recommendation thresholds
+            domain_service: Domain service for fetching blocked categories from Control API
         """
         pass
 ```
@@ -1033,7 +1065,7 @@ The aggregator and recommendation service should be initialized during applicati
 
 ```python
 # Application startup (conceptual)
-def create_recommendation_components(db_connection: DatabaseConnection):
+def create_recommendation_components(db_connection: DatabaseConnection, control_api_token: str):
     repository = CategoryTallyRepository(db_connection)
 
     config = CategoryAggregationConfig(
@@ -1042,8 +1074,16 @@ def create_recommendation_components(db_connection: DatabaseConnection):
         excluded_categories=["Personal", "Work-related", "Financial-Notification"]
     )
 
+    # Initialize domain service for blocked categories lookup
+    # Use mock mode when control_api_token is not configured
+    use_mock = not bool(control_api_token)
+    domain_service = DomainService(
+        api_token=control_api_token or None,
+        mock_mode=use_mock
+    )
+
     aggregator = CategoryAggregator(repository)
-    recommendation_service = BlockingRecommendationService(repository, config)
+    recommendation_service = BlockingRecommendationService(repository, config, domain_service)
 
     return aggregator, recommendation_service
 ```
@@ -1054,10 +1094,15 @@ A scheduled job should clean up old tally data:
 
 ```python
 # Daily cleanup job (conceptual)
-def cleanup_old_tallies(repository: ICategoryTallyRepository, retention_days: int = 30):
+def cleanup_old_tallies(
+    repository: ICategoryTallyRepository,
+    email_address: str,
+    retention_days: int = 30
+):
+    """Clean up old tally data for a specific account."""
     cutoff_date = date.today() - timedelta(days=retention_days)
-    deleted_count = repository.delete_tallies_before(cutoff_date)
-    logger.info(f"Cleaned up {deleted_count} old tally records")
+    deleted_count = repository.delete_tallies_before(email_address, cutoff_date)
+    logger.info(f"Cleaned up {deleted_count} old tally records for {email_address}")
 ```
 
 ---

@@ -375,10 +375,14 @@ def get_recommendation_service() -> BlockingRecommendationService:
     if not recommendation_service:
         try:
             # Initialize domain service
+            # Use mock mode when no CONTROL_API_TOKEN is configured
+            use_mock = not bool(CONTROL_API_TOKEN)
             domain_service = DomainService(
-                api_token=CONTROL_API_TOKEN,
-                mock_mode=False
+                api_token=CONTROL_API_TOKEN or None,
+                mock_mode=use_mock
             )
+            if use_mock:
+                logger.info("BlockingRecommendationService using DomainService in mock mode (no CONTROL_API_TOKEN configured)")
 
             # Initialize category aggregation config
             config = CategoryAggregationConfig()
