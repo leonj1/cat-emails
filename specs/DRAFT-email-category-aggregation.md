@@ -148,9 +148,20 @@ class IBlockingRecommendationService(ABC):
     def get_recommendation_reasons(
         self,
         email_address: str,
-        category: str
+        category: str,
+        days: int = 7
     ) -> 'RecommendationReason':
-        """Get detailed reasoning for why a category is recommended for blocking."""
+        """
+        Get detailed reasoning for why a category is recommended for blocking.
+
+        Args:
+            email_address: Account email address
+            category: Category to analyze
+            days: Number of days to analyze (1-30, default: 7)
+
+        Returns:
+            RecommendationReason with detailed analysis
+        """
         pass
 
     @abstractmethod
@@ -228,12 +239,12 @@ Represents category counts for a single day per account.
 ```python
 from pydantic import BaseModel, Field
 from datetime import date, datetime
-from typing import Dict
+from typing import Dict, Optional
 
 class DailyCategoryTally(BaseModel):
     """Daily aggregation of email categories for an account."""
 
-    id: int | None = None
+    id: Optional[int] = None
     email_address: str = Field(..., description="The email account this tally belongs to")
     tally_date: date = Field(..., description="The date these tallies are for")
     category_counts: Dict[str, int] = Field(
@@ -897,8 +908,8 @@ GET /api/accounts/user@gmail.com/category-stats?days=7
 ```json
 {
     "email_address": "user@gmail.com",
-    "period_start": "2025-11-21",
-    "period_end": "2025-11-28",
+    "start_date": "2025-11-21",
+    "end_date": "2025-11-28",
     "total_emails": 695,
     "days_with_data": 7,
     "category_summaries": [
