@@ -171,6 +171,24 @@ class ICategoryAggregationConfig(ABC):
 
 ---
 
+## 1.5 Valid Email Categories
+
+The following categories are the canonical email types supported by this system:
+
+- **Wants-Money**: Emails requesting money or containing payment requests
+- **Advertising**: Commercial advertisements and promotional content
+- **Marketing**: Marketing campaigns and newsletters
+- **Personal**: Personal or family-related emails
+- **Financial-Notification**: Banking, investment, and financial account notifications
+- **Appointment-Reminder**: Calendar invitations and appointment reminders
+- **Service-Updates**: Updates from services and subscriptions
+- **Work-related**: Work and professional communications
+- **Other**: Emails that do not fit into other categories
+
+All category fields (`DailyCategoryTally.category_counts` keys, `CategorySummary.category`, `BlockingRecommendation.category`, etc.) must use one of these canonical category names.
+
+---
+
 ## 2. Data Models
 
 ### 2.1 DailyCategoryTally
@@ -190,7 +208,7 @@ class DailyCategoryTally(BaseModel):
     tally_date: date = Field(..., description="The date these tallies are for")
     category_counts: Dict[str, int] = Field(
         default_factory=dict,
-        description="Map of category name to count"
+        description="Map of canonical category name (see section 1.5) to count"
     )
     total_emails: int = Field(default=0, description="Total emails processed this day")
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -225,7 +243,7 @@ from typing import Dict, List
 class CategorySummary(BaseModel):
     """Summary statistics for a single category."""
 
-    category: str
+    category: str = Field(..., description="Canonical category name (see section 1.5)")
     total_count: int
     percentage: float = Field(..., ge=0, le=100)
     daily_average: float
@@ -265,7 +283,7 @@ class RecommendationStrength(str, Enum):
 class BlockingRecommendation(BaseModel):
     """A recommendation to block a specific category."""
 
-    category: str
+    category: str = Field(..., description="Canonical category name (see section 1.5)")
     strength: RecommendationStrength
     email_count: int = Field(..., description="Number of emails in this category")
     percentage: float = Field(..., ge=0, le=100)
@@ -930,7 +948,7 @@ class CategoryAggregationConfig(ICategoryAggregationConfig):
         Args:
             threshold_percentage: Minimum % of total for recommendation (default: 10.0)
             minimum_count: Minimum email count for recommendation (default: 10)
-            excluded_categories: Categories to never recommend blocking (default: ["Personal", "Work-related"])
+            excluded_categories: Categories to never recommend blocking (default: ["Personal", "Work-related", "Financial-Notification"])
         """
         pass
 ```
