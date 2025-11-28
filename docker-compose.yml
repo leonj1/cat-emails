@@ -1,0 +1,52 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: cat-emails-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-cat_emails}
+      MYSQL_USER: ${MYSQL_USER:-cat_emails}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-cat_emails_password}
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: gmail-cleaner-api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      - API_KEY=${API_KEY:-}
+      - GMAIL_EMAIL=${GMAIL_EMAIL}
+      - GMAIL_PASSWORD=${GMAIL_PASSWORD}
+      - SUMMARY_RECIPIENT_EMAIL=${SUMMARY_RECIPIENT_EMAIL:-${GMAIL_EMAIL}}
+      - MAILTRAP_API_TOKEN=${MAILTRAP_API_TOKEN:-}
+      - REQUESTYAI_API_KEY=${REQUESTYAI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CONTROL_API_TOKEN=${CONTROL_API_TOKEN:-}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-cat_emails}
+      - MYSQL_USER=${MYSQL_USER:-cat_emails}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-cat_emails_password}
+    volumes:
+      - ./email_summaries:/app/email_summaries
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local

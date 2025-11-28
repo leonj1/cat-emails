@@ -98,6 +98,8 @@ api-run:
 		-e GMAIL_EMAIL="$(GMAIL_EMAIL)" \
 		-e SUMMARY_RECIPIENT_EMAIL=$(or $(SUMMARY_RECIPIENT_EMAIL),$(GMAIL_EMAIL)) \
 		-e MAILTRAP_API_TOKEN="$(MAILTRAP_API_TOKEN)" \
+		-e REQUESTYAI_API_KEY="$(REQUESTYAI_API_KEY)" \
+		-e OPENAI_API_KEY="$(OPENAI_API_KEY)" \
 		--restart unless-stopped \
 		$(API_IMAGE_NAME)
 	@echo "API started on port $(or $(API_PORT),8000). Use 'make api-logs' to view logs."
