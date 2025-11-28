@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
 from services.background_processor_interface import BackgroundProcessorInterface
+from services.interfaces.category_aggregator_interface import ICategoryAggregator
 from clients.account_category_client import AccountCategoryClient
 
 logger = get_logger(__name__)
@@ -17,7 +18,8 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
         process_account_callback: Callable[[str], Dict],
         settings_service,
         scan_interval: int,
-        background_enabled: bool
+        background_enabled: bool,
+        category_aggregator: Optional[ICategoryAggregator] = None
     ):
         """
         Initialize the background processor service.
@@ -27,11 +29,13 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
             settings_service: Service for getting settings like lookback hours
             scan_interval: Seconds to wait between processing cycles
             background_enabled: Whether background processing is enabled
+            category_aggregator: Optional aggregator for category tallies
         """
         self.process_account_callback = process_account_callback
         self.settings_service = settings_service
         self.scan_interval = scan_interval
         self.background_enabled = background_enabled
+        self.category_aggregator = category_aggregator
         self.running = True
         self.next_execution_time: Optional[datetime] = None
 
@@ -115,6 +119,37 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
 
                             if result["success"]:
                                 total_processed += result.get("emails_processed", 0)
+
+                                # Record categories in aggregator if enabled
+                                if self.category_aggregator:
+                                    try:
+                                        category_counts = result.get("category_counts", {})
+                                        if category_counts:
+                                            self.category_aggregator.record_batch(
+                                                account.email_address,
+                                                category_counts,
+                                                datetime.now()
+                                            )
+                                            logger.debug(
+                                                f"Recorded category batch for {account.email_address}: "
+                                                f"{category_counts}"
+                                            )
+                                    except Exception as e:
+                                        logger.error(
+                                            f"Failed to record categories for {account.email_address}: {e}"
+                                        )
+                                        # Continue processing - aggregation failure should not stop email processing
+
+                                # Flush aggregator after each account
+                                if self.category_aggregator:
+                                    try:
+                                        self.category_aggregator.flush()
+                                        logger.debug(f"Flushed aggregator after processing {account.email_address}")
+                                    except Exception as e:
+                                        logger.error(
+                                            f"Failed to flush aggregator for {account.email_address}: {e}"
+                                        )
+                                        # Continue processing - flush failure should not stop email processing
                             else:
                                 total_errors += 1
 

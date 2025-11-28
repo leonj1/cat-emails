@@ -287,6 +287,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 "emails_processed": len(new_emails),
                 "emails_categorized": len(new_emails),
                 "emails_labeled": len(new_emails),
+                "category_counts": category_actions,  # Add category counts for aggregator
                 "processing_time_seconds": round(processing_time, 2),
                 "timestamp": datetime.now().isoformat(),
                 "success": True

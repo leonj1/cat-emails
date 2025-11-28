@@ -36,6 +36,12 @@ from services.email_categorizer_service import EmailCategorizerService
 from services.openai_llm_service import OpenAILLMService
 from services.categorize_emails_llm import LLMCategorizeEmails
 from services.rate_limiter_service import RateLimiterService
+from services.blocking_recommendation_service import BlockingRecommendationService
+from services.category_aggregation_config import CategoryAggregationConfig
+from services.category_aggregator_service import CategoryAggregator
+from services.tally_cleanup_service import TallyCleanupService
+from repositories.category_tally_repository import CategoryTallyRepository
+from domain_service import DomainService
 from models.account_models import (
     TopCategoriesResponse, AccountListResponse, EmailAccountInfo,
     AccountCategoryStatsRequest
@@ -46,6 +52,11 @@ from models.standard_response import StandardResponse
 from models.error_response import ErrorResponse
 from models.processing_current_status_response import ProcessingCurrentStatusResponse
 from models.force_process_response import ForceProcessResponse, ProcessingInfo
+from models.recommendation_models import (
+    BlockingRecommendationResult,
+    RecommendationReason
+)
+from models.category_tally_models import AggregatedCategoryTally
 from models.config_response import (
     ConfigurationResponse, DatabaseConfig, DatabaseEnvVars, LLMConfig,
     BackgroundProcessingConfig, APIServiceConfig
@@ -214,6 +225,10 @@ BACKGROUND_PROCESSING_ENABLED = os.getenv("BACKGROUND_PROCESSING", "true").lower
 BACKGROUND_SCAN_INTERVAL = int(os.getenv("BACKGROUND_SCAN_INTERVAL", "300"))  # 5 minutes default
 BACKGROUND_PROCESS_HOURS = int(os.getenv("BACKGROUND_PROCESS_HOURS", "2"))  # Look back 2 hours default
 
+# Category aggregation configuration
+ENABLE_CATEGORY_AGGREGATION = os.getenv("ENABLE_CATEGORY_AGGREGATION", "true").lower() == "true"
+CATEGORY_AGGREGATION_BUFFER_SIZE = int(os.getenv("CATEGORY_AGGREGATION_BUFFER_SIZE", "100"))
+
 # Minimum delay to ensure healthchecks pass (seconds)
 MIN_BACKGROUND_START_DELAY = 1
 
@@ -270,6 +285,54 @@ account_email_processor_service: Optional[AccountEmailProcessorService] = None
 # Global rate limiter for force processing endpoint (5 minutes default)
 force_process_rate_limiter = RateLimiterService(default_interval_seconds=300)
 
+# Global recommendation service instance (will be initialized on first use)
+recommendation_service: Optional[BlockingRecommendationService] = None
+
+# Global category aggregation components (initialized on startup if enabled)
+category_aggregator = None
+tally_cleanup_service = None
+
+
+# Initialize category aggregation components
+def _initialize_category_aggregation():
+    """Initialize category aggregation components if enabled."""
+    global category_aggregator, tally_cleanup_service
+
+    if not ENABLE_CATEGORY_AGGREGATION:
+        logger.info("⏸️  Category aggregation is disabled")
+        return None
+
+    if category_aggregator:
+        return category_aggregator
+
+    try:
+        logger.info("🎬 Initializing category aggregation components...")
+
+        # Initialize repository for tallies
+        repository = CategoryTallyRepository(settings_service.repository.db_path)
+
+        # Initialize config
+        config = CategoryAggregationConfig()
+
+        # Initialize aggregator
+        category_aggregator = CategoryAggregator(
+            repository=repository,
+            buffer_size=CATEGORY_AGGREGATION_BUFFER_SIZE
+        )
+
+        # Initialize cleanup service
+        tally_cleanup_service = TallyCleanupService(
+            repository=repository,
+            config=config
+        )
+
+        logger.info(f"✅ Category aggregation initialized (buffer size: {CATEGORY_AGGREGATION_BUFFER_SIZE})")
+        return category_aggregator
+
+    except Exception as e:
+        logger.error(f"Failed to initialize category aggregation: {str(e)}")
+        return None
+
 
 # Initialize account email processor service after all dependencies are ready
 def _initialize_account_email_processor():
@@ -304,6 +367,35 @@ def get_account_service() -> AccountCategoryClientInterface:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database service unavailable"
         )
+
+
+def get_recommendation_service() -> BlockingRecommendationService:
+    """Dependency to provide BlockingRecommendationService instance."""
+    global recommendation_service
+    if not recommendation_service:
+        try:
+            # Initialize domain service
+            domain_service = DomainService(
+                api_token=CONTROL_API_TOKEN,
+                mock_mode=False
+            )
+
+            # Initialize category aggregation config
+            config = CategoryAggregationConfig()
+
+            # Create recommendation service
+            recommendation_service = BlockingRecommendationService(
+                repository=settings_service.repository,
+                config=config,
+                domain_service=domain_service
+            )
+        except Exception as e:
+            logger.error(f"Failed to create BlockingRecommendationService: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Recommendation service unavailable"
+            )
+    return recommendation_service
 
 
 def _make_llm_service(model: str) -> LLMServiceInterface:
@@ -381,12 +473,16 @@ def start_background_processor():
         # Initialize account email processor service
         processor_service = _initialize_account_email_processor()
 
+        # Initialize category aggregation if enabled
+        aggregator = _initialize_category_aggregation()
+
         # Create background processor service instance
         background_processor_service = BackgroundProcessorService(
             process_account_callback=processor_service.process_account,
             settings_service=settings_service,
             scan_interval=BACKGROUND_SCAN_INTERVAL,
-            background_enabled=BACKGROUND_PROCESSING_ENABLED
+            background_enabled=BACKGROUND_PROCESSING_ENABLED,
+            category_aggregator=aggregator
         )
 
         background_thread = threading.Thread(
@@ -2082,6 +2178,243 @@ async def force_process_account(
         )
 
 
+@app.get(
+    "/api/accounts/{email_address}/recommendations",
+    response_model=BlockingRecommendationResult,
+    tags=["recommendations"]
+)
+async def get_blocking_recommendations(
+    email_address: str = Path(..., description="Gmail email address"),
+    days: int = Query(7, ge=1, le=30, description="Number of days to analyze (1-30, default: 7)"),
+    x_api_key: Optional[str] = Header(None),
+    service: AccountCategoryClientInterface = Depends(get_account_service),
+    rec_service: BlockingRecommendationService = Depends(get_recommendation_service)
+):
+    """
+    Get blocking recommendations for an email account
+
+    Analyzes category tallies over a rolling window period and generates
+    recommendations for categories that should be considered for blocking.
+
+    Recommendations are based on:
+    - Percentage thresholds (HIGH: >=25%, MEDIUM: >=15%, LOW: >=threshold)
+    - Volume minimums (minimum_count)
+    - Category exclusions (Personal, Work-related, Financial-Notification)
+
+    Args:
+        email_address: Gmail email address to analyze
+        days: Number of days to look back (1-30, default: 7)
+
+    Returns:
+        BlockingRecommendationResult with recommendations and metadata
+
+    Raises:
+        400: Invalid parameters (days out of range)
+        401: Invalid or missing API key
+        404: Account not found
+        500: Internal server error
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        # Verify account exists
+        account = service.get_account_by_email(email_address)
+        if not account:
+            logger.warning(f"Account not found for recommendations: {email_address}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Account not found: {email_address}"
+            )
+
+        # Get recommendations from service
+        logger.info(f"Getting recommendations for {email_address} (days={days})")
+        result = rec_service.get_recommendations(email_address, days=days)
+
+        logger.info(
+            f"Generated {len(result.recommendations)} recommendations for {email_address}"
+        )
+        return result
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        error_msg = str(e)
+        logger.warning(f"Validation error in get_blocking_recommendations: {error_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg
+        )
+    except Exception as e:
+        logger.error(f"Error in get_blocking_recommendations: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate recommendations"
+        )
+
+
+@app.get(
+    "/api/accounts/{email_address}/recommendations/{category}/details",
+    response_model=RecommendationReason,
+    tags=["recommendations"]
+)
+async def get_recommendation_details(
+    email_address: str = Path(..., description="Gmail email address"),
+    category: str = Path(..., description="Email category name"),
+    days: int = Query(7, ge=1, le=30, description="Number of days to analyze (1-30, default: 7)"),
+    x_api_key: Optional[str] = Header(None),
+    service: AccountCategoryClientInterface = Depends(get_account_service),
+    rec_service: BlockingRecommendationService = Depends(get_recommendation_service)
+):
+    """
+    Get detailed reasons why a category is recommended for blocking
+
+    Provides comprehensive breakdown including:
+    - Daily tallies
+    - Trend analysis (increasing/decreasing/stable)
+    - Comparable categories
+    - Recommendation factors
+
+    Args:
+        email_address: Gmail email address
+        category: Category to analyze
+        days: Number of days to look back (1-30, default: 7)
+
+    Returns:
+        RecommendationReason with detailed breakdown
+
+    Raises:
+        400: Invalid parameters
+        401: Invalid or missing API key
+        404: Account not found or category has no data
+        500: Internal server error
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        # Verify account exists
+        account = service.get_account_by_email(email_address)
+        if not account:
+            logger.warning(f"Account not found for recommendation details: {email_address}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Account not found: {email_address}"
+            )
+
+        # Get detailed reasons from service
+        logger.info(f"Getting recommendation details for {email_address}/{category} (days={days})")
+        reason = rec_service.get_recommendation_reasons(email_address, category, days=days)
+
+        # Check if category has any data
+        if reason.total_count == 0:
+            logger.warning(f"No data found for category {category} in account {email_address}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Category '{category}' not found or has no data"
+            )
+
+        logger.info(
+            f"Generated recommendation details for {email_address}/{category}: "
+            f"{reason.total_count} emails ({reason.percentage}%)"
+        )
+        return reason
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        error_msg = str(e)
+        logger.warning(f"Validation error in get_recommendation_details: {error_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg
+        )
+    except Exception as e:
+        logger.error(f"Error in get_recommendation_details: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate recommendation details"
+        )
+
+
+@app.get(
+    "/api/accounts/{email_address}/category-stats",
+    response_model=AggregatedCategoryTally,
+    tags=["recommendations"]
+)
+async def get_category_statistics(
+    email_address: str = Path(..., description="Gmail email address"),
+    days: int = Query(7, ge=1, le=365, description="Number of days to analyze (1-365, default: 7)"),
+    x_api_key: Optional[str] = Header(None),
+    service: AccountCategoryClientInterface = Depends(get_account_service)
+):
+    """
+    Get raw category statistics for an email account
+
+    Returns aggregated category statistics across a date range without
+    applying recommendation logic. Provides pure statistical data including:
+    - Total emails and days with data
+    - Per-category counts, percentages, and daily averages
+    - Trend information (increasing/decreasing/stable)
+
+    Args:
+        email_address: Gmail email address
+        days: Number of days to look back (1-365, default: 7)
+
+    Returns:
+        AggregatedCategoryTally with category statistics
+
+    Raises:
+        400: Invalid parameters
+        401: Invalid or missing API key
+        404: Account not found
+        500: Internal server error
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        # Verify account exists
+        account = service.get_account_by_email(email_address)
+        if not account:
+            logger.warning(f"Account not found for category stats: {email_address}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Account not found: {email_address}"
+            )
+
+        # Calculate date range
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days - 1)
+
+        # Get aggregated stats from repository
+        logger.info(f"Getting category stats for {email_address} (days={days})")
+        stats = settings_service.repository.get_aggregated_tallies(
+            email_address,
+            start_date,
+            end_date
+        )
+
+        logger.info(
+            f"Retrieved category stats for {email_address}: "
+            f"{stats.total_emails} emails across {stats.days_with_data} days"
+        )
+        return stats
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        error_msg = str(e)
+        logger.warning(f"Validation error in get_category_statistics: {error_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg
+        )
+    except Exception as e:
+        logger.error(f"Error in get_category_statistics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve category statistics"
+        )
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize WebSocket manager and start background tasks on server startup"""
@@ -2181,6 +2514,15 @@ async def shutdown_event():
 
         # Stop background processor if running
         stop_background_processor()
+
+        # Flush category aggregator if enabled
+        if category_aggregator:
+            try:
+                logger.info("Flushing category aggregator...")
+                category_aggregator.flush()
+                logger.info("Category aggregator flushed successfully")
+            except Exception as e:
+                logger.error(f"Error flushing category aggregator: {e}")
 
         # Gracefully shutdown central logging service
         logger.info("Shutting down central logging service...")
