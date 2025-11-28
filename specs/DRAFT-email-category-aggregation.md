@@ -346,6 +346,8 @@ class RecommendationReason(BaseModel):
 
 ## 3. Database Schema
 
+**Note**: The schema below uses SQLite-specific syntax (e.g., `AUTOINCREMENT`). The project currently uses SQLite exclusively for the email summaries database. If future requirements demand multi-database support (PostgreSQL, MySQL), the schema should be adapted using database-agnostic patterns or ORM migrations.
+
 ### 3.1 Table: category_daily_tallies
 
 ```sql
@@ -389,7 +391,7 @@ CREATE TABLE category_tally_summaries (
 
 ### 4.1 Recording Categories During Background Processing
 
-```
+```text
 FUNCTION process_email_batch(email_address, emails):
     category_counts = {}
 
@@ -411,7 +413,7 @@ END FUNCTION
 
 ### 4.2 Category Aggregator Implementation
 
-```
+```text
 CLASS CategoryAggregator IMPLEMENTS ICategoryAggregator:
 
     CONSTRUCTOR(repository: ICategoryTallyRepository):
@@ -479,7 +481,7 @@ END CLASS
 
 ### 4.3 Recommendation Algorithm
 
-```
+```text
 CLASS BlockingRecommendationService IMPLEMENTS IBlockingRecommendationService:
 
     CONSTRUCTOR(
@@ -618,7 +620,7 @@ ORDER BY total_count DESC;
 Get blocking recommendations for an account.
 
 **Request**:
-```
+```text
 GET /api/accounts/user@gmail.com/recommendations?days=7
 ```
 
@@ -666,7 +668,7 @@ GET /api/accounts/user@gmail.com/recommendations?days=7
 Get detailed reasoning for a specific category recommendation.
 
 **Request**:
-```
+```text
 GET /api/accounts/user@gmail.com/recommendations/Marketing/details
 ```
 
@@ -705,7 +707,7 @@ GET /api/accounts/user@gmail.com/recommendations/Marketing/details
 Get raw category statistics without recommendations.
 
 **Request**:
-```
+```text
 GET /api/accounts/user@gmail.com/category-stats?days=7
 ```
 
@@ -920,7 +922,7 @@ def cleanup_old_tallies(repository: ICategoryTallyRepository, retention_days: in
 
 ### Unit Tests
 - `CategoryAggregator.record_category()` correctly buffers records
-- `CategoryAggregator.flush()` correctly merges with existing tallies
+- `CategoryAggregator.flush()` properly merges with existing tallies
 - `BlockingRecommendationService.calculate_strength()` returns correct strength levels
 - `BlockingRecommendationService.get_recommendations()` excludes configured categories
 - Repository correctly calculates percentages and aggregations
@@ -956,4 +958,4 @@ Feature: Email Category Blocking Recommendations
 
 ---
 
-**End of DRAFT Specification**
+## End of DRAFT Specification
