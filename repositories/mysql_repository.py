@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, and_, func, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.engine.url import make_url
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import QueuePool, NullPool
 
 from repositories.database_repository_interface import DatabaseRepositoryInterface
 from models.database import (
@@ -110,7 +110,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
             self.pool_recycle = pool_recycle
             
         # Validate pool settings
-        if self.pool_size <= 0:
+        if self.pool_size < 0:
             logger.warning(f"Invalid pool_size {self.pool_size}, resetting to default 5")
             self.pool_size = 5
             
@@ -196,15 +196,30 @@ class MySQLRepository(DatabaseRepositoryInterface):
                 self.username = url.username
         
         try:
+            # Determine pool class and arguments
+            if self.pool_size == 0:
+                pool_class = NullPool
+                pool_args = {
+                    "pool_recycle": self.pool_recycle,
+                    "pool_pre_ping": True,
+                    "echo": self.echo
+                }
+                logger.info("Using NullPool (no connection pooling)")
+            else:
+                pool_class = QueuePool
+                pool_args = {
+                    "pool_size": self.pool_size,
+                    "max_overflow": self.max_overflow,
+                    "pool_recycle": self.pool_recycle,
+                    "pool_pre_ping": True,
+                    "echo": self.echo
+                }
+
             # Create engine with connection pooling
             self.engine = create_engine(
                 conn_str,
-                poolclass=QueuePool,
-                pool_size=self.pool_size,
-                max_overflow=self.max_overflow,
-                pool_recycle=self.pool_recycle,
-                pool_pre_ping=True,  # Verify connections before using
-                echo=self.echo
+                poolclass=pool_class,
+                **pool_args
             )
             
             # Create all tables if they don't exist
@@ -214,6 +229,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
             
             logger.info(f"MySQL repository connected to: {self.host}:{self.port}/{self.database}")
         except Exception as e:
+            if self.engine:
+                self.engine.dispose()
+                self.engine = None
             logger.error(f"Failed to connect to MySQL database: {str(e)}")
             raise ConnectionError(f"Failed to connect to MySQL database: {str(e)}") from e
     
