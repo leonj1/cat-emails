@@ -240,6 +240,27 @@ class ProcessedEmailLog(Base):
     )
 
 
+class CategoryDailyTally(Base):
+    """Daily category tally per email account"""
+    __tablename__ = 'category_daily_tallies'
+
+    id = Column(Integer, primary_key=True)
+    email_address = Column(String(255), nullable=False, index=True)
+    tally_date = Column(Date, nullable=False, index=True)
+    category = Column(String(100), nullable=False)
+    count = Column(Integer, default=0, nullable=False)
+    total_emails = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('email_address', 'tally_date', 'category', name='uq_email_date_category'),
+        Index('idx_email_date', 'email_address', 'tally_date'),
+        Index('idx_email_category', 'email_address', 'category'),
+        Index('idx_date_range', 'email_address', 'tally_date', 'category'),
+    )
+
+
 # Database initialization functions
 def get_database_url(db_path: Optional[str] = None) -> str:
     """
