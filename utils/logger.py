@@ -61,12 +61,8 @@ def initialize_central_logging(
         if _initialized and not force:
             return _central_logging_service
 
-        # Check for feature flag to disable remote logging
-        disable_remote_logs = os.getenv("DISABLE_REMOTE_LOGS", "").lower() in ("true", "1", "yes")
-        if disable_remote_logs:
-            enable_remote = False
-
         # Create the central logging service
+        # Note: DISABLE_REMOTE_LOGS env var is checked in create_logging_service()
         _central_logging_service = create_logging_service(
             logger_name="cat-emails",
             log_level=log_level,
