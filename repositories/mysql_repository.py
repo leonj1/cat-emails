@@ -118,6 +118,10 @@ class MySQLRepository(DatabaseRepositoryInterface):
             logger.warning(f"Invalid max_overflow {self.max_overflow}, resetting to default 10")
             self.max_overflow = 10
 
+        if self.pool_recycle <= 0:
+            logger.warning(f"Invalid pool_recycle {self.pool_recycle}, resetting to default 3600")
+            self.pool_recycle = 3600
+
         self.echo = echo
         
         self.engine = None
@@ -306,7 +310,8 @@ class MySQLRepository(DatabaseRepositoryInterface):
                     "engine_initialized": True,
                     "session_factory_initialized": True,
                     "pool_size": self.pool_size,
-                    "max_overflow": self.max_overflow
+                    "max_overflow": self.max_overflow,
+                    "pool_recycle": self.pool_recycle
                 }
             }
         except Exception as e:
