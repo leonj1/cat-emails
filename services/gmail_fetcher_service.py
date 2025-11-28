@@ -143,8 +143,8 @@ class GmailFetcher(GmailFetcherInterface):
         if self.account_service and hasattr(self.account_service, 'close'):
             try:
                 self.account_service.close()
-            except Exception as e:
-                logger.error(f"Error closing account service: {str(e)}")
+            except Exception:
+                logger.exception("Error closing account service")
 
         if self.conn:
             try:

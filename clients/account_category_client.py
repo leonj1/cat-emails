@@ -642,3 +642,7 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(f"Error during testing: {str(e)}")
+    finally:
+        if 'service' in locals():
+            service.close()
+            print("Service closed")

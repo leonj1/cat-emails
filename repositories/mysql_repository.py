@@ -78,9 +78,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
         self.username = username
         self.password = password
         
-        # Load pool settings from env vars if not provided or using defaults
-        # We check if the passed values are the defaults to know if we should override from env
-        # This is a bit heuristic but safe since we're adding env var support
+        # Load pool settings from env vars if provided (takes precedence over constructor arguments)
         env_pool_size = os.getenv("MYSQL_POOL_SIZE")
         if env_pool_size is not None:
             try:
@@ -110,6 +108,15 @@ class MySQLRepository(DatabaseRepositoryInterface):
                 self.pool_recycle = pool_recycle
         else:
             self.pool_recycle = pool_recycle
+            
+        # Validate pool settings
+        if self.pool_size <= 0:
+            logger.warning(f"Invalid pool_size {self.pool_size}, resetting to default 5")
+            self.pool_size = 5
+            
+        if self.max_overflow < 0:
+            logger.warning(f"Invalid max_overflow {self.max_overflow}, resetting to default 10")
+            self.max_overflow = 10
 
         self.echo = echo
         
