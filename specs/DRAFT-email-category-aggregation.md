@@ -70,6 +70,15 @@ class ICategoryTallyRepository(ABC):
         pass
 
     @abstractmethod
+    def get_tally(
+        self,
+        email_address: str,
+        tally_date: date
+    ) -> Optional['DailyCategoryTally']:
+        """Retrieve a single daily tally by account and date for merging during flush."""
+        pass
+
+    @abstractmethod
     def get_aggregated_tallies(
         self,
         email_address: str,
@@ -112,6 +121,20 @@ class IBlockingRecommendationService(ABC):
         category: str
     ) -> 'RecommendationReason':
         """Get detailed reasoning for why a category is recommended for blocking."""
+        pass
+
+    @abstractmethod
+    def get_blocked_categories_for_account(
+        self,
+        email_address: str
+    ) -> List[str]:
+        """
+        Retrieve the list of categories already blocked for an account.
+
+        This method retrieves the blocked categories from the Control API
+        (via domain_service.get_blocked_categories()) for the given email account.
+        Returns an empty list if the account has no blocked categories.
+        """
         pass
 ```
 
@@ -416,10 +439,10 @@ END FUNCTION
 ```text
 CLASS CategoryAggregator IMPLEMENTS ICategoryAggregator:
 
-    CONSTRUCTOR(repository: ICategoryTallyRepository):
+    CONSTRUCTOR(repository: ICategoryTallyRepository, buffer_size: int = 100):
         self.repository = repository
         self.buffer = {}  // In-memory buffer for batching
-        self.buffer_size_limit = 100
+        self.buffer_size_limit = buffer_size
 
     FUNCTION record_category(email_address, category, timestamp):
         tally_date = timestamp.date()
@@ -448,7 +471,10 @@ CLASS CategoryAggregator IMPLEMENTS ICategoryAggregator:
             self.buffer[key][category] = self.buffer[key].get(category, 0) + count
         END FOR
 
-        self.flush()  // Flush immediately after batch
+        // Check if buffer size limit is exceeded and flush if needed
+        IF total_buffer_size() >= self.buffer_size_limit:
+            self.flush()
+        END IF
     END FUNCTION
 
     FUNCTION flush():
@@ -550,7 +576,7 @@ CLASS BlockingRecommendationService IMPLEMENTS IBlockingRecommendationService:
         END FOR
 
         // Get already blocked categories for context
-        already_blocked = get_blocked_categories_for_account(email_address)
+        already_blocked = self.get_blocked_categories_for_account(email_address)
 
         RETURN BlockingRecommendationResult(
             email_address=email_address,
@@ -591,10 +617,105 @@ CLASS BlockingRecommendationService IMPLEMENTS IBlockingRecommendationService:
 END CLASS
 ```
 
-### 4.4 7-Day Rolling Aggregation Query
+### 4.4 Trend Calculation
+
+Trends are calculated by comparing the first half and second half of the rolling window period.
+
+```text
+FUNCTION calculate_trend(daily_breakdown: List[DailyCount]) -> str:
+    """
+    Calculate trend direction for a category over the rolling window.
+
+    Args:
+        daily_breakdown: List of (date, count) tuples sorted chronologically
+
+    Returns:
+        'increasing', 'decreasing', or 'stable'
+    """
+    IF len(daily_breakdown) < 2:
+        RETURN 'stable'
+    END IF
+
+    // Split into first half and second half
+    midpoint = len(daily_breakdown) // 2
+    first_half = daily_breakdown[:midpoint]
+    second_half = daily_breakdown[midpoint:]
+
+    // Calculate averages for each half
+    first_half_avg = AVG([count FOR (date, count) IN first_half])
+    second_half_avg = AVG([count FOR (date, count) IN second_half])
+
+    // Calculate percentage change
+    IF first_half_avg == 0:
+        // Avoid division by zero
+        IF second_half_avg > 0:
+            RETURN 'increasing'
+        ELSE:
+            RETURN 'stable'
+        END IF
+    END IF
+
+    percentage_change = ((second_half_avg - first_half_avg) / first_half_avg) * 100
+
+    // Classify trend based on percentage change
+    // Threshold: ±15% change is considered significant
+    IF percentage_change >= 15.0:
+        RETURN 'increasing'
+    ELSE IF percentage_change <= -15.0:
+        RETURN 'decreasing'
+    ELSE:
+        RETURN 'stable'
+    END IF
+END FUNCTION
+
+FUNCTION calculate_trend_percentage_change(daily_breakdown: List[DailyCount]) -> float:
+    """Calculate the percentage change between first half and second half."""
+    IF len(daily_breakdown) < 2:
+        RETURN 0.0
+    END IF
+
+    midpoint = len(daily_breakdown) // 2
+    first_half_avg = AVG([count FOR (date, count) IN daily_breakdown[:midpoint]])
+    second_half_avg = AVG([count FOR (date, count) IN daily_breakdown[midpoint:]])
+
+    IF first_half_avg == 0:
+        RETURN 0.0
+    END IF
+
+    RETURN ((second_half_avg - first_half_avg) / first_half_avg) * 100
+END FUNCTION
+```
+
+**Trend Classification Rules**:
+- **Increasing**: Second half average is ≥15% higher than first half average
+- **Decreasing**: Second half average is ≤15% lower than first half average
+- **Stable**: Change is between -15% and +15%
+
+### 4.5 7-Day Rolling Aggregation Query
+
+**Optimized Version** (uses window functions for better performance):
 
 ```sql
--- Get aggregated tallies for the past 7 days
+-- Get aggregated tallies for the past 7 days using window functions
+-- This avoids recalculating the total sum for every category
+SELECT
+    category,
+    SUM(count) as total_count,
+    ROUND(SUM(count) * 100.0 /
+        SUM(SUM(count)) OVER(), 2) as percentage,
+    ROUND(AVG(count), 2) as daily_average,
+    COUNT(DISTINCT tally_date) as days_present
+FROM category_daily_tallies
+WHERE email_address = :email
+    AND tally_date BETWEEN :start_date AND :end_date
+GROUP BY category
+ORDER BY total_count DESC;
+```
+
+**Legacy Version** (for databases without window function support):
+
+```sql
+-- Fallback query using subquery
 SELECT
     category,
     SUM(count) as total_count,
@@ -610,6 +731,8 @@ WHERE email_address = :email
 GROUP BY category
 ORDER BY total_count DESC;
 ```
+
+**Note**: SQLite 3.25.0+ supports window functions. The optimized version should be used for better performance with large datasets.
 
 ---
 
@@ -848,9 +971,45 @@ class BackgroundEmailProcessor:
             category_counts=category_counts,
             timestamp=datetime.utcnow()
         )
+
+        # IMPORTANT: Ensure flush is called at end of processing run
+        # This is critical to persist any buffered data that hasn't reached the buffer limit
+        self.category_aggregator.flush()
 ```
 
-### 7.2 Initialization
+### 7.2 Buffer Flush Lifecycle
+
+The `CategoryAggregator` maintains an in-memory buffer to batch writes to the database. Understanding when flushes occur is critical for data integrity:
+
+**Automatic Flush Triggers**:
+1. **Buffer size limit reached**: When `total_buffer_size() >= buffer_size_limit` (default: 100 records)
+2. **End of processing run**: After `process_account()` completes (see section 7.1)
+3. **Application shutdown**: Via shutdown hook (recommended)
+
+**Manual Flush**:
+Implementers can call `aggregator.flush()` at any time to force persistence of buffered data.
+
+**Recommended Implementation**:
+
+```python
+# Application shutdown hook
+def shutdown_handler(aggregator: ICategoryAggregator):
+    """Ensure all buffered data is persisted before shutdown."""
+    aggregator.flush()
+    logging.info("Flushed category aggregator buffer on shutdown")
+
+# Register shutdown hook
+import atexit
+atexit.register(lambda: shutdown_handler(aggregator))
+```
+
+**Important Notes**:
+- Buffered data remains in memory until flushed
+- If the application crashes before flush, buffered data is lost
+- For critical applications, consider reducing `buffer_size` or flushing more frequently
+- Background processing should call `flush()` after each `process_account()` run to ensure data persistence
+
+### 7.3 Initialization
 
 The aggregator and recommendation service should be initialized during application startup:
 
@@ -871,7 +1030,7 @@ def create_recommendation_components(db_connection: DatabaseConnection):
     return aggregator, recommendation_service
 ```
 
-### 7.3 Data Cleanup Job
+### 7.4 Data Cleanup Job
 
 A scheduled job should clean up old tally data:
 
