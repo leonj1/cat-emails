@@ -431,10 +431,12 @@ CREATE TABLE category_daily_tallies (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    UNIQUE(email_address, tally_date, category),
-    INDEX idx_email_date (email_address, tally_date),
-    INDEX idx_date (tally_date)
+    UNIQUE(email_address, tally_date, category)
 );
+
+-- Indexes for efficient queries
+CREATE INDEX idx_email_date ON category_daily_tallies (email_address, tally_date);
+CREATE INDEX idx_date ON category_daily_tallies (tally_date);
 ```
 
 ### 3.2 Table: category_tally_summaries
@@ -451,9 +453,11 @@ CREATE TABLE category_tally_summaries (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    UNIQUE(email_address, tally_date),
-    INDEX idx_email_date_summary (email_address, tally_date)
+    UNIQUE(email_address, tally_date)
 );
+
+-- Index for efficient queries
+CREATE INDEX idx_email_date_summary ON category_tally_summaries (email_address, tally_date);
 ```
 
 ---
@@ -530,21 +534,28 @@ CLASS CategoryAggregator IMPLEMENTS ICategoryAggregator:
             existing = self.repository.get_tally(email_address, tally_date)
 
             IF existing:
-                // Merge counts
+                // Merge counts with existing tally
                 FOR EACH category, count IN counts:
                     existing.category_counts[category] =
                         existing.category_counts.get(category, 0) + count
                 END FOR
-                existing.total_emails += sum(counts.values())
-                self.repository.save_daily_tally(existing)
-            ELSE:
-                new_tally = DailyCategoryTally(
-                    email_address=email_address,
-                    tally_date=tally_date,
-                    category_counts=counts,
-                    total_emails=sum(counts.values())
+                total = existing.total_emails + sum(counts.values())
+
+                // Save using flat signature
+                self.repository.save_daily_tally(
+                    email_address,
+                    tally_date,
+                    existing.category_counts,
+                    total
                 )
-                self.repository.save_daily_tally(new_tally)
+            ELSE:
+                // Save new tally using flat signature
+                self.repository.save_daily_tally(
+                    email_address,
+                    tally_date,
+                    counts,
+                    sum(counts.values())
+                )
             END IF
         END FOR
 
@@ -974,13 +985,15 @@ class CategoryAggregationConfig(ICategoryAggregationConfig):
         self,
         threshold_percentage: float = 10.0,
         minimum_count: int = 10,
-        excluded_categories: List[str] = None
+        excluded_categories: List[str] = None,
+        retention_days: int = 30
     ):
         """
         Args:
             threshold_percentage: Minimum % of total for recommendation (default: 10.0)
             minimum_count: Minimum email count for recommendation (default: 10)
             excluded_categories: Categories to never recommend blocking (default: ["Personal", "Work-related", "Financial-Notification"])
+            retention_days: Number of days to retain historical tally data (default: 30)
         """
         pass
 ```
