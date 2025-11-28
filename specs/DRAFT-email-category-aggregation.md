@@ -141,7 +141,20 @@ class IBlockingRecommendationService(ABC):
         email_address: str,
         days: int = 7
     ) -> 'BlockingRecommendationResult':
-        """Generate blocking recommendations based on category tallies."""
+        """
+        Generate blocking recommendations based on category tallies.
+
+        Args:
+            email_address: Account email address
+            days: Number of days to analyze (1-30, default: 7). Values outside
+                  this range will raise ValueError.
+
+        Returns:
+            BlockingRecommendationResult with recommendations
+
+        Raises:
+            ValueError: If days < 1 or days > 30
+        """
         pass
 
     @abstractmethod
@@ -157,10 +170,14 @@ class IBlockingRecommendationService(ABC):
         Args:
             email_address: Account email address
             category: Category to analyze
-            days: Number of days to analyze (1-30, default: 7)
+            days: Number of days to analyze (1-30, default: 7). Values outside
+                  this range will raise ValueError.
 
         Returns:
             RecommendationReason with detailed analysis
+
+        Raises:
+            ValueError: If days < 1 or days > 30
         """
         pass
 
@@ -499,6 +516,12 @@ END FUNCTION
 
 ### 4.2 Category Aggregator Implementation
 
+**Thread-Safety Note**: The CategoryAggregator buffer is NOT thread-safe by default.
+Implementations should either:
+- Use a lock to protect concurrent access to `self.buffer`
+- Ensure `record_category()`, `record_batch()`, and `flush()` are called sequentially
+- Use a thread-safe queue for multi-threaded environments
+
 ```text
 CLASS CategoryAggregator IMPLEMENTS ICategoryAggregator:
 
@@ -577,6 +600,12 @@ END CLASS
 
 ### 4.3 Recommendation Algorithm
 
+**Error Handling Note**: Implementations should handle the following error scenarios:
+- **Database failures**: If `get_aggregated_tallies()` fails, log the error and return an empty result with 0 emails analyzed
+- **Control API failures**: If `get_blocked_categories_for_account()` fails, log a warning and continue with an empty blocked list
+- **Invalid parameters**: Validate `days` parameter (1-30) and raise `ValueError` for out-of-range values
+- **Network errors**: Use retry logic with exponential backoff for transient failures
+
 ```text
 CLASS BlockingRecommendationService IMPLEMENTS IBlockingRecommendationService:
 
@@ -588,6 +617,10 @@ CLASS BlockingRecommendationService IMPLEMENTS IBlockingRecommendationService:
         self.config = config
 
     FUNCTION get_recommendations(email_address, days=7):
+        // Validate input parameter
+        IF days < 1 OR days > 30:
+            RAISE ValueError("days must be between 1 and 30")
+        END IF
         end_date = today()
         start_date = end_date - days
 
