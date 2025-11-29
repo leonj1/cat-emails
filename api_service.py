@@ -578,11 +578,6 @@ async def root():
             "processing_statistics": "GET /api/processing/statistics",
             "websocket_status": "WS /ws/status (real-time processing status updates)"
         },
-        "deprecated_endpoints": {
-            "processing_status": "GET /api/processing/status -> Use GET /api/status",
-            "background_status": "GET /api/background/status -> Use GET /api/status",
-            "processing_current_status": "GET /api/processing/current-status -> Use GET /api/status"
-        },
         "authentication": "Optional via X-API-Key header or api_key query param" if API_KEY else "None",
         "websocket_info": {
             "endpoint": "/ws/status",
@@ -882,42 +877,6 @@ async def stop_background_processing(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.get("/api/background/status", tags=["background-processing"], deprecated=True)
-async def get_background_status(x_api_key: Optional[str] = Header(None)):
-    """
-    Get detailed background processor status
-
-    **DEPRECATED**: Use GET /api/status instead, which provides this information
-    plus processing status in a single call.
-
-    Returns comprehensive status information about the background Gmail processor thread.
-    """
-    verify_api_key(x_api_key)
-
-    global background_thread, background_thread_running
-
-    thread_info = None
-    if background_thread:
-        thread_info = {
-            "name": background_thread.name,
-            "is_alive": background_thread.is_alive(),
-            "daemon": background_thread.daemon,
-            "ident": background_thread.ident
-        }
-
-    return {
-        "enabled": BACKGROUND_PROCESSING_ENABLED,
-        "running": background_thread_running,
-        "thread": thread_info,
-        "configuration": {
-            "scan_interval_seconds": BACKGROUND_SCAN_INTERVAL,
-            "process_hours": settings_service.get_lookback_hours()
-        },
-        "timestamp": datetime.now().isoformat(),
-        "_deprecated": "Use GET /api/status instead"
-    }
-
-
 @app.get("/api/background/next-execution", tags=["background-processing"])
 async def get_next_execution_time(x_api_key: Optional[str] = Header(None)):
     """
@@ -953,31 +912,6 @@ async def get_next_execution_time(x_api_key: Optional[str] = Header(None)):
         "running": background_thread_running,
         "enabled": BACKGROUND_PROCESSING_ENABLED,
         "timestamp": datetime.now().isoformat()
-    }
-
-
-@app.get("/api/processing/status", tags=["processing-status"], deprecated=True)
-async def get_processing_status(x_api_key: Optional[str] = Header(None)):
-    """
-    Get current email processing status
-
-    **DEPRECATED**: Use GET /api/status instead, which provides this information
-    plus background thread status in a single call.
-
-    Returns the current processing status including active state and current processing details.
-    """
-    verify_api_key(x_api_key)
-
-    global processing_status_manager
-
-    current_status = processing_status_manager.get_current_status()
-    is_active = processing_status_manager.is_processing()
-
-    return {
-        "is_processing": is_active,
-        "current_status": current_status,
-        "timestamp": datetime.now().isoformat(),
-        "_deprecated": "Use GET /api/status instead"
     }
 
 
@@ -1021,141 +955,6 @@ async def get_processing_statistics(x_api_key: Optional[str] = Header(None)):
         "statistics": stats,
         "timestamp": datetime.now().isoformat()
     }
-
-
-@app.get("/api/processing/current-status", response_model=ProcessingCurrentStatusResponse, tags=["processing-status"], deprecated=True)
-async def get_current_processing_status(
-    include_recent: bool = Query(True, description="Include recent processing runs"),
-    recent_limit: int = Query(5, ge=1, le=50, description="Number of recent runs to return (1-50)"),
-    include_stats: bool = Query(False, description="Include processing statistics"),
-    x_api_key: Optional[str] = Header(None)
-):
-    """
-    Get comprehensive current processing status
-
-    **DEPRECATED**: Use GET /api/status instead, which provides this information
-    plus background thread status in a single call with the same query parameters.
-
-    REST API fallback for WebSocket functionality. Provides comprehensive processing status suitable for polling-based clients.
-
-    This endpoint provides the same real-time processing information available via WebSocket
-    in a traditional REST API format, suitable for polling-based clients that cannot use WebSockets.
-
-    Query Parameters:
-        include_recent: Whether to include recent processing runs (default: True)
-        recent_limit: Number of recent runs to return, 1-50 (default: 5)
-        include_stats: Whether to include processing statistics (default: False)
-
-    Returns:
-        ProcessingCurrentStatusResponse containing:
-        - is_processing: Boolean indicating if processing is currently active
-        - current_status: Current processing status object (or None if idle)
-        - recent_runs: Array of recent processing runs (if include_recent=True)
-        - statistics: Processing statistics (if include_stats=True)
-        - timestamp: When the status was retrieved
-        - websocket_available: Boolean indicating if WebSocket endpoint is available
-    
-    Authentication:
-        Requires X-API-Key header if API key is configured
-    
-    Raises:
-        400: Invalid query parameters
-        401: Invalid or missing API key
-        500: Internal server error
-    
-    Example Response:
-        {
-            "is_processing": true,
-            "current_status": {
-                "email_address": "user@example.com",
-                "state": "PROCESSING",
-                "current_step": "Processing email 15 of 30",
-                "progress": {"current": 15, "total": 30},
-                "start_time": "2025-01-15T10:30:00Z",
-                "last_updated": "2025-01-15T10:32:15Z"
-            },
-            "recent_runs": [
-                {
-                    "email_address": "user@example.com",
-                    "start_time": "2025-01-15T09:00:00Z",
-                    "end_time": "2025-01-15T09:05:30Z",
-                    "duration_seconds": 330.5,
-                    "final_state": "COMPLETED",
-                    "final_step": "Successfully processed 25 emails"
-                }
-            ],
-            "statistics": {
-                "total_runs": 50,
-                "successful_runs": 48,
-                "failed_runs": 2,
-                "average_duration_seconds": 285.4,
-                "success_rate": 96.0
-            },
-            "timestamp": "2025-01-15T10:32:20Z",
-            "websocket_available": true
-        }
-    
-    Use Cases:
-        - Polling-based status monitoring for web dashboards
-        - Mobile apps that don't support WebSockets reliably
-        - Simple integrations that prefer REST over WebSocket complexity
-        - Debugging and testing processing status without WebSocket setup
-        
-    Polling Recommendations:
-        - For active processing: Poll every 2-5 seconds
-        - For idle monitoring: Poll every 30-60 seconds
-        - Use include_stats=False for frequent polling to reduce response size
-        - Consider WebSocket endpoint for true real-time updates when possible
-    """
-    verify_api_key(x_api_key)
-    
-    try:
-        global processing_status_manager, websocket_manager
-        
-        # Validate query parameters
-        if recent_limit < 1 or recent_limit > 50:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="recent_limit must be between 1 and 50"
-            )
-        
-        # Get current processing status
-        is_processing = processing_status_manager.is_processing()
-        current_status = processing_status_manager.get_current_status()
-        
-        # Get recent runs if requested
-        recent_runs = None
-        if include_recent:
-            recent_runs = processing_status_manager.get_recent_runs(limit=recent_limit)
-        
-        # Get statistics if requested
-        statistics = None
-        if include_stats:
-            statistics = processing_status_manager.get_statistics()
-        
-        # Check if WebSocket is available
-        websocket_available = websocket_manager is not None
-        
-        response = ProcessingCurrentStatusResponse(
-            is_processing=is_processing,
-            current_status=current_status,
-            recent_runs=recent_runs,
-            statistics=statistics,
-            timestamp=datetime.now().isoformat(),
-            websocket_available=websocket_available
-        )
-        
-        return response
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
-        raise
-    except Exception as e:
-        logger.error(f"Error in get_current_processing_status: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve processing status: {str(e)}"
-        )
 
 
 @app.get("/api/status", response_model=UnifiedStatusResponse, tags=["processing-status"])
