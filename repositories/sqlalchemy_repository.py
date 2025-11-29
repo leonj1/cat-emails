@@ -516,7 +516,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
     def update_account_category_stats(
         self,
         account_id: int,
-        category: str,
+        category_name: str,
         count_increment: int = 1,
         processing_date: Optional[date] = None
     ) -> AccountCategoryStats:
@@ -530,17 +530,17 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             # Try to find existing stat
             stat = session.query(AccountCategoryStats).filter_by(
                 account_id=account_id,
-                category=category,
+                category_name=category_name,
                 processing_date=processing_date
             ).first()
-            
+
             if stat:
                 stat.email_count += count_increment
                 stat.updated_at = datetime.utcnow()
             else:
                 stat = AccountCategoryStats(
                     account_id=account_id,
-                    category=category,
+                    category_name=category_name,
                     email_count=count_increment,
                     processing_date=processing_date
                 )

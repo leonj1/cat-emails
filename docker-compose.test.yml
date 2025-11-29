@@ -1,0 +1,34 @@
+services:
+  mysql-test:
+    image: mysql:8.0
+    container_name: cat-emails-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: cat_emails_test
+      MYSQL_USER: cat_emails
+      MYSQL_PASSWORD: cat_emails_password
+    ports:
+      - "3308:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    tmpfs:
+      - /var/lib/mysql
+
+  integration-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.integration-test
+    container_name: cat-emails-integration-test
+    environment:
+      - MYSQL_HOST=mysql-test
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=cat_emails_test
+      - MYSQL_USER=cat_emails
+      - MYSQL_PASSWORD=cat_emails_password
+    depends_on:
+      mysql-test:
+        condition: service_healthy

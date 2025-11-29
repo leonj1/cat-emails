@@ -333,6 +333,11 @@ class MySQLRepository(DatabaseRepositoryInterface):
                 }
             }
         except Exception as e:
+            try:
+                session.rollback()
+            except Exception:
+                # Best-effort cleanup; don't mask the original error
+                logger.debug("Rollback after failed connection test raised; ignoring.")
             logger.error(f"Database connection test failed: {str(e)}")
             return {
                 "connected": False,
@@ -394,17 +399,32 @@ class MySQLRepository(DatabaseRepositoryInterface):
     def get_by_id(self, model_class: Type[T], entity_id: Any) -> Optional[T]:
         """Get entity by primary key ID"""
         session = self._get_session()
-        return session.query(model_class).get(entity_id)
+        try:
+            return session.get(model_class, entity_id)
+        except SQLAlchemyError:
+            session.rollback()
+            logger.exception("Database error in get_by_id")
+            raise
     
     def find_one(self, model_class: Type[T], **filters) -> Optional[T]:
         """Find a single entity matching filters"""
         session = self._get_session()
-        return session.query(model_class).filter_by(**filters).first()
+        try:
+            return session.query(model_class).filter_by(**filters).first()
+        except SQLAlchemyError:
+            session.rollback()
+            logger.exception("Database error in find_one")
+            raise
     
     def find_all(self, model_class: Type[T], **filters) -> List[T]:
         """Find all entities matching filters"""
         session = self._get_session()
-        return session.query(model_class).filter_by(**filters).all()
+        try:
+            return session.query(model_class).filter_by(**filters).all()
+        except SQLAlchemyError:
+            session.rollback()
+            logger.exception("Database error in find_all")
+            raise
     
     def update(self, entity: T) -> T:
         """Update an existing entity"""
@@ -441,7 +461,12 @@ class MySQLRepository(DatabaseRepositoryInterface):
     def count(self, model_class: Type[T], **filters) -> int:
         """Count entities matching filters"""
         session = self._get_session()
-        return session.query(model_class).filter_by(**filters).count()
+        try:
+            return session.query(model_class).filter_by(**filters).count()
+        except SQLAlchemyError:
+            session.rollback()
+            logger.exception("Database error in count")
+            raise
     
     # ==================== Processing Run Operations ====================
     
@@ -507,12 +532,17 @@ class MySQLRepository(DatabaseRepositoryInterface):
     def get_recent_processing_runs(self, limit: int = 10, email_address: Optional[str] = None) -> List[ProcessingRun]:
         """Get recent processing runs"""
         session = self._get_session()
-        query = session.query(ProcessingRun)
-        
-        if email_address:
-            query = query.filter_by(email_address=email_address)
-        
-        return query.order_by(ProcessingRun.start_time.desc()).limit(limit).all()
+        try:
+            query = session.query(ProcessingRun)
+
+            if email_address:
+                query = query.filter_by(email_address=email_address)
+
+            return query.order_by(ProcessingRun.start_time.desc()).limit(limit).all()
+        except SQLAlchemyError:
+            session.rollback()
+            logger.exception("Database error in get_recent_processing_runs")
+            raise
     
     # ==================== Email Summary Operations ====================
     
@@ -571,24 +601,29 @@ class MySQLRepository(DatabaseRepositoryInterface):
             raise
     
     def get_summaries_by_date_range(
-        self, 
-        start_date: datetime, 
+        self,
+        start_date: datetime,
         end_date: datetime,
         account_id: Optional[int] = None
     ) -> List[EmailSummary]:
         """Get email summaries within date range"""
         session = self._get_session()
-        query = session.query(EmailSummary).filter(
-            and_(
-                EmailSummary.date >= start_date,
-                EmailSummary.date <= end_date
+        try:
+            query = session.query(EmailSummary).filter(
+                and_(
+                    EmailSummary.date >= start_date,
+                    EmailSummary.date <= end_date
+                )
             )
-        )
-        
-        if account_id is not None:
-            query = query.filter_by(account_id=account_id)
-        
-        return query.order_by(EmailSummary.date.desc()).all()
+
+            if account_id is not None:
+                query = query.filter_by(account_id=account_id)
+
+            return query.order_by(EmailSummary.date.desc()).all()
+        except SQLAlchemyError:
+            session.rollback()
+            logger.exception("Database error in get_summaries_by_date_range")
+            raise
     
     # ==================== Account Operations ====================
     
@@ -599,12 +634,17 @@ class MySQLRepository(DatabaseRepositoryInterface):
     def get_all_accounts(self, active_only: bool = False) -> List[EmailAccount]:
         """Get all email accounts"""
         session = self._get_session()
-        query = session.query(EmailAccount)
-        
-        if active_only:
-            query = query.filter_by(is_active=True)
-        
-        return query.order_by(EmailAccount.email_address).all()
+        try:
+            query = session.query(EmailAccount)
+
+            if active_only:
+                query = query.filter_by(is_active=True)
+
+            return query.order_by(EmailAccount.email_address).all()
+        except SQLAlchemyError:
+            session.rollback()
+            logger.exception("Database error in get_all_accounts")
+            raise
     
     def create_or_update_account(
         self, 
@@ -712,52 +752,57 @@ class MySQLRepository(DatabaseRepositoryInterface):
     # ==================== Category Statistics Operations ====================
     
     def get_account_category_stats(
-        self, 
+        self,
         account_id: int,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None
     ) -> List[AccountCategoryStats]:
         """Get category statistics for account"""
         session = self._get_session()
-        query = session.query(AccountCategoryStats).filter_by(account_id=account_id)
-        
-        if start_date:
-            query = query.filter(AccountCategoryStats.processing_date >= start_date)
-        if end_date:
-            query = query.filter(AccountCategoryStats.processing_date <= end_date)
-        
-        return query.all()
+        try:
+            query = session.query(AccountCategoryStats).filter_by(account_id=account_id)
+
+            if start_date:
+                query = query.filter(AccountCategoryStats.date >= start_date)
+            if end_date:
+                query = query.filter(AccountCategoryStats.date <= end_date)
+
+            return query.all()
+        except SQLAlchemyError:
+            session.rollback()
+            logger.exception("Database error in get_account_category_stats")
+            raise
     
     def update_account_category_stats(
         self,
         account_id: int,
-        category: str,
+        category_name: str,
         count_increment: int = 1,
         processing_date: Optional[date] = None
     ) -> AccountCategoryStats:
         """Update or create category statistics for account"""
         if processing_date is None:
             processing_date = date.today()
-        
+
         session = self._get_session()
-        
+
         try:
             # Try to find existing stat
             stat = session.query(AccountCategoryStats).filter_by(
                 account_id=account_id,
-                category=category,
-                processing_date=processing_date
+                category_name=category_name,
+                date=processing_date,
             ).first()
-            
+
             if stat:
                 stat.email_count += count_increment
                 stat.updated_at = datetime.utcnow()
             else:
                 stat = AccountCategoryStats(
                     account_id=account_id,
-                    category=category,
+                    category_name=category_name,
                     email_count=count_increment,
-                    processing_date=processing_date
+                    date=processing_date,
                 )
                 session.add(stat)
             
@@ -799,7 +844,11 @@ class MySQLRepository(DatabaseRepositoryInterface):
         except IntegrityError:
             # Already exists, that's fine
             session.rollback()
-            return self.find_one(ProcessedEmailLog, email_address=email_address, message_id=message_id)
+            return self.find_one(
+                ProcessedEmailLog,
+                account_email=email_address,
+                message_id=message_id,
+            )
         except SQLAlchemyError as e:
             session.rollback()
             logger.error(f"Error marking email as processed: {str(e)}")
@@ -812,12 +861,17 @@ class MySQLRepository(DatabaseRepositoryInterface):
     ) -> int:
         """Get count of processed emails"""
         session = self._get_session()
-        query = session.query(ProcessedEmailLog).filter_by(email_address=email_address)
-        
-        if since:
-            query = query.filter(ProcessedEmailLog.processed_at >= since)
-        
-        return query.count()
+        try:
+            query = session.query(ProcessedEmailLog).filter_by(email_address=email_address)
+
+            if since:
+                query = query.filter(ProcessedEmailLog.processed_at >= since)
+
+            return query.count()
+        except SQLAlchemyError:
+            session.rollback()
+            logger.exception("Database error in get_processed_emails_count")
+            raise
     
     def cleanup_old_processed_emails(
         self,
