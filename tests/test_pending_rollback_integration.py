@@ -24,6 +24,7 @@ from unittest.mock import patch, MagicMock
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, PendingRollbackError
 from repositories.mysql_repository import MySQLRepository
 from models.database import UserSettings, Base
@@ -65,7 +66,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
                     print(f"Waiting for MySQL... ({i+1}/{max_retries})")
                     time.sleep(2)
                 else:
-                    raise RuntimeError(f"Could not connect to MySQL: {e}")
+                    raise RuntimeError(f"Could not connect to MySQL: {e}") from e
 
     @classmethod
     def tearDownClass(cls):
@@ -114,8 +115,6 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         self.assertEqual(setting.setting_value, 'test_value')
 
         # Now simulate an error by mocking the query to raise an exception
-        original_query = self.repository._get_session().query
-
         def mock_query_that_fails(*args, **kwargs):
             raise OperationalError("statement", {}, Exception("Simulated connection error"))
 
@@ -191,7 +190,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         # Simulate an error that puts the session in a bad state
         try:
             # Force an invalid operation that would normally cause PendingRollbackError
-            session.execute("SELECT * FROM nonexistent_table_xyz")
+            session.execute(text("SELECT * FROM nonexistent_table_xyz"))
         except Exception:
             # The fix should have already called rollback in find_one/find_all etc.
             # But for direct execute, we need to rollback manually here
@@ -219,7 +218,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         session = self.repository._get_session()
         try:
             # This will fail but we want to ensure the session recovers
-            session.execute("INVALID SQL SYNTAX HERE")
+            session.execute(text("INVALID SQL SYNTAX HERE"))
         except Exception:
             session.rollback()
 
@@ -269,7 +268,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
 
         # Corrupt the session by starting a bad transaction
         try:
-            session.execute("SELECT * FROM table_that_does_not_exist")
+            session.execute(text("SELECT * FROM table_that_does_not_exist"))
         except Exception:
             pass  # Session is now in a bad state
 
@@ -327,7 +326,7 @@ class TestPendingRollbackPreventionScenario(unittest.TestCase):
                 if i < max_retries - 1:
                     time.sleep(2)
                 else:
-                    raise RuntimeError(f"Could not connect to MySQL: {e}")
+                    raise RuntimeError(f"Could not connect to MySQL: {e}") from e
 
     @classmethod
     def tearDownClass(cls):
@@ -360,8 +359,8 @@ class TestPendingRollbackPreventionScenario(unittest.TestCase):
         # Simulate an error scenario (e.g., connection timeout during previous operation)
         session = self.repository._get_session()
         try:
-            session.execute("SELECT SLEEP(0.001) FROM dual WHERE 1=0")  # Quick query that works
-            session.execute("SELECT * FROM table_xyz_not_exists")  # This will fail
+            session.execute(text("SELECT SLEEP(0.001) FROM dual WHERE 1=0"))  # Quick query that works
+            session.execute(text("SELECT * FROM table_xyz_not_exists"))  # This will fail
         except Exception:
             pass  # Session might be in bad state now
 
@@ -375,7 +374,7 @@ class TestPendingRollbackPreventionScenario(unittest.TestCase):
         except PendingRollbackError:
             # This should NOT happen after the fix
             self.fail("PendingRollbackError was raised - the fix is not working!")
-        except Exception as e:
+        except Exception:
             # Some other error might occur - rollback and retry
             session.rollback()
             setting = self.repository.get_setting('lookback_hours')

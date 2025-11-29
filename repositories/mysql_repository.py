@@ -396,9 +396,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
         session = self._get_session()
         try:
             return session.query(model_class).get(entity_id)
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            logger.error(f"Database error in get_by_id: {str(e)}")
+            logger.exception("Database error in get_by_id")
             raise
     
     def find_one(self, model_class: Type[T], **filters) -> Optional[T]:
@@ -406,9 +406,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
         session = self._get_session()
         try:
             return session.query(model_class).filter_by(**filters).first()
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            logger.error(f"Database error in find_one: {str(e)}")
+            logger.exception("Database error in find_one")
             raise
     
     def find_all(self, model_class: Type[T], **filters) -> List[T]:
@@ -416,9 +416,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
         session = self._get_session()
         try:
             return session.query(model_class).filter_by(**filters).all()
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            logger.error(f"Database error in find_all: {str(e)}")
+            logger.exception("Database error in find_all")
             raise
     
     def update(self, entity: T) -> T:
@@ -458,9 +458,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
         session = self._get_session()
         try:
             return session.query(model_class).filter_by(**filters).count()
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            logger.error(f"Database error in count: {str(e)}")
+            logger.exception("Database error in count")
             raise
     
     # ==================== Processing Run Operations ====================
@@ -534,9 +534,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
                 query = query.filter_by(email_address=email_address)
 
             return query.order_by(ProcessingRun.start_time.desc()).limit(limit).all()
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            logger.error(f"Database error in get_recent_processing_runs: {str(e)}")
+            logger.exception("Database error in get_recent_processing_runs")
             raise
     
     # ==================== Email Summary Operations ====================
@@ -615,9 +615,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
                 query = query.filter_by(account_id=account_id)
 
             return query.order_by(EmailSummary.date.desc()).all()
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            logger.error(f"Database error in get_summaries_by_date_range: {str(e)}")
+            logger.exception("Database error in get_summaries_by_date_range")
             raise
     
     # ==================== Account Operations ====================
@@ -636,9 +636,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
                 query = query.filter_by(is_active=True)
 
             return query.order_by(EmailAccount.email_address).all()
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            logger.error(f"Database error in get_all_accounts: {str(e)}")
+            logger.exception("Database error in get_all_accounts")
             raise
     
     def create_or_update_account(
@@ -763,9 +763,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
                 query = query.filter(AccountCategoryStats.processing_date <= end_date)
 
             return query.all()
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            logger.error(f"Database error in get_account_category_stats: {str(e)}")
+            logger.exception("Database error in get_account_category_stats")
             raise
     
     def update_account_category_stats(
@@ -859,9 +859,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
                 query = query.filter(ProcessedEmailLog.processed_at >= since)
 
             return query.count()
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             session.rollback()
-            logger.error(f"Database error in get_processed_emails_count: {str(e)}")
+            logger.exception("Database error in get_processed_emails_count")
             raise
     
     def cleanup_old_processed_emails(
