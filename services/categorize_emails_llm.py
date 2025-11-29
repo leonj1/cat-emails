@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 from utils.logger import get_logger
-from typing import Optional
+from typing import Optional, Literal
 
 from openai import OpenAI
+from pydantic import BaseModel
 
 from services.categorize_emails_interface import (
     CategorizeEmails,
@@ -15,6 +16,11 @@ from services.categorize_emails_interface import (
 from services.llm_service_interface import LLMServiceInterface
 
 logger = get_logger(__name__)
+
+
+class EmailCategoryResponse(BaseModel):
+    """Pydantic model for structured LLM email categorization response."""
+    category: Literal["Advertising", "Marketing", "Wants-Money"]
 
 
 class LLMCategorizeEmails(CategorizeEmails):
@@ -114,37 +120,73 @@ class LLMCategorizeEmails(CategorizeEmails):
         if not isinstance(email_contents, str) or not email_contents.strip():
             return CategoryError(error="InvalidInput", detail="email_contents must be a non-empty string")
 
-        # Prompt design: force a single token from the allowed set
+        # Prompt design for structured output
         system_prompt = (
             "You categorize emails into commercial-intent classes. "
-            "Respond with EXACTLY one of these labels and nothing else: "
-            "Advertising | Marketing | Wants-Money."
+            "Analyze the email and classify it into exactly one category."
         )
         user_prompt = (
-            "Classify the following email strictly as one of: Advertising, Marketing, or Wants-Money.\n\n"
-            f"Email:\n{email_contents}\n\n"
-            "Answer with only the label, no punctuation or explanation."
+            "Classify the following email into one of these categories:\n"
+            "- Advertising: Promotional content, ads, product announcements\n"
+            "- Marketing: Newsletters, engagement emails, brand communications\n"
+            "- Wants-Money: Donation requests, payment reminders, fundraising\n\n"
+            f"Email:\n{email_contents}"
         )
 
         try:
-            # Use LLM service if available (new approach)
+            # Use LLM service with structured output (new approach)
             if self.llm_service is not None:
-                content = self.llm_service.call(
+                response = self.llm_service.call_structured(
                     prompt=user_prompt,
+                    response_model=EmailCategoryResponse,
                     system_prompt=system_prompt,
                     temperature=0
                 )
-            # Fall back to legacy OpenAI client (backward compatibility)
+                # Map the structured response to SimpleEmailCategory
+                category_value = response.category
+                if category_value == "Advertising":
+                    return SimpleEmailCategory.ADVERTISING
+                elif category_value == "Marketing":
+                    return SimpleEmailCategory.MARKETING
+                elif category_value == "Wants-Money":
+                    return SimpleEmailCategory.WANTS_MONEY1
+                else:
+                    # This should never happen due to Literal constraint
+                    return CategoryError(
+                        error="InvalidModelOutput",
+                        detail=f"Unexpected category: {category_value}"
+                    )
+
+            # Fall back to legacy OpenAI client with structured output
             elif self.client is not None:
-                resp = self.client.chat.completions.create(
+                resp = self.client.beta.chat.completions.parse(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
+                    response_format=EmailCategoryResponse,
                     temperature=0,
                 )
-                content = (resp.choices[0].message.content or "").strip()
+                parsed = resp.choices[0].message.parsed
+                if parsed is None:
+                    return CategoryError(
+                        error="InvalidModelOutput",
+                        detail="LLM returned null parsed response"
+                    )
+                # Map the structured response to SimpleEmailCategory
+                category_value = parsed.category
+                if category_value == "Advertising":
+                    return SimpleEmailCategory.ADVERTISING
+                elif category_value == "Marketing":
+                    return SimpleEmailCategory.MARKETING
+                elif category_value == "Wants-Money":
+                    return SimpleEmailCategory.WANTS_MONEY1
+                else:
+                    return CategoryError(
+                        error="InvalidModelOutput",
+                        detail=f"Unexpected category: {category_value}"
+                    )
             else:
                 return CategoryError(
                     error="UnsupportedProvider",
@@ -154,31 +196,6 @@ class LLMCategorizeEmails(CategorizeEmails):
                     ),
                 )
 
-            # Clean up the response
-            content = content.strip().strip('"\'')
-
-            # Normalize and map to enum
-            normalized = content.lower().replace(" ", "").replace("-", "")
-            if normalized == "advertising":
-                return SimpleEmailCategory.ADVERTISING
-            if normalized == "marketing":
-                return SimpleEmailCategory.MARKETING
-            if normalized == "wants-money":
-                return SimpleEmailCategory.WANTS_MONEY1
-            if normalized == "wantsmoney":
-                return SimpleEmailCategory.WANTS_MONEY2
-
-            # Check for "Wants-Money" with a hyphen, in case the model returns it
-            if "wants-money" in content.lower():
-                return SimpleEmailCategory.WANTS_MONEY1
-            if "wantsmoney" in content.lower():
-                return SimpleEmailCategory.WANTS_MONEY2
-
-            logger.warning(f"LLM returned unexpected category output: {content!r}")
-            return CategoryError(
-                error="InvalidModelOutput",
-                detail=f"Expected one of Advertising|Marketing|Wants-Money, got: {content!r}",
-            )
         except Exception as e:
             logger.error(f"LLM provider error: {e}")
             return CategoryError(error="ProviderError", detail=str(e))

@@ -22,6 +22,7 @@ os.environ.setdefault("MYSQL_PASSWORD", "cat_emails_password")
 
 # Required API keys (use existing .env values or defaults)
 os.environ.setdefault("REQUESTYAI_API_KEY", "sk-XfUA7zpWQQKOa0pbc27aRYy/INsznmXksPmJidPYsJx2nXbYTHciNP1FTxp1gTQRk+BMOWS0g82S3VoTzzJinMdZg0I7Xsf9hPwJDaiNowI=")
+os.environ.setdefault("REQUESTYAI_BASE_URL", "https://router.requesty.ai/v1")
 os.environ.setdefault("CONTROL_API_TOKEN", "fXhS_j2zzsWOtEBnVz6w7egG65mNjxST-2ae62j3ZJI")
 
 # Disable remote logging to avoid network calls during testing

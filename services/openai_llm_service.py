@@ -7,11 +7,14 @@ Ollama, RequestYAI, etc.
 
 import logging
 from utils.logger import get_logger
-from typing import Optional, Any
+from typing import Optional, Any, Type, TypeVar
 
 from openai import OpenAI
+from pydantic import BaseModel
 
 from services.llm_service_interface import LLMServiceInterface
+
+T = TypeVar('T', bound=BaseModel)
 
 logger = get_logger(__name__)
 
@@ -129,3 +132,53 @@ class OpenAILLMService(LLMServiceInterface):
     def get_provider_name(self) -> str:
         """Get the provider name."""
         return self.provider_name
+
+    def call_structured(
+        self,
+        prompt: str,
+        response_model: Type[T],
+        system_prompt: Optional[str] = None,
+        temperature: float = 0.0,
+        **kwargs: Any
+    ) -> T:
+        """
+        Call the LLM and parse the response into a Pydantic model.
+
+        Uses OpenAI's structured outputs feature to force the response
+        to conform to the given Pydantic model schema.
+
+        Args:
+            prompt: The user prompt
+            response_model: Pydantic model class for the response
+            system_prompt: Optional system prompt
+            temperature: Temperature for randomness
+            **kwargs: Additional OpenAI API parameters
+
+        Returns:
+            T: An instance of the response_model
+
+        Raises:
+            Exception: If the API call fails or response cannot be parsed
+        """
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        try:
+            response = self.client.beta.chat.completions.parse(
+                model=self.model,
+                messages=messages,
+                response_format=response_model,
+                temperature=temperature,
+                **kwargs
+            )
+
+            parsed = response.choices[0].message.parsed
+            if parsed is None:
+                raise ValueError("LLM returned null parsed response")
+
+            return parsed
+        except Exception as e:
+            logger.error(f"OpenAI structured output call failed: {e}")
+            raise
