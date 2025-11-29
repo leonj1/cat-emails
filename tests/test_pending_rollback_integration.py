@@ -19,7 +19,7 @@ import os
 import sys
 import time
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -74,9 +74,8 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         if hasattr(cls, 'repository') and cls.repository:
             cls.repository.disconnect()
 
-    def setUp(self):
-        """Set up test fixtures."""
-        # Clean up any existing test settings
+    def _cleanup_test_settings(self):
+        """Remove test settings from database."""
         session = self.repository._get_session()
         try:
             session.query(UserSettings).filter(
@@ -86,17 +85,13 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         except SQLAlchemyError:
             session.rollback()
 
+    def setUp(self):
+        """Set up test fixtures."""
+        self._cleanup_test_settings()
+
     def tearDown(self):
         """Clean up after each test."""
-        # Clean up test settings
-        session = self.repository._get_session()
-        try:
-            session.query(UserSettings).filter(
-                UserSettings.setting_key.like('test_%')
-            ).delete(synchronize_session=False)
-            session.commit()
-        except SQLAlchemyError:
-            session.rollback()
+        self._cleanup_test_settings()
 
     def test_find_one_recovers_after_error(self):
         """
@@ -126,7 +121,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
                 self.repository.find_one(UserSettings, setting_key=test_key)
 
         # After the error, subsequent operations should work (session was rolled back)
-        # Create a fresh repository to verify the fix works
+        # The same repository/session should work since it was properly rolled back
         setting = self.repository.find_one(UserSettings, setting_key=test_key)
         self.assertIsNotNone(setting)
         self.assertEqual(setting.setting_value, 'test_value')
