@@ -134,30 +134,62 @@ class TestPendingRollbackIntegration(unittest.TestCase):
     def test_count_recovers_after_error(self):
         """
         Test that count properly handles errors and allows session recovery.
+
+        This simulates a scenario where a database error occurs during count,
+        and verifies that subsequent operations can still succeed after the rollback.
         """
         # Create test settings
         for i in range(3):
             self.repository.set_setting(f'test_count_{i}', f'value_{i}', 'string', 'Test')
 
-        # Verify count works
-        # Note: count uses filter_by, we need to count all test settings
+        # Verify count works initially
+        count = self.repository.count(UserSettings)
+        self.assertGreaterEqual(count, 3)
+
+        # Now simulate an error by mocking the query to raise an exception
+        def mock_query_that_fails(*args, **kwargs):
+            raise OperationalError("statement", {}, Exception("Simulated connection error"))
+
+        # Patch the query method temporarily
         session = self.repository._get_session()
-        count = session.query(UserSettings).filter(
-            UserSettings.setting_key.like('test_count_%')
-        ).count()
-        self.assertEqual(count, 3)
-        session.commit()
+        with patch.object(session, 'query', side_effect=mock_query_that_fails):
+            # This should raise but also rollback the session
+            with self.assertRaises(OperationalError):
+                self.repository.count(UserSettings)
+
+        # After the error, subsequent operations should work (session was rolled back)
+        count = self.repository.count(UserSettings)
+        self.assertGreaterEqual(count, 3)
 
     def test_get_by_id_recovers_after_error(self):
         """
         Test that get_by_id properly handles errors and allows session recovery.
+
+        This simulates a scenario where a database error occurs during get_by_id,
+        and verifies that subsequent operations can still succeed after the rollback.
         """
         # Create a test setting
         test_key = 'test_get_by_id'
         setting = self.repository.set_setting(test_key, 'test_value', 'string', 'Test')
         setting_id = setting.id
 
-        # Verify we can read it by ID
+        # Verify we can read it by ID initially
+        retrieved = self.repository.get_by_id(UserSettings, setting_id)
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.setting_key, test_key)
+
+        # Now simulate an error by mocking the query to raise an exception
+        def mock_query_that_fails(*args, **kwargs):
+            raise OperationalError("statement", {}, Exception("Simulated connection error"))
+
+        # Patch the query method temporarily
+        session = self.repository._get_session()
+        with patch.object(session, 'query', side_effect=mock_query_that_fails):
+            # This should raise but also rollback the session
+            with self.assertRaises(OperationalError):
+                self.repository.get_by_id(UserSettings, setting_id)
+
+        # After the error, subsequent operations should work (session was rolled back)
         retrieved = self.repository.get_by_id(UserSettings, setting_id)
         self.assertIsNotNone(retrieved)
         self.assertEqual(retrieved.setting_key, test_key)
@@ -165,12 +197,30 @@ class TestPendingRollbackIntegration(unittest.TestCase):
     def test_find_all_recovers_after_error(self):
         """
         Test that find_all properly handles errors and allows session recovery.
+
+        This simulates a scenario where a database error occurs during find_all,
+        and verifies that subsequent operations can still succeed after the rollback.
         """
         # Create test settings with a common type
         for i in range(3):
             self.repository.set_setting(f'test_find_all_{i}', f'value_{i}', 'test_type', 'Test')
 
-        # Verify find_all works
+        # Verify find_all works initially
+        settings = self.repository.find_all(UserSettings, setting_type='test_type')
+        self.assertEqual(len(settings), 3)
+
+        # Now simulate an error by mocking the query to raise an exception
+        def mock_query_that_fails(*args, **kwargs):
+            raise OperationalError("statement", {}, Exception("Simulated connection error"))
+
+        # Patch the query method temporarily
+        session = self.repository._get_session()
+        with patch.object(session, 'query', side_effect=mock_query_that_fails):
+            # This should raise but also rollback the session
+            with self.assertRaises(OperationalError):
+                self.repository.find_all(UserSettings, setting_type='test_type')
+
+        # After the error, subsequent operations should work (session was rolled back)
         settings = self.repository.find_all(UserSettings, setting_type='test_type')
         self.assertEqual(len(settings), 3)
 
