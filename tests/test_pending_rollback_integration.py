@@ -83,7 +83,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
                 UserSettings.setting_key.like('test_%')
             ).delete(synchronize_session=False)
             session.commit()
-        except Exception:
+        except SQLAlchemyError:
             session.rollback()
 
     def tearDown(self):
@@ -95,7 +95,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
                 UserSettings.setting_key.like('test_%')
             ).delete(synchronize_session=False)
             session.commit()
-        except Exception:
+        except SQLAlchemyError:
             session.rollback()
 
     def test_find_one_recovers_after_error(self):
@@ -115,7 +115,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         self.assertEqual(setting.setting_value, 'test_value')
 
         # Now simulate an error by mocking the query to raise an exception
-        def mock_query_that_fails(*args, **kwargs):
+        def mock_query_that_fails(*_args, **_kwargs):
             raise OperationalError("statement", {}, Exception("Simulated connection error"))
 
         # Patch the query method temporarily
@@ -147,7 +147,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         self.assertGreaterEqual(count, 3)
 
         # Now simulate an error by mocking the query to raise an exception
-        def mock_query_that_fails(*args, **kwargs):
+        def mock_query_that_fails(*_args, **_kwargs):
             raise OperationalError("statement", {}, Exception("Simulated connection error"))
 
         # Patch the query method temporarily
@@ -178,13 +178,13 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         self.assertIsNotNone(retrieved)
         self.assertEqual(retrieved.setting_key, test_key)
 
-        # Now simulate an error by mocking the query to raise an exception
-        def mock_query_that_fails(*args, **kwargs):
+        # Now simulate an error by mocking the get method to raise an exception
+        def mock_get_that_fails(*_args, **_kwargs):
             raise OperationalError("statement", {}, Exception("Simulated connection error"))
 
-        # Patch the query method temporarily
+        # Patch the get method temporarily
         session = self.repository._get_session()
-        with patch.object(session, 'query', side_effect=mock_query_that_fails):
+        with patch.object(session, 'get', side_effect=mock_get_that_fails):
             # This should raise but also rollback the session
             with self.assertRaises(OperationalError):
                 self.repository.get_by_id(UserSettings, setting_id)
@@ -210,7 +210,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         self.assertEqual(len(settings), 3)
 
         # Now simulate an error by mocking the query to raise an exception
-        def mock_query_that_fails(*args, **kwargs):
+        def mock_query_that_fails(*_args, **_kwargs):
             raise OperationalError("statement", {}, Exception("Simulated connection error"))
 
         # Patch the query method temporarily
@@ -241,7 +241,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         try:
             # Force an invalid operation that would normally cause PendingRollbackError
             session.execute(text("SELECT * FROM nonexistent_table_xyz"))
-        except Exception:
+        except SQLAlchemyError:
             # The fix should have already called rollback in find_one/find_all etc.
             # But for direct execute, we need to rollback manually here
             session.rollback()
@@ -269,7 +269,7 @@ class TestPendingRollbackIntegration(unittest.TestCase):
         try:
             # This will fail but we want to ensure the session recovers
             session.execute(text("INVALID SQL SYNTAX HERE"))
-        except Exception:
+        except SQLAlchemyError:
             session.rollback()
 
         # All operations should now work
@@ -298,44 +298,22 @@ class TestPendingRollbackIntegration(unittest.TestCase):
     def test_read_operation_rollback_on_sqlalchemy_error(self):
         """
         Verify that SQLAlchemyError in read operations triggers rollback.
-
-        This test uses mocking to simulate a SQLAlchemy error and verify
-        that the rollback is called.
         """
         test_key = 'test_rollback_check'
         self.repository.set_setting(test_key, 'value', 'string', 'Test')
 
         session = self.repository._get_session()
-        original_rollback = session.rollback
-        rollback_called = [False]  # Use list to allow modification in nested function
 
-        def track_rollback():
-            rollback_called[0] = True
-            original_rollback()
-
-        # We can't easily mock the internal session without affecting the test,
-        # but we can verify that after any error, we can still use the session
-
-        # Corrupt the session by starting a bad transaction
+        # Corrupt the session with invalid SQL
         try:
             session.execute(text("SELECT * FROM table_that_does_not_exist"))
-        except Exception:
-            pass  # Session is now in a bad state
+        except SQLAlchemyError:
+            pass  # Session is now in a bad state (would cause PendingRollbackError before fix)
 
-        # Before the fix, this would raise PendingRollbackError
-        # After the fix, find_one should handle this gracefully
-        try:
-            # This might still fail if session is in bad state,
-            # but it should rollback and allow recovery
-            setting = self.repository.find_one(UserSettings, setting_key=test_key)
-        except Exception:
-            # If it fails, verify we can still recover
-            pass
-
-        # Force a clean rollback
+        # Rollback to recover
         session.rollback()
 
-        # Now operations should work
+        # After rollback, operations should work (fix prevents PendingRollbackError)
         setting = self.repository.find_one(UserSettings, setting_key=test_key)
         self.assertIsNotNone(setting)
 
@@ -411,7 +389,7 @@ class TestPendingRollbackPreventionScenario(unittest.TestCase):
         try:
             session.execute(text("SELECT SLEEP(0.001) FROM dual WHERE 1=0"))  # Quick query that works
             session.execute(text("SELECT * FROM table_xyz_not_exists"))  # This will fail
-        except Exception:
+        except SQLAlchemyError:
             pass  # Session might be in bad state now
 
         # Before the fix: this would raise PendingRollbackError
@@ -424,7 +402,7 @@ class TestPendingRollbackPreventionScenario(unittest.TestCase):
         except PendingRollbackError:
             # This should NOT happen after the fix
             self.fail("PendingRollbackError was raised - the fix is not working!")
-        except Exception:
+        except SQLAlchemyError:
             # Some other error might occur - rollback and retry
             session.rollback()
             setting = self.repository.get_setting('lookback_hours')

@@ -395,7 +395,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
         """Get entity by primary key ID"""
         session = self._get_session()
         try:
-            return session.query(model_class).get(entity_id)
+            return session.get(model_class, entity_id)
         except SQLAlchemyError:
             session.rollback()
             logger.exception("Database error in get_by_id")
