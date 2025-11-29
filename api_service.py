@@ -50,7 +50,13 @@ from models.summary_response import SummaryResponse
 from models.create_account_request import CreateAccountRequest
 from models.standard_response import StandardResponse
 from models.error_response import ErrorResponse
-from models.processing_current_status_response import ProcessingCurrentStatusResponse
+from models.processing_current_status_response import (
+    ProcessingCurrentStatusResponse,
+    UnifiedStatusResponse,
+    BackgroundStatus,
+    BackgroundConfiguration,
+    BackgroundThreadInfo
+)
 from models.force_process_response import ForceProcessResponse, ProcessingInfo
 from models.recommendation_models import (
     BlockingRecommendationResult,
@@ -554,9 +560,9 @@ async def root():
         "endpoints": {
             "health": "GET /api/health",
             "config": "GET /api/config",
+            "status": "GET /api/status (unified processing and background status)",
             "background_start": "POST /api/background/start",
             "background_stop": "POST /api/background/stop",
-            "background_status": "GET /api/background/status",
             "background_next_execution": "GET /api/background/next-execution",
             "morning_summary": "POST /api/summaries/morning",
             "evening_summary": "POST /api/summaries/evening",
@@ -568,11 +574,14 @@ async def root():
             "verify_password": "GET /api/accounts/{email_address}/verify-password",
             "deactivate_account": "PUT /api/accounts/{email_address}/deactivate",
             "force_process_account": "POST /api/accounts/{email_address}/process",
-            "processing_status": "GET /api/processing/status",
             "processing_history": "GET /api/processing/history",
             "processing_statistics": "GET /api/processing/statistics",
-            "processing_current_status": "GET /api/processing/current-status (comprehensive status with polling support)",
             "websocket_status": "WS /ws/status (real-time processing status updates)"
+        },
+        "deprecated_endpoints": {
+            "processing_status": "GET /api/processing/status -> Use GET /api/status",
+            "background_status": "GET /api/background/status -> Use GET /api/status",
+            "processing_current_status": "GET /api/processing/current-status -> Use GET /api/status"
         },
         "authentication": "Optional via X-API-Key header or api_key query param" if API_KEY else "None",
         "websocket_info": {
@@ -873,17 +882,20 @@ async def stop_background_processing(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.get("/api/background/status", tags=["background-processing"])
+@app.get("/api/background/status", tags=["background-processing"], deprecated=True)
 async def get_background_status(x_api_key: Optional[str] = Header(None)):
     """
     Get detailed background processor status
 
+    **DEPRECATED**: Use GET /api/status instead, which provides this information
+    plus processing status in a single call.
+
     Returns comprehensive status information about the background Gmail processor thread.
     """
     verify_api_key(x_api_key)
-    
+
     global background_thread, background_thread_running
-    
+
     thread_info = None
     if background_thread:
         thread_info = {
@@ -892,7 +904,7 @@ async def get_background_status(x_api_key: Optional[str] = Header(None)):
             "daemon": background_thread.daemon,
             "ident": background_thread.ident
         }
-    
+
     return {
         "enabled": BACKGROUND_PROCESSING_ENABLED,
         "running": background_thread_running,
@@ -901,7 +913,8 @@ async def get_background_status(x_api_key: Optional[str] = Header(None)):
             "scan_interval_seconds": BACKGROUND_SCAN_INTERVAL,
             "process_hours": settings_service.get_lookback_hours()
         },
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "_deprecated": "Use GET /api/status instead"
     }
 
 
@@ -943,24 +956,28 @@ async def get_next_execution_time(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.get("/api/processing/status", tags=["processing-status"])
+@app.get("/api/processing/status", tags=["processing-status"], deprecated=True)
 async def get_processing_status(x_api_key: Optional[str] = Header(None)):
     """
     Get current email processing status
 
+    **DEPRECATED**: Use GET /api/status instead, which provides this information
+    plus background thread status in a single call.
+
     Returns the current processing status including active state and current processing details.
     """
     verify_api_key(x_api_key)
-    
+
     global processing_status_manager
-    
+
     current_status = processing_status_manager.get_current_status()
     is_active = processing_status_manager.is_processing()
-    
+
     return {
         "is_processing": is_active,
         "current_status": current_status,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "_deprecated": "Use GET /api/status instead"
     }
 
 
@@ -1006,7 +1023,7 @@ async def get_processing_statistics(x_api_key: Optional[str] = Header(None)):
     }
 
 
-@app.get("/api/processing/current-status", response_model=ProcessingCurrentStatusResponse, tags=["processing-status"])
+@app.get("/api/processing/current-status", response_model=ProcessingCurrentStatusResponse, tags=["processing-status"], deprecated=True)
 async def get_current_processing_status(
     include_recent: bool = Query(True, description="Include recent processing runs"),
     recent_limit: int = Query(5, ge=1, le=50, description="Number of recent runs to return (1-50)"),
@@ -1016,16 +1033,19 @@ async def get_current_processing_status(
     """
     Get comprehensive current processing status
 
+    **DEPRECATED**: Use GET /api/status instead, which provides this information
+    plus background thread status in a single call with the same query parameters.
+
     REST API fallback for WebSocket functionality. Provides comprehensive processing status suitable for polling-based clients.
-    
+
     This endpoint provides the same real-time processing information available via WebSocket
     in a traditional REST API format, suitable for polling-based clients that cannot use WebSockets.
-    
+
     Query Parameters:
         include_recent: Whether to include recent processing runs (default: True)
         recent_limit: Number of recent runs to return, 1-50 (default: 5)
         include_stats: Whether to include processing statistics (default: False)
-    
+
     Returns:
         ProcessingCurrentStatusResponse containing:
         - is_processing: Boolean indicating if processing is currently active
@@ -1135,6 +1155,107 @@ async def get_current_processing_status(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve processing status: {str(e)}"
+        )
+
+
+@app.get("/api/status", response_model=UnifiedStatusResponse, tags=["processing-status"])
+async def get_unified_status(
+    include_recent: bool = Query(True, description="Include recent processing runs"),
+    recent_limit: int = Query(5, ge=1, le=50, description="Number of recent runs to return (1-50)"),
+    include_stats: bool = Query(False, description="Include processing statistics"),
+    x_api_key: Optional[str] = Header(None)
+):
+    """
+    Get unified processing and background status
+
+    Single endpoint that consolidates all status information:
+    - Current processing state (is a job running?)
+    - Background processor status (is the thread alive?)
+    - Recent processing runs (optional)
+    - Processing statistics (optional)
+
+    This replaces the need to call multiple endpoints:
+    - /api/processing/status
+    - /api/background/status
+    - /api/processing/current-status
+
+    Query Parameters:
+        include_recent: Whether to include recent processing runs (default: True)
+        recent_limit: Number of recent runs to return, 1-50 (default: 5)
+        include_stats: Whether to include processing statistics (default: False)
+
+    Returns:
+        UnifiedStatusResponse containing all status information
+
+    Authentication:
+        Requires X-API-Key header if API key is configured
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        global processing_status_manager, websocket_manager, background_thread, background_thread_running
+
+        # Validate query parameters
+        if recent_limit < 1 or recent_limit > 50:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="recent_limit must be between 1 and 50"
+            )
+
+        # Get processing status
+        is_processing = processing_status_manager.is_processing()
+        current_status = processing_status_manager.get_current_status()
+
+        # Get background thread info
+        thread_info = None
+        if background_thread:
+            thread_info = BackgroundThreadInfo(
+                name=background_thread.name,
+                is_alive=background_thread.is_alive(),
+                daemon=background_thread.daemon,
+                ident=background_thread.ident
+            )
+
+        background_status = BackgroundStatus(
+            enabled=BACKGROUND_PROCESSING_ENABLED,
+            running=background_thread_running,
+            thread=thread_info,
+            configuration=BackgroundConfiguration(
+                scan_interval_seconds=BACKGROUND_SCAN_INTERVAL,
+                process_hours=settings_service.get_lookback_hours()
+            )
+        )
+
+        # Get recent runs if requested
+        recent_runs = None
+        if include_recent:
+            recent_runs = processing_status_manager.get_recent_runs(limit=recent_limit)
+
+        # Get statistics if requested
+        statistics = None
+        if include_stats:
+            statistics = processing_status_manager.get_statistics()
+
+        # Check if WebSocket is available
+        websocket_available = websocket_manager is not None
+
+        return UnifiedStatusResponse(
+            is_processing=is_processing,
+            current_status=current_status,
+            background=background_status,
+            recent_runs=recent_runs,
+            statistics=statistics,
+            timestamp=datetime.now().isoformat(),
+            websocket_available=websocket_available
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_unified_status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve status: {str(e)}"
         )
 
 
@@ -2022,7 +2143,7 @@ async def force_process_account(
             "timestamp": "2025-10-07T10:30:00Z",
             "processing_info": {
                 "hours": 2,
-                "status_url": "/api/processing/current-status",
+                "status_url": "/api/status",
                 "websocket_url": "/ws/status"
             }
         }
@@ -2091,7 +2212,7 @@ async def force_process_account(
                         processing_info=ProcessingInfo(
                             state=current_status.get('state') if current_status else None,
                             current_step=current_status.get('current_step') if current_status else None,
-                            status_url="/api/processing/current-status",
+                            status_url="/api/status",
                             websocket_url="/ws/status"
                         )
                     ).model_dump()
@@ -2109,7 +2230,7 @@ async def force_process_account(
                         processing_info=ProcessingInfo(
                             state=current_status.get('state') if current_status else None,
                             current_step=f"Processing {current_email}",
-                            status_url="/api/processing/current-status",
+                            status_url="/api/status",
                             websocket_url="/ws/status"
                         )
                     ).model_dump()
@@ -2173,7 +2294,7 @@ async def force_process_account(
             timestamp=datetime.now().isoformat(),
             processing_info=ProcessingInfo(
                 hours=lookback_hours,
-                status_url="/api/processing/current-status",
+                status_url="/api/status",
                 websocket_url="/ws/status"
             )
         )
@@ -2570,6 +2691,7 @@ async def not_found(request, exc):
             "message": "Endpoint not found",
             "available_endpoints": {
                 "health": "GET /api/health",
+                "status": "GET /api/status (unified processing and background status)",
                 "morning_summary": "POST /api/summaries/morning",
                 "evening_summary": "POST /api/summaries/evening",
                 "weekly_summary": "POST /api/summaries/weekly",
@@ -2581,10 +2703,8 @@ async def not_found(request, exc):
                 "deactivate_account": "PUT /api/accounts/{email_address}/deactivate",
                 "delete_account": "DELETE /api/accounts/{email_address}",
                 "force_process_account": "POST /api/accounts/{email_address}/process",
-                "processing_status": "GET /api/processing/status",
                 "processing_history": "GET /api/processing/history",
                 "processing_statistics": "GET /api/processing/statistics",
-                "processing_current_status": "GET /api/processing/current-status",
                 "websocket_status": "WS /ws/status"
             }
         }

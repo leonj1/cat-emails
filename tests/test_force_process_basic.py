@@ -37,7 +37,7 @@ class TestForceProcessModels(unittest.TestCase):
         """Test creating a ForceProcessResponse with ProcessingInfo"""
         processing_info = ProcessingInfo(
             hours=24,
-            status_url="/api/processing/current-status",
+            status_url="/api/status",
             websocket_url="/ws/status",
             state="PROCESSING",
             current_step="Processing email 5 of 20"
