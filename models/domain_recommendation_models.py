@@ -25,7 +25,7 @@ class DomainRecommendation:
     category: str
     count: int
 
-    def to_dict(self) -> Dict[str, any]:
+    def to_dict(self) -> Dict[str, Any]:
         """
         Convert the recommendation to a dictionary.
 
