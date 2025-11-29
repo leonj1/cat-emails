@@ -193,6 +193,16 @@ class FakeGmailFetcher(GmailFetcherInterface):
         self.labels.clear()
         self.deleted_message_ids.clear()
         self._next_message_id = 1
+        self._blocked_domains.clear()
+
+    def add_blocked_domain(self, domain: str) -> None:
+        """
+        Add a domain to the blocked list for testing.
+
+        Args:
+            domain: Domain name to block (e.g., 'spam.com')
+        """
+        self._blocked_domains.add(domain.lower())
 
     # Methods required by EmailProcessorService (stub implementations for testing)
 
@@ -221,8 +231,17 @@ class FakeGmailFetcher(GmailFetcherInterface):
         return from_header.strip()
 
     def _is_domain_blocked(self, from_header: str) -> bool:
-        """Check if domain is blocked (stub for testing - always False)."""
-        return False
+        """
+        Check if domain is blocked.
+
+        Args:
+            from_header: Email From header
+
+        Returns:
+            True if domain is in the blocked list, False otherwise
+        """
+        domain = self._extract_domain(from_header)
+        return domain.lower() in self._blocked_domains
 
     def _is_domain_allowed(self, from_header: str) -> bool:
         """Check if domain is allowed (stub for testing - always False)."""
