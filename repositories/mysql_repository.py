@@ -862,7 +862,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
         """Get count of processed emails"""
         session = self._get_session()
         try:
-            query = session.query(ProcessedEmailLog).filter_by(email_address=email_address)
+            query = session.query(ProcessedEmailLog).filter_by(account_email=email_address)
 
             if since:
                 query = query.filter(ProcessedEmailLog.processed_at >= since)

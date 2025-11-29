@@ -507,9 +507,9 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
         query = session.query(AccountCategoryStats).filter_by(account_id=account_id)
         
         if start_date:
-            query = query.filter(AccountCategoryStats.processing_date >= start_date)
+            query = query.filter(AccountCategoryStats.date >= start_date)
         if end_date:
-            query = query.filter(AccountCategoryStats.processing_date <= end_date)
+            query = query.filter(AccountCategoryStats.date <= end_date)
         
         return query.all()
     
@@ -531,7 +531,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             stat = session.query(AccountCategoryStats).filter_by(
                 account_id=account_id,
                 category_name=category_name,
-                processing_date=processing_date
+                date=processing_date
             ).first()
 
             if stat:
@@ -542,7 +542,7 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
                     account_id=account_id,
                     category_name=category_name,
                     email_count=count_increment,
-                    processing_date=processing_date
+                    date=processing_date
                 )
                 session.add(stat)
             

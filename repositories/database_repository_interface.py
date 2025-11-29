@@ -416,13 +416,13 @@ class DatabaseRepositoryInterface(ABC):
     ) -> Any:
         """
         Update or create category statistics for account.
-        
+
         Args:
             account_id: Account ID
-            category: Email category name
+            category_name: Email category name
             count_increment: Number to increment count by
             processing_date: Date of processing (defaults to today)
-            
+
         Returns:
             AccountCategoryStats entity
         """
