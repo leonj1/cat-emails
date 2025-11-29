@@ -74,7 +74,7 @@ class RecommendationEmailNotifier(IRecommendationEmailNotifier):
             # Create the email message
             email_message = EmailMessage(
                 sender=EmailAddress(
-                    email="noreply@cat-emails.com",
+                    email="info@joseserver.com",
                     name="Cat Emails"
                 ),
                 to=[EmailAddress(email=recipient_email)],

@@ -773,7 +773,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
     
     def is_email_processed(self, email_address: str, message_id: str) -> bool:
         """Check if email has been processed already"""
-        count = self.count(ProcessedEmailLog, email_address=email_address, message_id=message_id)
+        count = self.count(ProcessedEmailLog, account_email=email_address, message_id=message_id)
         return count > 0
     
     def mark_email_processed(
@@ -785,13 +785,11 @@ class MySQLRepository(DatabaseRepositoryInterface):
     ) -> ProcessedEmailLog:
         """Mark email as processed to prevent duplicate processing"""
         session = self._get_session()
-        
+
         try:
             record = ProcessedEmailLog(
-                email_address=email_address,
+                account_email=email_address,
                 message_id=message_id,
-                category=category,
-                action_taken=action_taken,
                 processed_at=datetime.utcnow()
             )
             session.add(record)
