@@ -355,6 +355,15 @@ class TestPendingRollbackPreventionScenario(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up."""
         if hasattr(cls, 'repository') and cls.repository:
+            # Clean up test setting before disconnecting
+            try:
+                session = cls.repository._get_session()
+                session.query(UserSettings).filter(
+                    UserSettings.setting_key == 'lookback_hours'
+                ).delete(synchronize_session=False)
+                session.commit()
+            except SQLAlchemyError:
+                pass
             cls.repository.disconnect()
 
     def test_production_scenario_get_setting_after_error(self):
