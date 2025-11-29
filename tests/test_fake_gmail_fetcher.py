@@ -282,6 +282,12 @@ class TestFakeGmailFetcher(unittest.TestCase):
         # After clear, counter should reset
         self.assertEqual(id1, id2)
 
+    def test_get_blocked_domains(self):
+        """Test that get_blocked_domains returns the internal _blocked_domains set."""
+        blocked_domains = self.fetcher.get_blocked_domains()
+        self.assertIsInstance(blocked_domains, set)
+        self.assertEqual(blocked_domains, set())
+
 
 if __name__ == '__main__':
     unittest.main()

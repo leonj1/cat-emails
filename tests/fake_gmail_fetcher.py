@@ -13,7 +13,7 @@ Usage:
     emails = fetcher.get_recent_emails(hours=2)
 """
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 from email.message import EmailMessage
 
 from services.gmail_fetcher_interface import GmailFetcherInterface
@@ -34,6 +34,7 @@ class FakeGmailFetcher(GmailFetcherInterface):
         self.labels: Dict[str, List[str]] = {}  # message_id -> list of labels
         self.deleted_message_ids: List[str] = []
         self._next_message_id = 1
+        self._blocked_domains: Set[str] = set()  # Set of blocked domain strings
 
     def connect(self) -> None:
         """Simulate establishing connection to Gmail IMAP server."""
@@ -187,11 +188,21 @@ class FakeGmailFetcher(GmailFetcherInterface):
         return message_id in self.deleted_message_ids
 
     def clear(self) -> None:
-        """Clear all emails, labels, and deleted messages."""
+        """Clear all emails, labels, deleted messages, and blocked domains."""
         self.emails.clear()
         self.labels.clear()
         self.deleted_message_ids.clear()
         self._next_message_id = 1
+        self._blocked_domains.clear()
+
+    def add_blocked_domain(self, domain: str) -> None:
+        """
+        Add a domain to the blocked list for testing.
+
+        Args:
+            domain: Domain name to block (e.g., 'spam.com')
+        """
+        self._blocked_domains.add(domain.lower())
 
     # Methods required by EmailProcessorService (stub implementations for testing)
 
@@ -220,8 +231,17 @@ class FakeGmailFetcher(GmailFetcherInterface):
         return from_header.strip()
 
     def _is_domain_blocked(self, from_header: str) -> bool:
-        """Check if domain is blocked (stub for testing - always False)."""
-        return False
+        """
+        Check if domain is blocked.
+
+        Args:
+            from_header: Email From header
+
+        Returns:
+            True if domain is in the blocked list, False otherwise
+        """
+        domain = self._extract_domain(from_header)
+        return domain.lower() in self._blocked_domains
 
     def _is_domain_allowed(self, from_header: str) -> bool:
         """Check if domain is allowed (stub for testing - always False)."""
@@ -230,3 +250,7 @@ class FakeGmailFetcher(GmailFetcherInterface):
     def _is_category_blocked(self, category: str) -> bool:
         """Check if category is blocked (stub for testing - always False)."""
         return False
+
+    def get_blocked_domains(self) -> Set[str]:
+        """Return the set of blocked domains."""
+        return self._blocked_domains.copy()

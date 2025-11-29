@@ -421,3 +421,7 @@ class GmailFetcher(GmailFetcherInterface):
         except Exception as e:
             logger.error(f"Error deleting email {message_id}: {str(e)}")
             return False
+
+    def get_blocked_domains(self) -> Set[str]:
+        """Return the set of blocked domains."""
+        return self._blocked_domains.copy()
