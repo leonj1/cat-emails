@@ -333,6 +333,11 @@ class MySQLRepository(DatabaseRepositoryInterface):
                 }
             }
         except Exception as e:
+            try:
+                session.rollback()
+            except Exception:
+                # Best-effort cleanup; don't mask the original error
+                logger.debug("Rollback after failed connection test raised; ignoring.")
             logger.error(f"Database connection test failed: {str(e)}")
             return {
                 "connected": False,
@@ -771,7 +776,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
     def update_account_category_stats(
         self,
         account_id: int,
-        category: str,
+        category_name: str,
         count_increment: int = 1,
         processing_date: Optional[date] = None
     ) -> AccountCategoryStats:
@@ -785,8 +790,8 @@ class MySQLRepository(DatabaseRepositoryInterface):
             # Try to find existing stat
             stat = session.query(AccountCategoryStats).filter_by(
                 account_id=account_id,
-                category=category,
-                date=processing_date
+                category_name=category_name,
+                date=processing_date,
             ).first()
 
             if stat:
@@ -795,9 +800,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
             else:
                 stat = AccountCategoryStats(
                     account_id=account_id,
-                    category=category,
+                    category_name=category_name,
                     email_count=count_increment,
-                    date=processing_date
+                    date=processing_date,
                 )
                 session.add(stat)
             
@@ -839,7 +844,11 @@ class MySQLRepository(DatabaseRepositoryInterface):
         except IntegrityError:
             # Already exists, that's fine
             session.rollback()
-            return self.find_one(ProcessedEmailLog, email_address=email_address, message_id=message_id)
+            return self.find_one(
+                ProcessedEmailLog,
+                account_email=email_address,
+                message_id=message_id,
+            )
         except SQLAlchemyError as e:
             session.rollback()
             logger.error(f"Error marking email as processed: {str(e)}")

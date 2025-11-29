@@ -410,7 +410,7 @@ class DatabaseRepositoryInterface(ABC):
     def update_account_category_stats(
         self,
         account_id: int,
-        category: str,
+        category_name: str,
         count_increment: int = 1,
         processing_date: Optional[date] = None
     ) -> Any:
