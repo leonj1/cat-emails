@@ -76,12 +76,19 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         3. Categorizes them using AI
         4. Applies labels and actions
         5. Sends logs to remote collector
+        6. Collects domain blocking recommendations (if collector provided)
+        7. Sends recommendation notification email (if notifier provided)
 
         Args:
             email_address: The Gmail account to process
 
         Returns:
-            Dictionary with processing results
+            Dictionary with processing results including:
+            - Standard fields: account, emails_found, emails_processed, etc.
+            - Recommendation fields (if collector provided):
+              recommended_domains_to_block, total_emails_matched, unique_domains_count
+            - Notification fields (if notifier provided):
+              notification_sent, notification_error
         """
         logger.info(f"🔍 Processing emails for account: {email_address}")
 
@@ -251,8 +258,10 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                                     category,
                                     blocked_domains_set
                                 )
-                    except Exception as e:
+                    except (ValueError, AttributeError) as e:
                         logger.warning(f"Failed to collect domain recommendation: {e}")
+                    except Exception as e:
+                        logger.error(f"Unexpected error collecting domain recommendation: {e}")
 
                 # Update status for labeling periodically
                 if i % 3 == 2:
@@ -335,10 +344,14 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                                 email_address,
                                 recommendations
                             )
-                        except Exception as e:
+                        except (ConnectionError, TimeoutError, ValueError) as e:
                             logger.warning(f"Failed to send recommendation notification: {e}")
-                except Exception as e:
+                        except Exception as e:
+                            logger.error(f"Unexpected error sending notification: {e}")
+                except (AttributeError, ValueError, KeyError) as e:
                     logger.warning(f"Failed to get recommendation summary: {e}")
+                except Exception as e:
+                    logger.error(f"Unexpected error in recommendation summary: {e}")
 
             result = {
                 "account": email_address,
