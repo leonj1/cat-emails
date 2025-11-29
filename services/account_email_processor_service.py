@@ -261,7 +261,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                     except (ValueError, AttributeError) as e:
                         logger.warning(f"Failed to collect domain recommendation: {e}")
                     except Exception as e:
-                        logger.error(f"Unexpected error collecting domain recommendation: {e}")
+                        logger.exception(f"Unexpected error collecting domain recommendation: {e}")
 
                 # Update status for labeling periodically
                 if i % 3 == 2:
@@ -347,11 +347,11 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                         except (ConnectionError, TimeoutError, ValueError) as e:
                             logger.warning(f"Failed to send recommendation notification: {e}")
                         except Exception as e:
-                            logger.error(f"Unexpected error sending notification: {e}")
+                            logger.exception(f"Unexpected error sending notification: {e}")
                 except (AttributeError, ValueError, KeyError) as e:
                     logger.warning(f"Failed to get recommendation summary: {e}")
                 except Exception as e:
-                    logger.error(f"Unexpected error in recommendation summary: {e}")
+                    logger.exception(f"Unexpected error in recommendation summary: {e}")
 
             result = {
                 "account": email_address,
