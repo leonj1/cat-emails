@@ -34,6 +34,7 @@ class FakeGmailFetcher(GmailFetcherInterface):
         self.labels: Dict[str, List[str]] = {}  # message_id -> list of labels
         self.deleted_message_ids: List[str] = []
         self._next_message_id = 1
+        self._blocked_domains = set()  # Set of blocked domain strings
 
     def connect(self) -> None:
         """Simulate establishing connection to Gmail IMAP server."""

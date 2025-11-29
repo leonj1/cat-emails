@@ -14,6 +14,9 @@ from services.gmail_fetcher_service import GmailFetcher
 from services.email_processor_service import EmailProcessorService
 from services.extract_sender_email_service import ExtractSenderEmailService
 from services.processing_status_manager import ProcessingState
+from services.interfaces.blocking_recommendation_collector_interface import IBlockingRecommendationCollector
+from services.interfaces.recommendation_email_notifier_interface import IRecommendationEmailNotifier
+from services.domain_extractor import extract_domain
 
 logger = get_logger(__name__)
 
@@ -31,7 +34,9 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         account_category_client: AccountCategoryClientInterface,
         deduplication_factory: EmailDeduplicationFactoryInterface,
         logs_collector: Optional[LogsCollectorService] = None,
-        create_gmail_fetcher: Optional[Callable[[str, str, str], GmailFetcherInterface]] = None
+        create_gmail_fetcher: Optional[Callable[[str, str, str], GmailFetcherInterface]] = None,
+        blocking_recommendation_collector: Optional[IBlockingRecommendationCollector] = None,
+        recommendation_email_notifier: Optional[IRecommendationEmailNotifier] = None
     ):
         """
         Initialize the account email processor service.
@@ -46,6 +51,8 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             deduplication_factory: EmailDeduplicationFactoryInterface implementation (required)
             logs_collector: LogsCollectorService instance (optional, creates new if not provided)
             create_gmail_fetcher: Optional callable to create GmailFetcherInterface instances (defaults to GmailFetcher constructor)
+            blocking_recommendation_collector: Optional IBlockingRecommendationCollector for collecting domain recommendations
+            recommendation_email_notifier: Optional IRecommendationEmailNotifier for sending recommendation emails
         """
         self.processing_status_manager = processing_status_manager
         self.settings_service = settings_service
@@ -56,6 +63,8 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         self.deduplication_factory = deduplication_factory
         self.logs_collector = logs_collector if logs_collector is not None else LogsCollectorService()
         self.create_gmail_fetcher = create_gmail_fetcher if create_gmail_fetcher is not None else GmailFetcher
+        self.blocking_recommendation_collector = blocking_recommendation_collector
+        self.recommendation_email_notifier = recommendation_email_notifier
 
     def process_account(self, email_address: str) -> Dict:
         """
@@ -139,6 +148,10 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
 
             start_time = time.time()
 
+            # Clear the recommendation collector for this processing run
+            if self.blocking_recommendation_collector:
+                self.blocking_recommendation_collector.clear()
+
             # Get the current lookback hours from settings
             current_lookback_hours = self.settings_service.get_lookback_hours()
 
@@ -219,7 +232,27 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                     )
 
                 # Process the email
-                processor.process_email(msg)
+                category = processor.process_email(msg)
+
+                # Collect domain recommendation if collector is present and email was categorized
+                if self.blocking_recommendation_collector and category:
+                    try:
+                        from_header = str(msg.get("From", ""))
+                        if from_header and "@" in from_header:
+                            # Extract sender email using the email extractor
+                            sender_email = email_extractor.extract_sender_email(from_header)
+                            if sender_email:
+                                sender_domain = extract_domain(sender_email)
+                                # Get blocked domains from fetcher
+                                blocked_domains_set = fetcher._blocked_domains
+                                # Collect the recommendation
+                                self.blocking_recommendation_collector.collect(
+                                    sender_domain,
+                                    category,
+                                    blocked_domains_set
+                                )
+                    except Exception as e:
+                        logger.warning(f"Failed to collect domain recommendation: {e}")
 
                 # Update status for labeling periodically
                 if i % 3 == 2:
@@ -281,6 +314,32 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 {"current": len(new_emails), "total": len(new_emails)}
             )
 
+            # Get recommendation summary and send notification
+            summary = None
+            notification_result = None
+            recommendations = []
+            total_matched = 0
+            unique_domains = 0
+
+            if self.blocking_recommendation_collector:
+                try:
+                    summary = self.blocking_recommendation_collector.get_summary()
+                    recommendations = summary.recommendations
+                    total_matched = summary.total_count
+                    unique_domains = summary.domain_count
+
+                    # Only send notification if there are recommendations
+                    if self.recommendation_email_notifier and unique_domains > 0:
+                        try:
+                            notification_result = self.recommendation_email_notifier.send_recommendations(
+                                email_address,
+                                recommendations
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to send recommendation notification: {e}")
+                except Exception as e:
+                    logger.warning(f"Failed to get recommendation summary: {e}")
+
             result = {
                 "account": email_address,
                 "emails_found": len(recent_emails),
@@ -290,7 +349,12 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 "category_counts": category_actions,  # Add category counts for aggregator
                 "processing_time_seconds": round(processing_time, 2),
                 "timestamp": datetime.now().isoformat(),
-                "success": True
+                "success": True,
+                "recommended_domains_to_block": [r.to_dict() for r in recommendations],
+                "total_emails_matched": total_matched,
+                "unique_domains_count": unique_domains,
+                "notification_sent": notification_result.success if notification_result else False,
+                "notification_error": notification_result.error_message if notification_result else None
             }
 
             logger.info(f"✅ Successfully processed {email_address}: {len(new_emails)} emails in {processing_time:.2f}s")
