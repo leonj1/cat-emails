@@ -9,27 +9,40 @@ You are the ORCHESTRATOR for the BDD-TDD pipeline. Use the Task tool to execute 
 
 ## Pipeline Overview
 
-```
-Architect → BDD-Agent → (hook) → Gherkin-to-Test → (hook) → Run-Prompt →
+```plaintext
+init-explorer → Architect → BDD-Agent → (hook) → Gherkin-to-Test → (hook) → Run-Prompt →
   [For each prompt: test-creator → coder → standards → tester]
 ```
 
 ## Execution Steps
 
-### 1. **Architect Phase** (Greenfield Spec Design)
-Invoke `architect` agent with:
-```
-Create a DRAFT spec for: $ARGUMENTS
+### 1. **Initialization Phase** (Context & Exploration)
 
-Output to: specs/DRAFT-[feature-name].md
-Include: interfaces, data models, logic flow, constructor signatures
+Invoke `init-explorer` agent to:
+1. Explore the target project structure
+2. Read/create progress file (`claude-progress.txt`)
+3. Read/create feature list (`feature_list.md`) with comprehensive feature requirements
+4. Invoke the `architect` agent automatically
+
+```text
+Task(subagent_type="init-explorer", prompt="
+Explore this project and initialize context for the architect workflow.
+
+next_agent: architect
+task: $ARGUMENTS
+
+After exploration:
+1. Create .feature_list.md.example if feature_list.md doesn't exist
+2. Update claude-progress.txt with session start
+3. Invoke the architect agent with the task
+")
 ```
 
-Wait for architect to complete.
+Wait for init-explorer to complete (it will invoke architect internally).
 
 ### 2. **BDD Phase** (Behavior-Driven Scenarios)
 Invoke `bdd-agent` with:
-```
+```text
 Based on the feature request: $ARGUMENTS
 And the DRAFT spec in: specs/DRAFT-*.md
 
@@ -47,7 +60,7 @@ Wait for bdd-agent to complete.
 
 ### 3. **Gherkin-to-Test Phase** (Convert BDD to Prompts)
 When you see the bdd-agent completion signal, invoke `gherkin-to-test` with:
-```
+```text
 Convert the confirmed BDD scenarios to prompt files:
 
 1. Read feature files from: ./tests/bdd/*.feature
@@ -69,7 +82,7 @@ Wait for gherkin-to-test to complete.
 When you see the gherkin-to-test completion signal, invoke `run-prompt` command with the prompt numbers provided in the signal.
 
 Example: If signal says "run-prompt 006 007 008 --sequential", execute:
-```
+```text
 Execute prompts sequentially: [prompt-numbers] --sequential
 
 For each prompt, the TDD flow will execute:
@@ -84,18 +97,21 @@ Wait for all prompts to complete.
 ### 5. **Completion Report**
 After all phases complete, provide a summary:
 
-```
+```markdown
 **BDD-TDD Pipeline Complete**
 
 **Feature**: $ARGUMENTS
 
 **Phases Completed**:
-1. Architect: specs/DRAFT-*.md created
-2. BDD: [N] scenarios confirmed by user
-3. Gherkin-to-Test: [M] prompt files created
-4. Run-Prompt: All prompts executed
+1. Init-Explorer: Project context gathered, feature list created
+2. Architect: specs/DRAFT-*.md created
+3. BDD: [N] scenarios confirmed by user
+4. Gherkin-to-Test: [M] prompt files created
+5. Run-Prompt: All prompts executed
 
 **Artifacts Created**:
+- claude-progress.txt (updated)
+- feature_list.md (if exists, updated)
 - specs/DRAFT-[feature].md
 - specs/BDD-SPEC-[feature].md
 - specs/GAP-ANALYSIS.md
@@ -107,6 +123,7 @@ After all phases complete, provide a summary:
 - Code implemented: [files]
 - Standards: Passed
 - Tests: Passed
+- Features completed: X/Y
 
 **Feature Ready**: Yes
 ```
@@ -139,6 +156,14 @@ Quality gates are automatically triggered via hooks:
 
 These happen automatically within the run-prompt execution.
 
+## Feature List Protocol
+
+The `feature_list.md` file prevents one-shotting and premature victory:
+- Features are broken into granular, testable units
+- Each feature has `[ ] Incomplete` status initially
+- Agents work on ONE feature at a time
+- Only mark `[x] Complete` after verified testing
+
 ## Notes
 
 - **BDD Scenarios are Sequential**: Always use `--sequential` flag for BDD prompts
@@ -146,3 +171,4 @@ These happen automatically within the run-prompt execution.
 - **Retry Limit**: BDD-agent has 5 retry attempts for clarifications
 - **Codebase Analysis**: gherkin-to-test invokes codebase-analyst internally
 - **Refactoring**: refactor-decision-engine runs before prompt creation
+- **Progress Tracking**: claude-progress.txt maintains session history across context windows

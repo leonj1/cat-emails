@@ -2,6 +2,16 @@
   "hooks": {
     "SubagentStop": [
       {
+        "matcher": "init-explorer",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-init-explorer.sh",
+            "timeout": 30000
+          }
+        ]
+      },
+      {
         "matcher": "coder",
         "hooks": [
           {
@@ -79,6 +89,33 @@
           {
             "type": "command",
             "command": "python3 .claude/hooks/pre-write-governance.py"
+          }
+        ]
+      },
+      {
+        "matcher": "debugger",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/crash-guardrail.py"
+          }
+        ]
+      },
+      {
+        "matcher": "forensic",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/crash-guardrail.py"
+          }
+        ]
+      },
+      {
+        "matcher": "analyst",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/crash-guardrail.py"
           }
         ]
       }

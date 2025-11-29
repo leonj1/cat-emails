@@ -17,7 +17,7 @@ Use this command to create implementation prompts following BDD and TDD best pra
 
 **Example**: `/architect Build a user authentication system with JWT`
 
-**Flow**: architect → bdd-agent → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → coder → standards → tester → bdd-test-runner
+**Flow**: init-explorer → architect → bdd-agent → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → coder → standards → tester → bdd-test-runner
 
 ### `/coder` - Orchestrated Development
 Use this command when you want to implement features with full orchestration:
@@ -67,9 +67,34 @@ Use this command to run the project's test suite and automatically fix any failu
 
 **Example**: `/fix-failing-tests`
 
+### `/debugger` - CRASH-RCA Forensic Debugging
+Use this command to start a forensic Root Cause Analysis debugging session:
+- Enforces read-only investigation mode (Write/Edit tools blocked)
+- Logs every investigation step with hypothesis and confidence
+- Tracks evidence chain throughout investigation
+- Generates structured RCA report on completion
+
+**When to use**: When you need to systematically investigate a bug or issue with disciplined, evidence-based analysis.
+
+**Example**: `/debugger Login API returns 500 errors intermittently`
+
+**Flow**:
+1. `init-explorer` gathers project context and progress
+2. `crash.py start` initializes session (Forensic Mode ON)
+3. `crash.py step` logs each hypothesis before investigation
+4. Read-only tools gather evidence (Grep, Read, Glob, Bash)
+5. `crash.py diagnose` generates RCA report (Forensic Mode OFF)
+
+**Key Features**:
+- **Forensic Mode**: Write/Edit blocked until diagnosis complete
+- **Hypothesis Logging**: Every investigation step recorded
+- **Evidence Chain**: All findings tracked with file:line references
+- **Structured Report**: Standardized RCA output format
+
 ## Project Structure
 
 - `.claude/agents/` - Specialized agent configurations
+  - `init-explorer.md` - Initializer agent that explores codebase and sets up context
   - `architect.md` - Greenfield spec designer
   - `bdd-agent.md` - BDD specialist that generates Gherkin scenarios
   - `gherkin-to-test.md` - Converts Gherkin to TDD prompts
@@ -84,6 +109,9 @@ Use this command to run the project's test suite and automatically fix any failu
   - `fix-failing-tests.md` - Fix failing tests specialist
   - `verifier.md` - Code investigation specialist
   - `stuck.md` - Human escalation agent
+  - `debugger.md` - CRASH-RCA orchestrator for forensic debugging
+  - `forensic.md` - Investigation specialist for CRASH sessions
+  - `analyst.md` - RCA synthesis specialist
 - `.claude/coding-standards/` - Code quality standards
 - `.claude/commands/` - Custom slash commands
 - `.claude/hooks/` - Automated workflow hooks
@@ -96,13 +124,57 @@ This project uses Claude Code hooks to automatically enforce quality gates:
 
 ### Configured Hooks
 
-1. **post-bdd-agent.sh** - Signals gherkin-to-test after BDD scenarios generated
-2. **post-gherkin-to-test.sh** - Signals run-prompt after prompts created
-3. **post-coder-standards-check.sh** - Triggers coding standards check after coder completes
-4. **post-standards-testing.sh** - Triggers testing after standards check passes
-5. **post-tester-infrastructure.sh** - Triggers bdd-test-runner to validate test infrastructure
+1. **post-init-explorer.sh** - Signals that project context is gathered
+2. **post-bdd-agent.sh** - Signals gherkin-to-test after BDD scenarios generated
+3. **post-gherkin-to-test.sh** - Signals run-prompt after prompts created
+4. **post-coder-standards-check.sh** - Triggers coding standards check after coder completes
+5. **post-standards-testing.sh** - Triggers testing after standards check passes
+6. **post-tester-infrastructure.sh** - Triggers bdd-test-runner to validate test infrastructure
+7. **crash-guardrail.py** - Blocks Write/Edit tools during CRASH debugging sessions
 
 Hooks create state files in `.claude/.state/` to track workflow completion.
+
+### Init-Explorer Agent
+
+The `init-explorer` agent is the **initializer** that runs at the start of `/architect` and `/debugger` workflows. It:
+
+1. **Orients to the project**: Runs `pwd`, `ls`, `git log`, `git status`
+2. **Reads progress history**: Checks `claude-progress.txt` for previous session context
+3. **Reads feature list**: Checks `feature_list.md` for implementation status
+4. **Explores structure**: Uses the Explore agent to analyze tech stack and patterns
+5. **Updates progress**: Logs this session's start to `claude-progress.txt`
+6. **Invokes next agent**: Hands off to `architect` or `debugger` with full context
+
+### Session Continuity Files
+
+| File | Purpose |
+|------|---------|
+| `claude-progress.txt` | Session log showing what agents have done across context windows |
+| `feature_list.md` | Comprehensive feature requirements with completion status |
+| `.feature_list.md.example` | Example template created if `feature_list.md` is missing |
+
+### Feature List Protocol
+
+The `feature_list.md` file prevents two common agent failure modes:
+- **One-shotting**: Trying to implement everything at once
+- **Premature victory**: Declaring the project done before all features work
+
+**Rules for agents**:
+1. Only modify the status checkbox - Never remove or edit feature descriptions
+2. Mark `[x] Complete` only after verified testing - Not after implementation
+3. Work on one feature at a time - Incremental progress
+4. Read feature list at session start - Choose highest-priority incomplete feature
+
+### CRASH-RCA Scripts
+
+Located in `.claude/scripts/`:
+
+- **crash.py** - State manager for forensic debugging sessions
+  - `crash.py start "issue"` - Initialize session
+  - `crash.py step --hypothesis "..." --action "..." --confidence 0.7` - Log investigation step
+  - `crash.py status` - Check session state
+  - `crash.py diagnose --root_cause "..." --justification "..." --evidence "..."` - Complete with RCA
+  - `crash.py cancel` - Abort session
 
 ## Documentation Guidelines
 
@@ -116,9 +188,10 @@ Hooks create state files in `.claude/.state/` to track workflow completion.
 **Best for**: New features with comprehensive test coverage, behavior-driven development
 
 **Flow**:
-1. `/architect` creates greenfield spec
-2. `bdd-agent` generates Gherkin scenarios
-3. `gherkin-to-test` invokes codebase-analyst and creates prompts
+1. `init-explorer` gathers project context, reads/creates `feature_list.md`
+2. `architect` creates greenfield spec
+3. `bdd-agent` generates Gherkin scenarios
+4. `gherkin-to-test` invokes codebase-analyst and creates prompts
 5. `run-prompt` executes prompts sequentially
 6. For each prompt:
    - `test-creator` writes tests from Gherkin
@@ -128,6 +201,8 @@ Hooks create state files in `.claude/.state/` to track workflow completion.
    - `bdd-test-runner` validates test infrastructure (Dockerfile.test, Makefile, `make test`)
 
 **Benefits**:
+- Session continuity via `claude-progress.txt` and `feature_list.md`
+- Prevents one-shotting and premature victory
 - Tests derived from business-readable Gherkin scenarios
 - Clear traceability from requirements to tests to code
 - Full quality gates
@@ -172,3 +247,23 @@ For exploratory tasks, questions, or non-coding requests, you can interact with 
 - `/refactor` for code quality improvements
 - `/fix-failing-tests` for fixing failing tests automatically
 - `/verifier` for code investigation
+- `/debugger` for forensic root cause analysis
+
+### Forensic Debugging Workflow (`/debugger`)
+**Best for**: Systematic bug investigation, intermittent issues, production incidents
+
+**Flow**:
+1. `init-explorer` gathers project context, reads progress and feature list
+2. `/debugger "issue description"` starts CRASH-RCA session
+3. Forensic Mode activates (Write/Edit blocked)
+4. Log hypothesis with `crash.py step`
+5. Investigate with read-only tools (Grep, Read, Glob)
+6. Repeat steps 4-5 until confidence > 0.8
+7. Complete with `crash.py diagnose`
+
+**Benefits**:
+- Session continuity via `claude-progress.txt`
+- Prevents accidental code changes during investigation
+- Forces disciplined hypothesis-driven debugging
+- Creates audit trail of investigation steps
+- Generates standardized RCA reports

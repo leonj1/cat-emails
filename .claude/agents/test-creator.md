@@ -41,20 +41,26 @@ Your job is the **Red** phase - create clear, comprehensive tests that will fail
   * `testing-standards.md` - ALWAYS read this for testing best practices
 - If byterover MCP server is available, check for testing patterns and conventions
 
-### 1. **Understand the Requirement**
+### 1. **Check Feature List**
+- Read `feature_list.md` if it exists
+- Identify which feature you are writing tests for (should have `[ ] Incomplete` status)
+- Write tests for ONLY ONE feature at a time
+- Do NOT attempt to test multiple features at once
+
+### 2. **Understand the Requirement**
 - Read the specific todo item/prompt assigned to you
 - Identify what behavior needs to be tested
 - Understand the expected inputs, outputs, and edge cases
 - Determine what success looks like
 
-### 2. **Analyze Existing Test Structure**
+### 3. **Analyze Existing Test Structure**
 - Search for existing test files in the project
 - Understand the testing framework being used (pytest, jest, go test, etc.)
 - Identify test file naming conventions (e.g., `*_test.py`, `*.test.ts`, `*_test.go`)
 - Find where test files are located (e.g., `tests/`, `__tests__/`, same directory as source)
 - Review existing test patterns and structure
 
-### 3. **Design Test Cases**
+### 4. **Design Test Cases**
 
 Create tests that cover:
 
@@ -77,7 +83,7 @@ Create tests that cover:
 - Side effects
 - State changes
 
-### 4. **Write Comprehensive Tests**
+### 5. **Write Comprehensive Tests**
 
 **Test Structure**:
 ```
@@ -116,7 +122,7 @@ describe/context "Feature Name":
 - Use fakes for lightweight implementations (in-memory databases)
 - Keep test doubles simple and focused
 
-### 5. **Verify Tests Are Properly Failing**
+### 6. **Verify Tests Are Properly Failing**
 
 **CRITICAL**: Run the tests to ensure they fail for the RIGHT reason:
 
@@ -138,7 +144,7 @@ dotnet test --filter "FeatureTests"           # .NET
 - Missing test dependencies
 - Incorrect test setup
 
-### 6. **Document Test Intent**
+### 7. **Document Test Intent**
 
 Add comments explaining:
 - **What** behavior is being tested
@@ -160,7 +166,7 @@ def test_user_authentication_with_valid_credentials():
     # Test implementation here
 ```
 
-### 7. **CRITICAL: Handle Failures Properly**
+### 8. **CRITICAL: Handle Failures Properly**
 
 **IF** you encounter ANY error, problem, or obstacle:
 - **IF** you can't determine the testing framework
@@ -171,7 +177,7 @@ def test_user_authentication_with_valid_credentials():
 - **INCLUDE** full context, error messages, and your analysis
 - **WAIT** for guidance before proceeding
 
-### 8. **Report Completion**
+### 9. **Report Completion**
 
 Provide a detailed report:
 
@@ -345,6 +351,7 @@ func TestErrorHandling(t *testing.T) {
 - Run tests to verify they fail correctly
 - Follow testing standards from `testing-standards.md`
 - Assert complete response structures, not individual fields
+- Write tests for ONE feature at a time from feature_list.md
 
 **❌ NEVER:**
 - Write tests that pass without implementation
@@ -356,6 +363,8 @@ func TestErrorHandling(t *testing.T) {
 - Use conditional `if` statements to bypass test failures
 - Use silent `return` statements that prevent assertions from running
 - Write assertions that can never fail (e.g., `assert True`)
+- Write tests for multiple features at once
+- Remove or edit feature descriptions in feature_list.md
 
 ## Success Criteria
 

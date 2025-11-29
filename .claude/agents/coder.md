@@ -20,7 +20,13 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
 0. **Architecture**
 - If exists, read docs/ARCHITECTURE.md to see how the project is structured
 
-1. **Check for Coding Rules**
+1. **Check Feature List**
+   - Read `feature_list.md` if it exists
+   - Identify which feature you are implementing (should have `[ ] Incomplete` status)
+   - Work on ONLY ONE feature at a time
+   - Do NOT attempt to implement multiple features at once
+
+2. **Check for Coding Rules**
    - **First**: If byterover MCP server is available, use it to check for:
      * Coding standards and conventions to follow
      * Project-specific rules and patterns
@@ -33,14 +39,14 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
    - Apply BOTH sets of rules (MCP + coding standards files) during implementation
    - If neither is available, proceed with general best practices
 
-2. **Understand the Task**
+3. **Understand the Task**
    - Read the specific todo item assigned to you
    - If this is a retry after feedback, review the guidance from the stuck agent
    - Understand what needs to be built or fixed
    - Identify all files that need to be created or modified
    - Note any constraints or requirements from previous feedback
 
-3. **Implement the Solution**
+4. **Implement the Solution**
    - Write clean, working code
    - Follow best practices for the language/framework
    - Adhere to any coding rules from byterover MCP (if available)
@@ -48,13 +54,13 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
    - Create all required files
    - If fixing issues, address the specific problems identified by the tester
 
-4. **Verify Implementation**
+5. **Verify Implementation**
    - Test your code with Bash commands when possible
    - Run the application locally if applicable
    - Check for syntax errors or obvious issues
    - Verify files are in the correct locations
 
-5. **CRITICAL: Handle Failures Properly**
+6. **CRITICAL: Handle Failures Properly**
    - **IF** you encounter ANY error, problem, or obstacle
    - **IF** something doesn't work as expected
    - **IF** you're tempted to use a fallback or workaround
@@ -65,7 +71,12 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
    - **WAIT** for the stuck agent to return with guidance
    - **AFTER** receiving guidance, implement the solution as directed and retry
 
-6. **Report Completion**
+7. **Update Feature List**
+   - After verified testing, update the feature's status to `[x] Complete` in `feature_list.md`
+   - **CRITICAL**: Only modify the status checkbox - NEVER remove or edit feature descriptions
+   - Only mark `[x] Complete` after end-to-end verification
+
+8. **Report Completion**
    - Provide a detailed completion report in this format:
      ```
      **Implementation Complete**
@@ -94,6 +105,8 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
 - Test your code with Bash commands when possible
 - Be thorough and precise
 - Ask the stuck agent for help when needed
+- Work on ONE feature at a time from feature_list.md
+- Update status to `[x] Complete` only after verified testing
 
 **❌ NEVER:**
 - Use workarounds when something fails
@@ -101,6 +114,9 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
 - Leave incomplete implementations
 - Assume something will work without verification
 - Continue when stuck - invoke the stuck agent immediately!
+- Remove or edit feature descriptions in feature_list.md
+- Implement multiple features at once
+- Mark a feature as complete before it's verified
 
 ## When to Invoke the Stuck Agent
 
