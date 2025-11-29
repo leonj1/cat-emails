@@ -1,0 +1,192 @@
+[
+  {
+    "message_id": "<6s5x9Fq9RGalhOO5s0fG8A@geopod-ismtpd-68>",
+    "sender": "Carson at Legion <contact@legionathletics.com>",
+    "subject": "SECRET CODE (Use in the next 59 mins)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:05.868307",
+    "sender_domain": "legionathletics.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<20251129035735.2c6889521aaa1f88@email.baerskintactical.com>",
+    "sender": "BAERSkin Tactical <new@email.baerskintactical.com>",
+    "subject": "=?UTF-8?q?=E2=8F=B0_6_Hours:_Black_Friday's_Final_Window?=",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:07.973984",
+    "sender_domain": "email.baerskintactical.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/scribe4-api/pull/29/c3590969500@github.com>",
+    "sender": "\"ai-reviewer2[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/scribe4-api] Add templates scope/state columns to fix\r\n unknown column error (PR #29)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:10.130079",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/scribe4-api/pull/29/c3590969518@github.com>",
+    "sender": "\"coderabbitai[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/scribe4-api] Add templates scope/state columns to fix\r\n unknown column error (PR #29)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:12.154528",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<mvuzp4e9kgt5hqelr8oamhrk2w2qqb3hd4e25@convertkit-mail4.com>",
+    "sender": "Milan =?iso-8859-2?q?Jovanovi=E6?= <milan@milanjovanovic.tech>",
+    "subject": "=?UTF-8?B?8J+Tpw==?= Vertical Slice Architecture: Where Does the\r\n Shared Logic Live?",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:14.497771",
+    "sender_domain": "milanjovanovic.tech",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/scribe4-api/pull/30/c3590974086@github.com>",
+    "sender": "\"ai-reviewer2[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/scribe4-api] Add templates.content column to fix template\r\n creation (PR #30)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:16.747246",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/scribe4-api/pull/30/c3590974079@github.com>",
+    "sender": "\"coderabbitai[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/scribe4-api] Add templates.content column to fix template\r\n creation (PR #30)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:18.964607",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4eHs8w/1764390067@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml -\r\n terragon/disable-remote-logging-2899h9 (15886e4)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:21.063068",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/pull/72/c3590976428@github.com>",
+    "sender": "\"coderabbitai[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/cat-emails] Disable remote logging by default; add\r\n DISABLE_REMOTE_LOGS env var (PR #72)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:23.192046",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/pull/72/c3590976469@github.com>",
+    "sender": "\"ai-reviewer2[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/cat-emails] Disable remote logging by default; add\r\n DISABLE_REMOTE_LOGS env var (PR #72)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:25.311700",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/pull/72/review/3520467470@github.com>",
+    "sender": "\"coderabbitai[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/cat-emails] Disable remote logging by default; add\r\n DISABLE_REMOTE_LOGS env var (PR #72)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:27.495392",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4eUJuw/1764390615@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml - master (8925f10)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:29.660272",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<20251129043121.d844b15605b204e9@cio79999.notify.railway.app>",
+    "sender": "Railway <hello@notify.railway.app>",
+    "subject": "Deployment crashed for scribe4-api in KandM!",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:31.826863",
+    "sender_domain": "notify.railway.app",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4eVr6w/1764390678@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml - master (ff7812a)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:33.972128",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<t0eqnU2jSwqXczVZY9kGSQ@geopod-ismtpd-10>",
+    "sender": "Fashion Nova | Black Friday <noreply@fashionnova.com>",
+    "subject": "=?UTF-8?B?8J+aqEZJTkFMIDMgSFJT8J+aqFhUUkE=?= $25 OFF $125! W/Code:\r\n =?UTF-8?B?R05JVEXigLzvuI8=?=",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:36.207195",
+    "sender_domain": "fashionnova.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4eajZQ/1764390905@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml - master (123871b)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:38.363480",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4edDMQ/1764391027@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml - master (c0d16da)",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:40.535191",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<0100019acdf3fb64-a1f0d67b-b0d6-48fd-8451-587ce09f9893-000000@email.amazonses.com>",
+    "sender": "Eric from Consensus <eric@mail.consensus.app>",
+    "subject": "=?utf-8?B?VGhhbmsgeW91IGZvciB5b3VyIHN1YnNjcmlwdGlvbiB0byBDb25zZW5zdXMgUHJlbWl1bSEg8J+SnA==?=",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:42.783258",
+    "sender_domain": "mail.consensus.app",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<0101019acdf5358a-24c03858-29e8-48b0-a1d3-fd8b777aad3b-000000@us-west-2.amazonses.com>",
+    "sender": "Consensus <invoice+statements+acct_1M08h7F5zSuk8EYS@stripe.com>",
+    "subject": "Your receipt from Consensus #2092-6425",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-29 04:56:44.944242",
+    "sender_domain": "stripe.com",
+    "was_pre_categorized": false
+  }
+]

@@ -90,3 +90,58 @@ Features: 0/1 complete (feature_list.md exists with FEAT-001)
 
 Next: Update CLAUDE.md to reflect actual migration system, or investigate Railway console for Flyway configuration
 ---
+
+=== Session 20251129-060000 ===
+Workflow: architect
+Task: Add domain blocking recommendations to process_account response and email notification
+Status: Initialized
+Context: Explored project for domain blocking and email sending capabilities
+
+Key Findings:
+
+1. AccountEmailProcessorService (services/account_email_processor_service.py):
+   - process_account() method at line 60-349
+   - Returns Dict with: account, emails_found, emails_processed, emails_categorized,
+     emails_labeled, category_counts, processing_time_seconds, timestamp, success
+   - Uses EmailProcessorService for individual email processing
+   - EmailProcessorService tracks category_actions dict with category stats
+
+2. Email Categorization Flow:
+   - EmailProcessorService (services/email_processor_service.py) processes each email
+   - Checks if domain is blocked via fetcher._is_domain_blocked()
+   - Checks if category is blocked via fetcher._is_category_blocked()
+   - Default blocked categories: Marketing, Advertising, Wants-Money (domain_service.py:38-44)
+   - DomainService (domain_service.py) fetches blocked domains/categories from Control API
+
+3. Domain Blocking System:
+   - BlockedDomain model: {domain: str, reason: str}
+   - DomainService.fetch_blocked_domains() returns List[BlockedDomain]
+   - GmailFetcherService caches blocked domains in _blocked_domains set
+   - Emails from blocked domains get category "Blocked_Domain" and are deleted
+
+4. Blocking Recommendations Feature (already exists):
+   - BlockingRecommendationService (services/blocking_recommendation_service.py)
+   - Analyzes category tallies to recommend categories to block
+   - Returns BlockingRecommendationResult with recommendations list
+   - Tests in tests/test_blocking_recommendations.py
+   - BDD feature in tests/bdd/blocking-recommendations.feature
+
+5. Email Sending Capabilities:
+   - MailtrapProvider (email_providers/mailtrap.py) - sends via Mailtrap API
+   - EmailSender class (send_emails.py) - uses SMTP with Mailtrap
+   - Uses MAILTRAP_API_TOKEN env var
+   - EmailMessage model (models/email_models.py) for structured email content
+
+Required Changes for Task:
+1. Modify process_account response model to include:
+   - List of recommended domains to block (new domains seen in Marketing/Advertising/Wants-Money)
+   - Count of recommended domains
+2. After processing, collect domains from emails categorized as Marketing/Advertising/Wants-Money
+   that are NOT already in blocked_domains list
+3. Send email notification to the processed account with "Domains recommended to be blocked"
+4. Use existing MailtrapProvider or EmailSender to send the notification
+
+Features: 0/1 complete (feature_list.md has FEAT-001)
+
+Next: Invoking architect agent to create specification
+---

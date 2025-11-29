@@ -1,0 +1,82 @@
+[
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4e5Y6A/1764392377@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml -\r\n terragon/fix-flyway-migration-validation-7w1c6h (bc73cf8)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 05:14:29.409896",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/pull/73/c3590994675@github.com>",
+    "sender": "\"coderabbitai[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/cat-emails] Debug Flyway migration validation error (PR\r\n #73)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 05:14:33.039975",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/pull/73/c3590994702@github.com>",
+    "sender": "\"ai-reviewer2[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/cat-emails] Debug Flyway migration validation error (PR\r\n #73)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 05:14:37.370386",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/pull/73/review/3520477560@github.com>",
+    "sender": "\"coderabbitai[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/cat-emails] Debug Flyway migration validation error (PR\r\n #73)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 05:14:40.604716",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4fB35Q/1764392643@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml -\r\n terragon/fix-flyway-migration-validation-7w1c6h (c146756)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 05:14:44.946686",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<v8ukoep2g7hrhvgq50nawuv30g0llf9hkvo2z@convertkit-mail4.com>",
+    "sender": "Infograpia <hello@infograpia.com>",
+    "subject": "1 Hour Left =?UTF-8?B?4pqg77iPIERvbuKAmXQ=?= lose your Black Friday\r\n upgrade",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 05:14:47.452819",
+    "sender_domain": "infograpia.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4fEqSg/1764392745@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml - master (431de54)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 05:14:57.575875",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4fNwHQ/1764393116@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml - master (9bd1fc5)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 05:15:01.163516",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  }
+]

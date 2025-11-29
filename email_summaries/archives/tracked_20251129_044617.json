@@ -1,0 +1,82 @@
+[
+  {
+    "message_id": "<test-1@example.com>",
+    "sender": "billing@company.com",
+    "subject": "Invoice Payment Due",
+    "category": "WantsMoney",
+    "action": "kept",
+    "processed_at": "2025-11-27 19:16:21.285430",
+    "sender_domain": "company.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<test-2@example.com>",
+    "sender": "admin@workplace.com",
+    "subject": "Meeting Schedule Update",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-27 19:16:21.286234",
+    "sender_domain": "workplace.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<test-3@example.com>",
+    "sender": "pm@workplace.com",
+    "subject": "Project Status Report",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-27 19:16:21.286995",
+    "sender_domain": "workplace.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<test-4@example.com>",
+    "sender": "friend@personal.com",
+    "subject": "Hello from your friend",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-27 19:16:21.287695",
+    "sender_domain": "personal.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<test-5@example.com>",
+    "sender": "service@subscriptions.com",
+    "subject": "Subscription Renewal Notice",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-27 19:16:21.288845",
+    "sender_domain": "subscriptions.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<test-6@example.com>",
+    "sender": "orders@ecommerce.com",
+    "subject": "Order Confirmation",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-27 19:16:21.289641",
+    "sender_domain": "ecommerce.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<test-7@example.com>",
+    "sender": "statements@bank.com",
+    "subject": "Account Statement",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-27 19:16:21.290403",
+    "sender_domain": "bank.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<test-8@example.com>",
+    "sender": "hr@company.com",
+    "subject": "Team Announcement",
+    "category": "Other",
+    "action": "kept",
+    "processed_at": "2025-11-27 19:16:21.291145",
+    "sender_domain": "company.com",
+    "was_pre_categorized": false
+  }
+]
