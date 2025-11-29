@@ -244,7 +244,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                             if sender_email:
                                 sender_domain = extract_domain(sender_email)
                                 # Get blocked domains from fetcher
-                                blocked_domains_set = fetcher._blocked_domains
+                                blocked_domains_set = fetcher.get_blocked_domains()
                                 # Collect the recommendation
                                 self.blocking_recommendation_collector.collect(
                                     sender_domain,

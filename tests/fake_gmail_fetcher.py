@@ -13,7 +13,7 @@ Usage:
     emails = fetcher.get_recent_emails(hours=2)
 """
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 from email.message import EmailMessage
 
 from services.gmail_fetcher_interface import GmailFetcherInterface
@@ -231,3 +231,7 @@ class FakeGmailFetcher(GmailFetcherInterface):
     def _is_category_blocked(self, category: str) -> bool:
         """Check if category is blocked (stub for testing - always False)."""
         return False
+
+    def get_blocked_domains(self) -> Set[str]:
+        """Return the set of blocked domains."""
+        return self._blocked_domains

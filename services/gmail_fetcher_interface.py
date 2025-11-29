@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Set
 from email import message_from_bytes
 
 
@@ -35,5 +35,10 @@ class GmailFetcherInterface(ABC):
     @abstractmethod
     def delete_email(self, message_id: str) -> bool:
         """Move a message to Trash and expunge the original."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_blocked_domains(self) -> Set[str]:
+        """Return the set of blocked domains."""
         raise NotImplementedError
 

@@ -572,6 +572,10 @@ class GmailFetcher:
             logger.error(f"Error deleting email {message_id}: {str(e)}")
             return False
 
+    def get_blocked_domains(self) -> Set[str]:
+        """Return the set of blocked domains."""
+        return self._blocked_domains
+
 def print_summary(hours: int, stats: dict):
     """Print a summary of email processing results."""
     print("\n" + "="*50)
