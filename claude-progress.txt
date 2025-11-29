@@ -1,0 +1,27 @@
+=== Session 20251129-043217 ===
+Workflow: exploration
+Task: General project exploration and context setup
+Status: Initialized
+Context: Explored project structure - AI-powered Gmail email categorizer
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for API service
+- Database: SQLAlchemy with MySQL/SQLite support
+- ML/AI: OpenAI API compatible (RequestYAI, Ollama)
+- Testing: pytest with BDD (Gherkin feature files)
+- Email: IMAP for Gmail, Mailtrap/SMTP for sending
+- Build: Docker, Makefile
+
+Key Components:
+- api_service.py: FastAPI REST API (100k+ lines)
+- gmail_fetcher.py: Main email fetcher and processor
+- services/: Business logic layer (60+ service files)
+- models/: Pydantic models and SQLAlchemy ORM
+- repositories/: Data access layer (MySQL, SQLAlchemy)
+- tests/: Unit tests with BDD scenarios
+
+Features: No feature_list.md found - created example at .feature_list.md.example
+
+Next: No next_agent specified - exploration complete
+---
