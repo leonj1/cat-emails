@@ -243,3 +243,18 @@ test-mailfrom-integration: email-test-build
 		-e SMTP_PASSWORD="$(SMTP_PASSWORD)" \
 		$(EMAIL_TEST_IMAGE_NAME) \
 		tests/test_mailfrom_integration.py
+
+# Run PendingRollbackError integration test with MySQL
+test-pending-rollback-integration:
+	@echo "Starting MySQL container for integration tests..."
+	docker compose -f docker-compose.test.yml up -d mysql-test
+	@echo "Waiting for MySQL to be healthy..."
+	@timeout 60 sh -c 'until docker compose -f docker-compose.test.yml exec -T mysql-test mysqladmin ping -h localhost -u root -prootpassword 2>/dev/null; do sleep 2; done'
+	@echo "Running PendingRollbackError integration tests..."
+	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit integration-test
+	@echo "Cleaning up..."
+	docker compose -f docker-compose.test.yml down -v
+
+# Clean up integration test containers
+test-integration-clean:
+	docker compose -f docker-compose.test.yml down -v --remove-orphans
