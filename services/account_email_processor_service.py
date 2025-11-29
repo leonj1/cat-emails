@@ -222,6 +222,11 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 self.logs_collector
             )
 
+            # Get blocked domains once outside the loop if collector is present
+            blocked_domains_set = (
+                fetcher.get_blocked_domains() if self.blocking_recommendation_collector else set()
+            )
+
             for i, msg in enumerate(new_emails, 1):
                 logger.info(f"    ⚡ Processing email {i}/{len(new_emails)}")
                 self.processing_status_manager.update_status(
@@ -250,8 +255,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                             sender_email = email_extractor.extract_sender_email(from_header)
                             if sender_email:
                                 sender_domain = extract_domain(sender_email)
-                                # Get blocked domains from fetcher
-                                blocked_domains_set = fetcher.get_blocked_domains()
                                 # Collect the recommendation
                                 self.blocking_recommendation_collector.collect(
                                     sender_domain,
@@ -260,8 +263,8 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                                 )
                     except (ValueError, AttributeError) as e:
                         logger.warning(f"Failed to collect domain recommendation: {e}")
-                    except Exception as e:
-                        logger.exception(f"Unexpected error collecting domain recommendation: {e}")
+                    except Exception:
+                        logger.exception("Unexpected error collecting domain recommendation")
 
                 # Update status for labeling periodically
                 if i % 3 == 2:
@@ -346,12 +349,12 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                             )
                         except (ConnectionError, TimeoutError, ValueError) as e:
                             logger.warning(f"Failed to send recommendation notification: {e}")
-                        except Exception as e:
-                            logger.exception(f"Unexpected error sending notification: {e}")
+                        except Exception:
+                            logger.exception("Unexpected error sending recommendation notification")
                 except (AttributeError, ValueError, KeyError) as e:
                     logger.warning(f"Failed to get recommendation summary: {e}")
-                except Exception as e:
-                    logger.exception(f"Unexpected error in recommendation summary: {e}")
+                except Exception:
+                    logger.exception("Unexpected error in recommendation summary")
 
             result = {
                 "account": email_address,
