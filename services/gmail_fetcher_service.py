@@ -424,4 +424,4 @@ class GmailFetcher(GmailFetcherInterface):
 
     def get_blocked_domains(self) -> Set[str]:
         """Return the set of blocked domains."""
-        return self._blocked_domains
+        return self._blocked_domains.copy()
