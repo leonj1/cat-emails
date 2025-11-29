@@ -758,9 +758,9 @@ class MySQLRepository(DatabaseRepositoryInterface):
             query = session.query(AccountCategoryStats).filter_by(account_id=account_id)
 
             if start_date:
-                query = query.filter(AccountCategoryStats.processing_date >= start_date)
+                query = query.filter(AccountCategoryStats.date >= start_date)
             if end_date:
-                query = query.filter(AccountCategoryStats.processing_date <= end_date)
+                query = query.filter(AccountCategoryStats.date <= end_date)
 
             return query.all()
         except SQLAlchemyError:
@@ -778,17 +778,17 @@ class MySQLRepository(DatabaseRepositoryInterface):
         """Update or create category statistics for account"""
         if processing_date is None:
             processing_date = date.today()
-        
+
         session = self._get_session()
-        
+
         try:
             # Try to find existing stat
             stat = session.query(AccountCategoryStats).filter_by(
                 account_id=account_id,
                 category=category,
-                processing_date=processing_date
+                date=processing_date
             ).first()
-            
+
             if stat:
                 stat.email_count += count_increment
                 stat.updated_at = datetime.utcnow()
@@ -797,7 +797,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
                     account_id=account_id,
                     category=category,
                     email_count=count_increment,
-                    processing_date=processing_date
+                    date=processing_date
                 )
                 session.add(stat)
             
