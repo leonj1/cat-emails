@@ -574,7 +574,7 @@ class GmailFetcher:
 
     def get_blocked_domains(self) -> Set[str]:
         """Return the set of blocked domains."""
-        return self._blocked_domains
+        return self._blocked_domains.copy()
 
 def print_summary(hours: int, stats: dict):
     """Print a summary of email processing results."""
