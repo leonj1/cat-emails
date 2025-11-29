@@ -25,3 +25,68 @@ Features: No feature_list.md found - created example at .feature_list.md.example
 
 Next: No next_agent specified - exploration complete
 ---
+
+=== Session 20251129-045500 ===
+Workflow: debugger
+Task: Flyway migration validation failure - detected resolved migration not applied to database: 2025112900
+Status: Complete
+Context: Comprehensive forensic investigation of Flyway configuration using CRASH-RCA protocol
+
+Key Findings from Comprehensive Investigation:
+
+1. Repository Analysis:
+   - CLAUDE.md:4-5 claims: "Database schemas get applied from ./sql folder. Dockerfile has entrypoint that applied database schemas using flyway."
+   - No ./sql folder exists in repository (verified via find, ls, git log)
+   - No .sql files found anywhere in repository
+   - No Flyway configuration files (flyway.conf, flyway.toml, etc.)
+   - No reference to migration version "2025112900" found in codebase
+
+2. Git History Verification (addressing CodeRabbit review):
+   - .gitignore: No sql/ or *.sql exclusions found
+   - git log --all --full-history: No commits mentioning sql/ or flyway
+   - git log --diff-filter=D: No deleted SQL or Flyway files in history
+   - Conclusion: sql/ folder never existed in this repository
+
+3. Docker/Container Configuration Check:
+   - Examined all Dockerfiles (Dockerfile, Dockerfile.api, Dockerfile.service, etc.)
+   - No Flyway installation or entrypoint scripts found
+   - All entrypoints use Python scripts (api_service.py, gmail_fetcher_service.py, etc.)
+   - docker-compose.yml: No Flyway service, no migration containers
+
+4. CI/CD Pipeline Inspection:
+   - Only workflow: .github/workflows/presubmit-review.yml (CodeRabbit AI review)
+   - No deployment pipelines
+   - No Flyway-related CI/CD steps
+
+5. Railway Deployment Investigation:
+   - railway.json: Uses standard Dockerfile, no Flyway references
+   - Error logs show messages ("Deriving Flyway config", "Cleaning up failed migrations") that don't exist anywhere in this repository
+   - Conclusion: Flyway execution happens in Railway's infrastructure layer, not from this codebase
+
+6. Actual Migration System:
+   - Project uses Python-based migrations in /root/repo/migrations/
+   - Migration files: 001-004 (*.py format, not .sql)
+   - Uses migrate.py runner with SQLAlchemy
+
+Root Cause Analysis:
+- The error "Detected resolved migration not applied to database: 2025112900" means:
+  * Flyway FOUND a migration file V2025112900*.sql somewhere
+  * But this migration is NOT in the database's flyway_schema_history table
+  * Flyway's default validation rejects out-of-order migrations
+- The Flyway service and sql/ folder exist in Railway's external infrastructure (possibly a Railway Template, database migration service, or manual Railway project configuration)
+- The migration file V2025112900 (dated Nov 29, 2025 = today) was recently created/uploaded to Railway's migration folder
+- This repository has NO Flyway configuration - CLAUDE.md documentation is incorrect/aspirational
+
+Resolution Strategies:
+1. Query Railway console/dashboard to find the Flyway service configuration
+2. Locate the sql/ folder in Railway's filesystem (not in this repo)
+3. Either:
+   a) Add missing migration to Railway's sql/ folder or remove V2025112900
+   b) Enable outOfOrder=true in Railway's Flyway configuration
+   c) Run flyway baseline to reset migration history
+   d) Migrate from Flyway to the Python migration system already in this repo
+
+Features: 0/1 complete (feature_list.md exists with FEAT-001)
+
+Next: Update CLAUDE.md to reflect actual migration system, or investigate Railway console for Flyway configuration
+---
