@@ -9,7 +9,7 @@ logger = get_logger(__name__)
 
 
 class EmailCategorizerService(EmailCategorizerInterface):
-    """Service for categorizing emails using LLM with resilient error handling."""
+    """Service for categorizing emails using LLM with fail-fast error handling."""
 
     def __init__(self, llm_service_factory):
         """
@@ -29,18 +29,19 @@ class EmailCategorizerService(EmailCategorizerInterface):
             model: The model identifier to use for categorization
 
         Returns:
-            str: The category name, defaults to "Other" on errors
+            str: The category name
+
+        Raises:
+            RuntimeError: If LLM categorization fails (connection error, invalid response, etc.)
         """
-        try:
-            llm_service = self.llm_service_factory.create_service(model)
-            categorizer = LLMCategorizeEmails(llm_service=llm_service)
-            result = categorizer.category(contents)
+        llm_service = self.llm_service_factory.create_service(model)
+        categorizer = LLMCategorizeEmails(llm_service=llm_service)
+        result = categorizer.category(contents)
 
-            if isinstance(result, SimpleEmailCategory):
-                return result.value
+        if isinstance(result, SimpleEmailCategory):
+            return result.value
 
-            logger.warning(f"Categorization returned error or unexpected result: {result}")
-            return "Other"
-        except Exception as e:
-            logger.error(f"Failed to categorize email via LLMCategorizeEmails: {str(e)}")
-            return "Other"
+        # Fail fast on any error - do not fall back to "Other"
+        error_detail = getattr(result, 'detail', str(result))
+        error_type = getattr(result, 'error', 'UnknownError')
+        raise RuntimeError(f"LLM categorization failed: {error_type} - {error_detail}")

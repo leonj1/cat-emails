@@ -332,8 +332,12 @@ class GmailFetcher(GmailFetcherInterface):
 
         # Calculate the date threshold with timezone information
         date_threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
-        date_str = date_threshold.strftime("%d-%b-%Y")
-        logger.debug(f"Using date threshold: {date_str}")
+        # Use 1 day before the threshold for IMAP SINCE search to handle timezone differences
+        # IMAP SINCE is date-only (no time) and uses server's local timezone, which may differ from UTC
+        # We compensate by searching from the previous day and filtering by exact timestamp in Python
+        imap_search_date = date_threshold - timedelta(days=1)
+        date_str = imap_search_date.strftime("%d-%b-%Y")
+        logger.debug(f"Using IMAP search date: {date_str} (actual threshold: {date_threshold})")
 
         # Search for emails after the threshold
         search_criteria = f'(SINCE "{date_str}")'
