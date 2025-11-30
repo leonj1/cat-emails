@@ -609,8 +609,12 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     logger.info("Starting email processing")
     logger.info(f"Processing emails from the last {hours} hours")
 
-    # Initialize logs collector service
-    logs_collector = LogsCollectorService()
+    # Read SEND_LOGS feature flag from environment
+    send_logs_raw = os.environ.get("SEND_LOGS", "false").lower().strip()
+    send_logs_enabled = send_logs_raw in ("true", "1", "yes")
+
+    # Initialize logs collector service with explicit flag
+    logs_collector = LogsCollectorService(send_logs=send_logs_enabled)
     logs_collector.send_log(
         "INFO",
         f"Email processing started for {email_address}",

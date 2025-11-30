@@ -13,21 +13,25 @@ from datetime import datetime, timedelta
 from urllib.parse import urlparse
 import json
 
+from services.logs_collector_interface import ILogsCollector
+
 
 logger = get_logger(__name__)
 
 
-class LogsCollectorService:
+class LogsCollectorService(ILogsCollector):
     """Service for sending application logs to LOGS_COLLECTOR_API."""
 
-    def __init__(self, api_url: Optional[str] = None, api_token: Optional[str] = None):
+    def __init__(self, send_logs: bool, api_url: Optional[str] = None, api_token: Optional[str] = None):
         """
         Initialize the logs collector service.
 
         Args:
+            send_logs: Whether to enable log sending
             api_url: URL of the logs collector API (defaults to LOGS_COLLECTOR_API env var)
             api_token: Authentication token for the API (defaults to LOGS_COLLECTOR_TOKEN or LOGS_COLLECTOR_API_TOKEN env var)
         """
+        self._send_logs = send_logs
         self.api_url = api_url or os.getenv("LOGS_COLLECTOR_API")
         # Support both LOGS_COLLECTOR_TOKEN (deployment) and LOGS_COLLECTOR_API_TOKEN (local) env vars
         self.api_token = api_token or os.getenv("LOGS_COLLECTOR_TOKEN") or os.getenv("LOGS_COLLECTOR_API_TOKEN")
@@ -48,6 +52,16 @@ class LogsCollectorService:
             logger.info(f"LogsCollectorService initialized with API: {self.api_url}")
             # Pre-resolve DNS on initialization
             self._resolve_dns(self.api_url)
+
+    @property
+    def is_send_enabled(self) -> bool:
+        """
+        Check if log sending is enabled.
+
+        Returns:
+            bool: True if log sending is enabled, False otherwise
+        """
+        return self._send_logs
 
     def _resolve_dns(self, url: str) -> Optional[str]:
         """
@@ -181,7 +195,13 @@ class LogsCollectorService:
         Returns:
             bool: True if log was sent successfully, False otherwise
         """
+        # Check send_logs flag FIRST
+        if not self._send_logs:
+            logger.debug("Log sending disabled by feature flag")
+            return False
+
         if not self.enabled:
+            logger.debug("Log sending disabled: no API URL configured")
             return False
 
         try:

@@ -20,7 +20,8 @@ from models.email_summary import (
 )
 from services.database_service import DatabaseService
 from clients.account_category_client import AccountCategoryClient
-from services.logs_collector_service import LogsCollectorService
+from services.logs_collector_interface import ILogsCollector
+from services.logs_collector_service import LogsCollectorService  # noqa: F401 - Imported for test patching only
 
 
 logger = get_logger(__name__)
@@ -30,7 +31,7 @@ class EmailSummaryService:
     """Service for tracking processed emails and generating summaries."""
     
     def __init__(self, data_dir: str = "./email_summaries", use_database: bool = True,
-                 gmail_email: Optional[str] = None, logs_collector: Optional[LogsCollectorService] = None,
+                 gmail_email: Optional[str] = None, logs_collector: Optional[ILogsCollector] = None,
                  repository=None):
         """
         Initialize the summary service.
@@ -39,7 +40,7 @@ class EmailSummaryService:
             data_dir: Directory to store summary data
             use_database: Whether to persist summaries to database
             gmail_email: Gmail account email for account tracking (optional)
-            logs_collector: LogsCollectorService instance (optional, creates new if not provided)
+            logs_collector: ILogsCollector instance (optional)
             repository: MySQLRepository instance for dependency injection (optional, creates new if not provided)
         """
         self.data_dir = Path(data_dir)
@@ -52,7 +53,7 @@ class EmailSummaryService:
         self.gmail_email = gmail_email
 
         # Initialize logs collector service
-        self.logs_collector = logs_collector if logs_collector is not None else LogsCollectorService()
+        self.logs_collector = logs_collector
 
         # Initialize database service if enabled
         self.use_database = use_database
@@ -127,12 +128,13 @@ class EmailSummaryService:
         self.performance_metrics['total_emails'] = 0
 
         # Send log to collector
-        self.logs_collector.send_log(
-            "INFO",
-            f"Processing run started for {self.gmail_email or 'unknown'}",
-            {"scan_hours": scan_hours, "gmail_email": self.gmail_email},
-            "email-summary-service"
-        )
+        if self.logs_collector:
+            self.logs_collector.send_log(
+                "INFO",
+                f"Processing run started for {self.gmail_email or 'unknown'}",
+                {"scan_hours": scan_hours, "gmail_email": self.gmail_email},
+                "email-summary-service"
+            )
         
         # Get or create account if account service is available and gmail_email is set
         if self.account_service and self.gmail_email:
@@ -175,13 +177,14 @@ class EmailSummaryService:
 
         # Send log to collector
         status = "completed" if success else "failed"
-        self.logs_collector.send_processing_run_log(
-            run_id=str(self.current_run_id) if self.current_run_id else "unknown",
-            status=status,
-            metrics=self.run_metrics,
-            error=error_message,
-            source="email-summary-service"
-        )
+        if self.logs_collector:
+            self.logs_collector.send_processing_run_log(
+                run_id=str(self.current_run_id) if self.current_run_id else "unknown",
+                status=status,
+                metrics=self.run_metrics,
+                error=error_message,
+                source="email-summary-service"
+            )
 
         if self.db_service and self.use_database and self.current_run_id:
             self.db_service.complete_processing_run(
@@ -242,14 +245,15 @@ class EmailSummaryService:
             logger.debug(f"Tracked email: {message_id}")
 
             # Send log to collector
-            self.logs_collector.send_email_processing_log(
-                message_id=message_id,
-                category=category,
-                action=action,
-                sender=sender,
-                processing_time=processing_time,
-                source="email-summary-service"
-            )
+            if self.logs_collector:
+                self.logs_collector.send_email_processing_log(
+                    message_id=message_id,
+                    category=category,
+                    action=action,
+                    sender=sender,
+                    processing_time=processing_time,
+                    source="email-summary-service"
+                )
 
             # Update statistics for database
             if self.use_database:

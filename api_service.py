@@ -182,6 +182,9 @@ API_KEY = os.getenv("API_KEY")
 CONTROL_API_TOKEN = os.getenv("CONTROL_API_TOKEN", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "vertex/google/gemini-2.5-flash")
 
+# Feature flags - Read SEND_LOGS at startup
+SEND_LOGS_ENABLED = os.getenv("SEND_LOGS", "false").lower() in ("true", "1", "yes")
+
 # Validate critical environment variables at startup
 def validate_environment():
     """Validate that all required environment variables are set."""
@@ -285,6 +288,9 @@ email_categorizer_service = EmailCategorizerService(llm_service_factory)
 # Global WebSocket auth service instance
 websocket_auth_service = WebSocketAuthService(API_KEY)
 
+# Global logs collector service instance
+logs_collector_service = LogsCollectorService(send_logs=SEND_LOGS_ENABLED)
+
 # Global account email processor service instance (will be initialized with dependencies below)
 account_email_processor_service: Optional[AccountEmailProcessorService] = None
 
@@ -357,7 +363,8 @@ def _initialize_account_email_processor():
             api_token=CONTROL_API_TOKEN,
             llm_model=LLM_MODEL,
             account_category_client=AccountCategoryClient(repository=settings_service.repository),
-            deduplication_factory=EmailDeduplicationFactory()
+            deduplication_factory=EmailDeduplicationFactory(),
+            logs_collector=logs_collector_service
             # create_gmail_fetcher defaults to GmailFetcher constructor
         )
     return account_email_processor_service

@@ -9,7 +9,8 @@ from services.categorize_emails_interface import SimpleEmailCategory
 from services.email_categorizer_interface import EmailCategorizerInterface
 from services.interfaces.email_extractor_interface import EmailExtractorInterface
 from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
-from services.logs_collector_service import LogsCollectorService
+from services.logs_collector_interface import ILogsCollector
+from services.logs_collector_service import LogsCollectorService  # noqa: F401 - Imported for test patching only
 
 logger = get_logger(__name__)
 
@@ -28,7 +29,7 @@ class EmailProcessorService:
         model: str,
         email_categorizer: EmailCategorizerInterface,
         email_extractor: EmailExtractorInterface,
-        logs_collector: Optional[LogsCollectorService] = None,
+        logs_collector: Optional[ILogsCollector] = None,
     ) -> None:
         """Initialize the service.
 
@@ -47,7 +48,7 @@ class EmailProcessorService:
         self.email_extractor = email_extractor
 
         # Initialize logs collector service
-        self.logs_collector = logs_collector if logs_collector is not None else LogsCollectorService()
+        self.logs_collector = logs_collector
 
         # Aggregated results for the whole batch
         self.category_actions: Dict[str, Dict[str, int]] = {}
@@ -106,22 +107,24 @@ class EmailProcessorService:
                 category = "Blocked_Domain"
                 pre_categorized = True
                 deletion_candidate = True
-                self.logs_collector.send_log(
-                    "INFO",
-                    f"Email from blocked domain: {sender_domain}",
-                    {"sender": sender_email, "domain": sender_domain, "subject": subject[:50]},
-                    "email-processor"
-                )
+                if self.logs_collector:
+                    self.logs_collector.send_log(
+                        "INFO",
+                        f"Email from blocked domain: {sender_domain}",
+                        {"sender": sender_email, "domain": sender_domain, "subject": subject[:50]},
+                        "email-processor"
+                    )
             elif self.fetcher._is_domain_allowed(from_header):
                 category = "Allowed_Domain"
                 pre_categorized = True
                 deletion_candidate = False
-                self.logs_collector.send_log(
-                    "INFO",
-                    f"Email from allowed domain: {sender_domain}",
-                    {"sender": sender_email, "domain": sender_domain, "subject": subject[:50]},
-                    "email-processor"
-                )
+                if self.logs_collector:
+                    self.logs_collector.send_log(
+                        "INFO",
+                        f"Email from allowed domain: {sender_domain}",
+                        {"sender": sender_email, "domain": sender_domain, "subject": subject[:50]},
+                        "email-processor"
+                    )
             else:
                 category = "Other"  # placeholder, will be overwritten if not pre_categorized
 
@@ -271,17 +274,18 @@ class EmailProcessorService:
             print(f"Skipping email due to error: {e}")
 
             # Send error log
-            self.logs_collector.send_log(
-                "ERROR",
-                f"Failed to process email: {str(e)}",
-                {
-                    "message_id": message_id,
-                    "sender": from_header,
-                    "subject": subject[:50] if subject else "",
-                    "error": str(e)
-                },
-                "email-processor"
-            )
+            if self.logs_collector:
+                self.logs_collector.send_log(
+                    "ERROR",
+                    f"Failed to process email: {str(e)}",
+                    {
+                        "message_id": message_id,
+                        "sender": from_header,
+                        "subject": subject[:50] if subject else "",
+                        "error": str(e)
+                    },
+                    "email-processor"
+                )
             return None
 
         return category
