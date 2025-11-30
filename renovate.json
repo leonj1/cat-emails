@@ -1,0 +1,43 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "labels": ["dependencies", "renovate"],
+  "timezone": "UTC",
+  "schedule": ["before 6am on Monday"],
+  "prHourlyLimit": 5,
+  "prConcurrentLimit": 10,
+  "pip_requirements": {
+    "fileMatch": ["requirements\\.txt$", "requirements-.*\\.txt$"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["pip_requirements"],
+      "groupName": "Python dependencies",
+      "groupSlug": "python-deps"
+    },
+    {
+      "matchManagers": ["dockerfile"],
+      "groupName": "Docker dependencies",
+      "groupSlug": "docker-deps"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "enabled": true
+  }
+}
