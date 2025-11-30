@@ -34,6 +34,7 @@ ENV SUMMARY_RECIPIENT_EMAIL=""
 ENV SMTP_USERNAME=""
 ENV OLLAMA_HOST_PRIMARY="10.1.1.247:11434"
 ENV OLLAMA_HOST_SECONDARY="10.1.1.212:11434"
+ENV DATABASE_PATH="/app/email_summaries/summaries.db"
 
 # Email schedule configuration (24-hour format, Eastern Time)
 ENV MORNING_HOUR="8"

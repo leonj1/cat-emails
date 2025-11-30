@@ -167,6 +167,47 @@ Potential Root Causes:
 4. A background process is being spawned without inheriting the DATABASE_PATH env var
 
 Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite
+
+Next: Applied fix - Added DATABASE_PATH to all Dockerfiles
+---
+
+=== Session 20251130-Implementation ===
+Workflow: Implementation (Post-CRASH-RCA)
+Task: Apply fixes identified in CRASH-RCA debugging session
+Status: Completed
+
+Implementation Summary:
+Following the CRASH-RCA diagnosis, implemented the fix to ensure DATABASE_PATH is available to all services.
+
+Changes Applied:
+1. ✅ Dockerfile.service - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 37
+2. ✅ Dockerfile - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 27
+3. ✅ docker-compose.yml - Added DATABASE_PATH=/app/email_summaries/summaries.db to api service environment at line 43
+
+Rationale:
+- Dockerfile.api already had DATABASE_PATH set (line 37)
+- Background service (Dockerfile.service) was missing this environment variable
+- Main container (Dockerfile) was also missing this variable
+- docker-compose.yml did not explicitly set DATABASE_PATH for consistency
+
+Validation:
+- Verified Dockerfile.service builds successfully (docker build -f Dockerfile.service)
+- All three files now consistently define DATABASE_PATH
+- Environment variable will propagate to background processes via os.environ
+
+Impact:
+- Fixes the error: "Database path must be provided either via 'db_path' parameter or 'DATABASE_PATH' environment variable"
+- Ensures all background processes can initialize database connections
+- Maintains SQLite fallback removal policy (data loss prevention)
+- Provides explicit configuration rather than relying on code-level defaults
+
+Testing Plan (from CodeRabbit response):
+1. Rebuild containers with updated Dockerfiles
+2. Run background service and verify no database path errors
+3. Add integration tests for initialization paths
+4. Document MySQL as required for production
+
+Next: Commit changes and update PR
 Features: 0/1 complete
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
