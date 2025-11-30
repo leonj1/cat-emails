@@ -40,6 +40,7 @@ services:
       - MYSQL_DATABASE=${MYSQL_DATABASE:-cat_emails}
       - MYSQL_USER=${MYSQL_USER:-cat_emails}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-cat_emails_password}
+      - DATABASE_PATH=/app/email_summaries/summaries.db
     volumes:
       - ./email_summaries:/app/email_summaries
     depends_on:

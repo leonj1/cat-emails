@@ -24,6 +24,7 @@ COPY . .
 ENV GMAIL_EMAIL=""
 ENV GMAIL_PASSWORD=""
 ENV PYTHONUNBUFFERED=1
+ENV DATABASE_PATH="/app/email_summaries/summaries.db"
 
 # Default to running the API service
 CMD ["python", "api_service.py"]
