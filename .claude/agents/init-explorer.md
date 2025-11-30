@@ -49,21 +49,20 @@ if [ -f claude-progress.txt ]; then cat claude-progress.txt; fi
 
 If it doesn't exist, you'll create it in Step 6.
 
-### Step 3: Read Feature List
+### Step 3: Read Architect's Digest
 
-Check if `feature_list.md` exists and read it:
+Check if `architects_digest.md` exists and read it:
 
 ```bash
-if [ -f feature_list.md ]; then cat feature_list.md; fi
+if [ -f architects_digest.md ]; then cat architects_digest.md; fi
 ```
 
 If it exists:
-- Count how many features are marked `[x]` (complete) vs `[ ]` (incomplete)
-- Identify the next incomplete feature to work on
-- Report: "Features: X/Y complete. Next: <feature description>"
+- Identify the current active task (First item under "Active Stack" not marked as Done)
+- Report: "Active Task: <task description>"
 
 If it doesn't exist:
-- You will create an example file after exploration (Step 5)
+- You will create it in Step 5.
 
 ### Step 4: Explore Project Structure
 
@@ -80,45 +79,24 @@ Analyze this project and return:
 ")
 ```
 
-### Step 5: Create Feature List Example (If Missing)
+### Step 5: Create Architect's Digest (If Missing)
 
-If `feature_list.md` does not exist:
+If `architects_digest.md` does not exist:
 
-Create an example file `.feature_list.md.example` to show the expected format:
+Create the file `architects_digest.md` to track the recursive breakdown of tasks:
 
 ```markdown
-# Feature List: Example Project Name
+# Architect's Digest
+> Status: Planning
 
-> Created: 2025-01-29
-> Status: 0/2 features complete
+## Active Stack
+1. $ARGUMENTS (Pending)
 
-## Functional Features
-
-### FEAT-001: User can perform the primary action
-- **Category**: functional
-- **Status**: [ ] Incomplete
-- **Steps**:
-  1. Setup preconditions
-  2. Execute the action
-  3. Verify the result
-
-## Error Handling Features
-
-### FEAT-002: System handles invalid input gracefully
-- **Category**: error-handling
-- **Status**: [ ] Incomplete
-- **Steps**:
-  1. Provide invalid input
-  2. Verify error message displayed
-  3. Verify system remains stable
+## Completed
+(empty)
 ```
 
-**Important**:
-- The example file is `.feature_list.md.example` (note the leading dot)
-- The user should copy this to `feature_list.md` and customize it for their project
-- Break down the task into 10-50 granular, testable features
-- Include functional, error-handling, and edge-case features
-- Mark features as `[x] Complete` or `[ ] Incomplete`
+**Note**: This file replaces the flat `feature_list.md`. It allows for nested sub-tasks (e.g., 1.1, 1.2) as the Architect decomposes complex features.
 
 ### Step 6: Update Progress File
 
@@ -145,8 +123,8 @@ Based on the `next_agent` parameter:
   Task(subagent_type="architect", prompt="
   Create a DRAFT spec for: <task>
 
-  Note: If feature_list.md exists, work on ONE feature at a time.
-  If it doesn't exist, an example has been created at .feature_list.md.example
+  Note: Work on the top item in architects_digest.md.
+  If it doesn't exist, it has been initialized with the current task.
   ")
   ```
 
@@ -184,26 +162,21 @@ Evidence: src/db/config.py:12
 ---
 ```
 
-## Feature List Format
+## Architect's Digest Format
 
-The `feature_list.md` tracks implementation progress:
+The `architects_digest.md` tracks recursive task decomposition:
 
 ```markdown
-# Feature List: User Authentication System
+# Architect's Digest
+> Status: In Progress
 
-> Created: 2025-01-29
-> Status: 0/1 features complete
+## Active Stack
+1. Manage Orders (Decomposed)
+   1.1 Create Order (In Progress)
+   1.2 Update Order (Pending)
 
-## Functional Features
-
-### AUTH-001: User can register with email and password
-- **Category**: functional
-- **Status**: [ ] Incomplete
-- **Steps**:
-  1. Navigate to registration page
-  2. Enter valid email and password
-  3. Submit form
-  4. Verify account created
+## Completed
+- [x] User Login
 ```
 
 ## What NOT To Do
@@ -228,7 +201,7 @@ Call the stuck agent IMMEDIATELY if:
 
 - [ ] Project context understood (tech stack, structure, patterns)
 - [ ] Progress file read (if exists) or created
-- [ ] Feature list read (if exists) or example created (`.feature_list.md.example`)
+- [ ] Architect's Digest read (if exists) or created
 - [ ] Git history reviewed
 - [ ] Progress file updated with session start
 - [ ] Next agent invoked with full arguments

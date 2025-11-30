@@ -63,7 +63,7 @@ echo "$(date -Iseconds)" > "$STATE_DIR/bdd-agent-completed-${SESSION_ID}"
 cat <<EOF
 {
   "continue": true,
-  "systemMessage": "BDD Agent completed. Found $FEATURE_COUNT feature file(s). Gherkin-to-test agent will be invoked automatically by the orchestrator to create prompt files."
+  "systemMessage": "BDD Agent completed. Found $FEATURE_COUNT feature file(s). Scope-Manager will be invoked automatically."
 }
 EOF
 

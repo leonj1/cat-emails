@@ -10,7 +10,7 @@ You are the ORCHESTRATOR for the BDD-TDD pipeline. Use the Task tool to execute 
 ## Pipeline Overview
 
 ```plaintext
-init-explorer → Architect → BDD-Agent → (hook) → Gherkin-to-Test → (hook) → Run-Prompt →
+init-explorer → Architect → BDD-Agent → Scope-Manager → (hook) → Gherkin-to-Test → (hook) → Run-Prompt →
   [For each prompt: test-creator → coder → standards → tester]
 ```
 
@@ -56,10 +56,35 @@ Create BDD spec summary: specs/BDD-SPEC-[feature-name].md
 Wait for bdd-agent to complete.
 
 **HOOK SIGNAL**: After bdd-agent completes, you will see a system message:
-> "BDD Agent completed. Gherkin-to-test agent will be invoked automatically by the orchestrator."
+> "BDD Agent completed. Scope-Manager will be invoked automatically."
 
-### 3. **Gherkin-to-Test Phase** (Convert BDD to Prompts)
-When you see the bdd-agent completion signal, invoke `gherkin-to-test` with:
+### 3. **Scope Validation Phase** (Complexity Guardrail)
+
+Invoke `scope-manager` with:
+```text
+Analyze the generated BDD feature files in ./tests/bdd/
+Determine if the scope is safe for implementation.
+```
+
+**Branching Logic based on Scope-Manager Result**:
+
+#### **PATH A: FAIL (Too Complex)**
+If Scope Manager returns `RESULT: FAIL` and `TARGET_TASK: [Name]`:
+
+1.  **Do NOT** proceed to Gherkin-to-Test.
+2.  **Loop Back** to the **Architect** agent with this precise instruction:
+    ```text
+    The previous design failed scope check. Break task '[TARGET_TASK]' down in `architects_digest.md` into smaller sub-components.
+    Once decomposed, immediately pick the first sub-task and create a new DRAFT spec for it.
+    ```
+3.  **Restart** the process from the BDD Phase for this new sub-task.
+
+#### **PATH B: PASS (Safe)**
+If Scope Manager returns `RESULT: PASS`:
+Proceed to the Gherkin-to-Test phase.
+
+### 4. **Gherkin-to-Test Phase** (Convert BDD to Prompts)
+When Scope Manager approves, invoke `gherkin-to-test` with:
 ```text
 Convert the confirmed BDD scenarios to prompt files:
 
@@ -78,7 +103,7 @@ Wait for gherkin-to-test to complete.
 **HOOK SIGNAL**: After gherkin-to-test completes, you will see a system message:
 > "Gherkin-to-test agent completed. Run-prompt will be invoked automatically by the orchestrator with: run-prompt [numbers] --sequential"
 
-### 4. **Run-Prompt Phase** (TDD Implementation)
+### 5. **Run-Prompt Phase** (TDD Implementation)
 When you see the gherkin-to-test completion signal, invoke `run-prompt` command with the prompt numbers provided in the signal.
 
 Example: If signal says "run-prompt 006 007 008 --sequential", execute:
@@ -94,8 +119,17 @@ For each prompt, the TDD flow will execute:
 
 Wait for all prompts to complete.
 
-### 5. **Completion Report**
-After all phases complete, provide a summary:
+### 6. **Completion & Continuation**
+
+**CRITICAL CHECK**: Before finishing, verify if this was part of a decomposed task list (e.g., in `architects_digest.md`).
+
+**IF Pending Sub-Tasks Exist:**
+1.  **Do NOT** stop or ask for confirmation.
+2.  Emit a brief status: "Phase Complete. Automatically starting next phase: [Next Task Name]..."
+3.  **Loop Back** to **Step 1 (Initialization)** or **Step 2 (BDD Phase)** to begin the next task immediately.
+
+**IF All Tasks Complete:**
+Provide the final summary:
 
 ```markdown
 **BDD-TDD Pipeline Complete**
@@ -106,8 +140,9 @@ After all phases complete, provide a summary:
 1. Init-Explorer: Project context gathered, feature list created
 2. Architect: specs/DRAFT-*.md created
 3. BDD: [N] scenarios confirmed by user
-4. Gherkin-to-Test: [M] prompt files created
-5. Run-Prompt: All prompts executed
+4. Scope-Manager: Validated feature complexity
+5. Gherkin-to-Test: [M] prompt files created
+6. Run-Prompt: All prompts executed
 
 **Artifacts Created**:
 - claude-progress.txt (updated)

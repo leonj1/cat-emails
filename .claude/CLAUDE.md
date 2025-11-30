@@ -97,6 +97,7 @@ Use this command to start a forensic Root Cause Analysis debugging session:
   - `init-explorer.md` - Initializer agent that explores codebase and sets up context
   - `architect.md` - Greenfield spec designer
   - `bdd-agent.md` - BDD specialist that generates Gherkin scenarios
+  - `scope-manager.md` - Complexity gatekeeper for BDD features
   - `gherkin-to-test.md` - Converts Gherkin to TDD prompts
   - `codebase-analyst.md` - Finds reuse opportunities
   - `refactor-decision-engine.md` - Decides if refactoring needed
@@ -140,7 +141,7 @@ The `init-explorer` agent is the **initializer** that runs at the start of `/arc
 
 1. **Orients to the project**: Runs `pwd`, `ls`, `git log`, `git status`
 2. **Reads progress history**: Checks `claude-progress.txt` for previous session context
-3. **Reads feature list**: Checks `feature_list.md` for implementation status
+3. **Reads digest**: Checks `architects_digest.md` for task stack and recursive state
 4. **Explores structure**: Uses the Explore agent to analyze tech stack and patterns
 5. **Updates progress**: Logs this session's start to `claude-progress.txt`
 6. **Invokes next agent**: Hands off to `architect` or `debugger` with full context
@@ -150,6 +151,7 @@ The `init-explorer` agent is the **initializer** that runs at the start of `/arc
 | File | Purpose |
 |------|---------|
 | `claude-progress.txt` | Session log showing what agents have done across context windows |
+| `architects_digest.md` | Recursive task breakdown and architecture state |
 | `feature_list.md` | Comprehensive feature requirements with completion status |
 | `.feature_list.md.example` | Example template created if `feature_list.md` is missing |
 
@@ -182,18 +184,23 @@ Located in `.claude/scripts/`:
 - Keep `README.md` in the root directory
 - Ensure all header/footer links have actual pages (no 404s)
 
+## Database Migration Rules (Flyway)
+
+If the project already has a `./sql` folder, you cannot modify any of these existing files since these are used for Flyway migrations. Your only option if you need to make changes to the database schema is to add new `.sql` files.
+
 ## Workflow Comparison
 
 ### BDD-TDD Workflow (`/architect`)
 **Best for**: New features with comprehensive test coverage, behavior-driven development
 
 **Flow**:
-1. `init-explorer` gathers project context, reads/creates `feature_list.md`
-2. `architect` creates greenfield spec
+1. `init-explorer` gathers project context, creates `architects_digest.md`
+2. `architect` creates greenfield spec (or decomposes complex tasks)
 3. `bdd-agent` generates Gherkin scenarios
-4. `gherkin-to-test` invokes codebase-analyst and creates prompts
-5. `run-prompt` executes prompts sequentially
-6. For each prompt:
+4. `scope-manager` validates complexity (loops back to Architect if too complex)
+5. `gherkin-to-test` invokes codebase-analyst and creates prompts
+6. `run-prompt` executes prompts sequentially
+7. For each prompt:
    - `test-creator` writes tests from Gherkin
    - `coder` implements to pass tests
    - `coding-standards-checker` verifies quality
