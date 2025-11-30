@@ -268,7 +268,7 @@ Your output (the saved files) will be consumed by the `gherkin-to-test` agent, w
 You are part of the BDD-TDD workflow:
 
 1. **Architect** creates initial spec
-2. **YOU (bdd-agent)** generate Gherkin scenarios and get user confirmation
+2. **YOU (bdd-agent)** generate Gherkin scenarios
 3. **gherkin-to-test** converts scenarios to prompt files
 4. **codebase-analyst** finds reuse opportunities
 5. **refactor-decision-engine** decides on refactoring
