@@ -1,0 +1,252 @@
+[
+  {
+    "message_id": "<0100019ad03c69a9-496b7ac4-28cb-49d6-9d24-7cc4bfc85bad-000000@email.amazonses.com>",
+    "sender": "Epic Books for Kids <hello@getepic.com>",
+    "subject": "Black Friday Savings! Just $5.25/month for unlimited reading.",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:27:53.767362",
+    "sender_domain": "getepic.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<sfog6RnsQ7qWMvltc_AofA@geopod-ismtpd-57>",
+    "sender": "Boots <boots@boot.dev>",
+    "subject": "Our Black Friday discount is here. But does learning code even\r\n matter?",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:27:55.937560",
+    "sender_domain": "boot.dev",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<mqZdpu-vTjKq3z-_Q6duYQ@geopod-ismtpd-29>",
+    "sender": "Etsy <email@email.etsy.com>",
+    "subject": "Small shops, big sales",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:27:58.164218",
+    "sender_domain": "email.etsy.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<E1020005-187C84A9E5E374DF-7186FAB5@shopify.com>",
+    "sender": "\"Zinus, Inc.\" <store+20974191@m.shopifyemail.com>",
+    "subject": "Limited-Time Mattress Deals Inside!",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:00.083062",
+    "sender_domain": "m.shopifyemail.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<mid-1764430043391d6589034bea6@response.email.consumerreports.org>",
+    "sender": "Consumer Reports <Consumer_Reports@email.consumerreports.org>",
+    "subject": "=?UTF-8?Q?Oops!_IN_CASE_YOU_MISSED_IT_=F0=9F=99=8C?=",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:03.609178",
+    "sender_domain": "email.consumerreports.org",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<TVxVx5G2TWiQgMQlW_Adrg@geopod-ismtpd-5>",
+    "sender": "Fracture <support@fractureme.com>",
+    "subject": "Best deal of the =?UTF-8?B?eWVhcuKAlHRoaXM=?= weekend only!",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:05.731075",
+    "sender_domain": "fractureme.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<6fb54-1509-692b1597@e.democrats.org>",
+    "sender": "\"Team DNC\" <feedback@e.democrats.org>",
+    "subject": "How we won in 2025",
+    "category": "WantsMoney",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:09.013384",
+    "sender_domain": "e.democrats.org",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<0.1.5D.61B.1DC6147A1F5376E.14858@mta2.frankspeech.com>",
+    "sender": "\"LindellTV\" <no-reply@frankspeech.com>",
+    "subject": "Almost Gone: Buy One Get One FREE BOGO Is Selling Fast - Ivermectin, HCQ & Mebendazole",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:11.376193",
+    "sender_domain": "frankspeech.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<0.0.17C.715.1DC6147F5B4DE72.61DA@vmta133.87.lstrk.net>",
+    "sender": "\"Blackstone Shooting Sports\" <hello@blackstoneshooting.com>",
+    "subject": "Saturday Steals - Blackstone Black Friday",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:13.220133",
+    "sender_domain": "blackstoneshooting.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<20251129155623.2e2a2a3e72f3af11@store.charlestyrwhitt.com>",
+    "sender": "Charles Tyrwhitt Black Friday <no-reply@store.charlestyrwhitt.com>",
+    "subject": "Last Call: 4 Shirts for $179 ends Tonight!",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:15.611811",
+    "sender_domain": "store.charlestyrwhitt.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<e755015b-5bb8-486a-b159-2cd4f8d852e7@iad4s12mta786.xt.local>",
+    "sender": "\"1 Hotel South Beach\" <southbeach@mail.1hotels.com>",
+    "subject": "=?UTF-8?B?QXdha2VucyB3aXRoIEJSRUFLRkFTVOKAmXMgQ2xpbWF0ZSBXYXZl?=\r\n =?UTF-8?B?cyAmIEJvbnRhbuKAmXMgTmlnaHRmYWxsIEJlYXRz?=",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:18.009350",
+    "sender_domain": "mail.1hotels.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<BhUt8TMbTtmH5l3A6VtSDQ@geopod-ismtpd-3>",
+    "sender": "Stanley 1913 <stanley@stanley1913.com>",
+    "subject": "Gifts Under $50",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:20.222076",
+    "sender_domain": "stanley1913.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<20251129160614.3d71364b3a9d1fb6@store.charlestyrwhitt.com>",
+    "sender": "Charles Tyrwhitt Black Friday <no-reply@store.charlestyrwhitt.com>",
+    "subject": "Last Call: 4 Shirts for $179 ends Tonight!",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:22.752314",
+    "sender_domain": "store.charlestyrwhitt.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<20251129160655.122f349e26cd2e6d@mail2.warbyparker.com>",
+    "sender": "Warby Parker <sayhello@mail2.warbyparker.com>",
+    "subject": "We just opened in Ridge Hill",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:25.445243",
+    "sender_domain": "mail2.warbyparker.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<y25_oEOhTWGYKfXB9s-P7g@geopod-ismtpd-10>",
+    "sender": "GetFPV <chloe@getfpv.com>",
+    "subject": "=?UTF-8?B?8J+WpPCfj4E=?= FLASH SALE: SAVE 25% on Lumenier Motors  | \r\n BRAND SALES: 10% OFF Flywoo + EMAX Products! =?UTF-8?B?8J+kkSDinKg=?=",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:27.334873",
+    "sender_domain": "getfpv.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<yBPvQPQBR4-g79Yl-rkP9w@geopod-ismtpd-68>",
+    "sender": "Fubo <stream@newsletters.fubo.tv>",
+    "subject": "FINAL hours for $175 off =?UTF-8?B?8J+YsQ==?=",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:29.566554",
+    "sender_domain": "newsletters.fubo.tv",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<bFYLooLHRL-P9E2cyR6xag@geopod-ismtpd-7>",
+    "sender": "ALPAKA <info@alpakagear.com>",
+    "subject": "The sale that just =?UTF-8?B?d29u4oCZdCBxdWl0IPCfkqU=?=",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:40.910737",
+    "sender_domain": "alpakagear.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/pull/74/review/3520747977@github.com>",
+    "sender": "\"coderabbitai[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/cat-emails] feat: blocking-domain recommendations\r\n (extractor/collector/notifier) (PR #74)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:45.081626",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4x-zLA/1764432716@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml - master (189d26f)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:50.569177",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/pull/74/c3591778319@github.com>",
+    "sender": "\"coderabbitai[bot]\" <notifications@github.com>",
+    "subject": "Re: [leonj1/cat-emails] feat: blocking-domain recommendations\r\n (extractor/collector/notifier) (PR #74)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:54.024786",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<1764432694045.cf22382a-a400-42ca-afe6-9422003720dd@bf55x.hubspotemail.net>",
+    "sender": "Grant Cardone <info@grantcardone.com>",
+    "subject": "Going live soon",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:28:58.037110",
+    "sender_domain": "grantcardone.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<leonj1/cat-emails/check-suites/CS_kwDOMlLluM8AAAAL4yAZPQ/1764432782@github.com>",
+    "sender": "\"Jose M Leon\" <notifications@github.com>",
+    "subject": "[leonj1/cat-emails] Run failed:\r\n .github/workflows/presubmit-review.yml -\r\n feature/blocking-recommendations-email-notification (ff523a0)",
+    "category": "Marketing",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:29:03.840422",
+    "sender_domain": "github.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<w-Bq-2fWSpWGMH2vdGq-wQ@geopod-ismtpd-33>",
+    "sender": "\"Udemy Instructor: Deepali Srivastava\" <no-reply@e.udemymail.com>",
+    "subject": "Learn Advanced Data Structure & Linux skills @$10/Rs399",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:29:06.032006",
+    "sender_domain": "e.udemymail.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<m8n92EOgSP2l5wQcpty-_g@geopod-ismtpd-74>",
+    "sender": "Walmart Black Friday <newsletters@em.walmart.com>",
+    "subject": "Almost GONE: up to 50% off! =?UTF-8?B?8J+YhQ==?=",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:29:08.438803",
+    "sender_domain": "em.walmart.com",
+    "was_pre_categorized": false
+  },
+  {
+    "message_id": "<0100019ad06d19c4-423706f5-b0d6-419a-aa78-2acd69eb04cd-000000@email.amazonses.com>",
+    "sender": "Coinbase <info@mail.coinbase.com>",
+    "subject": "A coffee a day adds up. So can your crypto.",
+    "category": "Advertising",
+    "action": "kept",
+    "processed_at": "2025-11-29 16:29:11.053671",
+    "sender_domain": "mail.coinbase.com",
+    "was_pre_categorized": false
+  }
+]
