@@ -144,6 +144,7 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         settings_service = SettingsService()
         email_categorizer = Mock(return_value="Marketing")
         deduplication_factory = EmailDeduplicationFactory()
+        fake_fetcher = Mock()
 
         service = AccountEmailProcessorService(
             processing_status_manager=processing_status_manager,
@@ -152,7 +153,8 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
             api_token=api_token,
             llm_model="test-model",
             account_category_client=self.real_client,
-            deduplication_factory=deduplication_factory
+            deduplication_factory=deduplication_factory,
+            create_gmail_fetcher=Mock(return_value=fake_fetcher)
         )
 
         # Process should fail with appropriate error

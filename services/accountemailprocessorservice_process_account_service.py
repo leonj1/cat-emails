@@ -17,6 +17,16 @@ from services.email_categorizer_interface import EmailCategorizerInterface
 logger = get_logger(__name__)
 
 
+class CallbackCategorizerAdapter(EmailCategorizerInterface):
+    """Adapter to convert a categorization callback into EmailCategorizerInterface."""
+
+    def __init__(self, callback: Callable[[str, str], str]):
+        self.callback = callback
+
+    def categorize(self, email_content: str, model: str) -> str:
+        return self.callback(email_content, model)
+
+
 class AccountEmailProcessorServiceProcessAccountService:
     """
     Dedicated service for processing emails for a single Gmail account.
@@ -203,14 +213,6 @@ class AccountEmailProcessorServiceProcessAccountService:
             f"Processing {total} emails",
             {"current": 0, "total": total}
         )
-
-        # Create adapter to convert callback to EmailCategorizerInterface
-        class CallbackCategorizerAdapter(EmailCategorizerInterface):
-            def __init__(self, callback: Callable[[str, str], str]):
-                self.callback = callback
-
-            def categorize(self, email_content: str, model: str) -> str:
-                return self.callback(email_content, model)
 
         email_categorizer = CallbackCategorizerAdapter(self.email_categorizer_callback)
         email_extractor = ExtractSenderEmailService()
