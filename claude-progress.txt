@@ -180,9 +180,9 @@ Implementation Summary:
 Following the CRASH-RCA diagnosis, implemented the fix to ensure DATABASE_PATH is available to all services.
 
 Changes Applied:
-1. ✅ Dockerfile.service - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 37
-2. ✅ Dockerfile - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 27
-3. ✅ docker-compose.yml - Added DATABASE_PATH=/app/email_summaries/summaries.db to api service environment at line 43
+1. Dockerfile.service - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 37
+2. Dockerfile - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 27
+3. docker-compose.yml - Added DATABASE_PATH=/app/email_summaries/summaries.db to api service environment at line 43
 
 Rationale:
 - Dockerfile.api already had DATABASE_PATH set (line 37)
@@ -211,4 +211,54 @@ Next: Commit changes and update PR
 Features: 0/1 complete
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
+
+=== Session 20251201-050450 ===
+Workflow: architect
+Task: Remove all references in the code that would invoke the remote logs collector. The logs collector at https://logs-collector-production.up.railway.app/logs is returning 404 errors and needs to be removed from the codebase.
+Status: Initialized
+Context: Explored project structure, identified logs collector architecture
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker
+
+Logs Collector Architecture Analysis:
+
+1. Core Service Files (to be removed/modified):
+   - /root/repo/services/logs_collector_service.py - Main LogsCollectorService class with HTTP client, DNS caching, retry logic
+   - /root/repo/services/logs_collector_interface.py - ILogsCollector interface
+   - /root/repo/clients/logs_collector_client.py - RemoteLogsCollectorClient, FakeLogsCollectorClient, LogEntry models
+   - /root/repo/services/logging_service.py - CentralLoggingService (uses LogsCollectorClient)
+   - /root/repo/services/logging_factory.py - Factory creating RemoteLogsCollectorClient
+
+2. Integration Points:
+   - /root/repo/api_service.py:32 - imports LogsCollectorService
+   - /root/repo/api_service.py:292 - creates LogsCollectorService instance
+   - /root/repo/api_service.py:367 - passes logs_collector to other services
+   - /root/repo/gmail_fetcher.py:27 - imports LogsCollectorService
+   - /root/repo/gmail_fetcher.py:617-761 - multiple send_log() calls
+
+3. Feature Flag System:
+   - /root/repo/models/feature_flags.py - FeatureFlags.send_logs
+   - SEND_LOGS env var controls remote logging (default: False)
+   - Already exists as a kill switch for remote logging
+
+4. Test Files (52 files reference logs collector):
+   - /root/repo/tests/test_logs_collector_*.py (4 files)
+   - /root/repo/test_logs_collector_service.py
+   - /root/repo/test_centralized_logging.py
+   - /root/repo/test_logging_compliance*.py
+   - Plus 40+ integration tests
+
+5. Documentation Files:
+   - /root/repo/services/LOGGING_SERVICE_README.md
+   - /root/repo/docs/LOGGING_SERVICE_*.md
+   - /root/repo/examples/logging_service_example.py
+   - /root/repo/specs/DRAFT-*.md (related specs)
+
+6. Environment Configuration:
+   - /root/repo/.env.example - LOGS_COLLECTOR_API, LOGS_COLLECTOR_TOKEN vars
+
+Features: 1/1 complete (FEAT-001 in feature_list.md)
+
+Next: Invoking architect agent to create spec for logs collector removal
 ---

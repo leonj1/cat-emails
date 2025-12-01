@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from services.email_processor_service import EmailProcessorService
 from services.email_categorizer_interface import EmailCategorizerInterface
 from services.gmail_fetcher_interface import GmailFetcherInterface
-from services.logs_collector_service import LogsCollectorService
 
 
 class EmailProcessorFactoryInterface(ABC):
@@ -17,8 +16,7 @@ class EmailProcessorFactoryInterface(ABC):
         fetcher: GmailFetcherInterface,
         email_address: str,
         model: str,
-        email_categorizer: EmailCategorizerInterface,
-        logs_collector: LogsCollectorService
+        email_categorizer: EmailCategorizerInterface
     ) -> EmailProcessorService:
         """
         Create an EmailProcessorService instance.
@@ -28,7 +26,6 @@ class EmailProcessorFactoryInterface(ABC):
             email_address: Email address being processed
             model: LLM model identifier
             email_categorizer: Email categorizer implementation
-            logs_collector: LogsCollectorService instance
 
         Returns:
             EmailProcessorService instance
