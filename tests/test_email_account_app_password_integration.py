@@ -8,6 +8,7 @@ by using the real AccountCategoryClient with real database models instead of moc
 import unittest
 import tempfile
 import os
+from typing import Callable
 from faker import Faker
 
 # Add parent directory to path
@@ -49,7 +50,7 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         if hasattr(self, 'temp_db_path') and os.path.exists(self.temp_db_path):
             os.unlink(self.temp_db_path)
 
-    def _create_fake_fetcher(self):
+    def _create_fake_fetcher(self) -> Mock:
         """Create a properly configured fake fetcher for testing."""
         fake_fetcher = Mock()
         fake_fetcher.connect = Mock()
@@ -64,7 +65,7 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         fake_fetcher.account_service = None
         return fake_fetcher
 
-    def _create_test_service(self, api_token, create_gmail_fetcher):
+    def _create_test_service(self, api_token: str, create_gmail_fetcher: Callable) -> AccountEmailProcessorService:
         """Helper to create AccountEmailProcessorService with common test dependencies."""
         processing_status_manager = ProcessingStatusManager()
         settings_service = SettingsService()
@@ -122,8 +123,10 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         fake_fetcher = self._create_fake_fetcher()
 
         def create_fake_fetcher(email, password, token):
-            # Verify that password is accessible
+            # Verify all parameters are passed correctly
+            self.assertEqual(email, test_email)
             self.assertEqual(password, test_password)
+            self.assertEqual(token, api_token)
             return fake_fetcher
 
         # Create service
@@ -151,8 +154,15 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         # Create fake fetcher
         fake_fetcher = self._create_fake_fetcher()
 
+        def create_fake_fetcher(email, password, token):
+            # This test expects early failure, but we still validate parameters if called
+            self.assertEqual(email, test_email)
+            self.assertIsNone(password)  # Expected to be None since app_password not set
+            self.assertEqual(token, api_token)
+            return fake_fetcher
+
         # Create service
-        service = self._create_test_service(api_token, Mock(return_value=fake_fetcher))
+        service = self._create_test_service(api_token, create_fake_fetcher)
 
         # Process should fail with appropriate error
         result = service.process_account(test_email)

@@ -31,7 +31,12 @@ class CallbackCategorizerAdapter(EmailCategorizerInterface):
 
         Args:
             callback: Function that takes (email_content, model) and returns category name
+
+        Raises:
+            ValueError: If callback is None
         """
+        if callback is None:
+            raise ValueError("callback must not be None")
         self.callback = callback
 
     def categorize(self, email_content: str, model: str) -> str:
@@ -368,7 +373,7 @@ class AccountEmailProcessorServiceProcessAccountService:
 
     def _handle_processing_error(self, email_address: str, error: Exception) -> Dict:
         """Handle processing errors."""
-        logger.error(f"Email processing failed for {email_address}: {error!s}")
+        logger.exception("Email processing failed for %s: %s", email_address, error)
 
         try:
             self.processing_status_manager.update_status(
