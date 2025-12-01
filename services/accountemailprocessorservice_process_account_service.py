@@ -36,7 +36,6 @@ class AccountEmailProcessorServiceProcessAccountService:
         llm_model: str,
         account_category_client,
         deduplication_factory,
-        logs_collector,
         create_gmail_fetcher: Callable[[str, str, str], object]
     ):
         """Initialize the process account service with all dependencies."""
@@ -47,7 +46,6 @@ class AccountEmailProcessorServiceProcessAccountService:
         self.llm_model = llm_model
         self.account_category_client = account_category_client
         self.deduplication_factory = deduplication_factory
-        self.logs_collector = logs_collector
         self.create_gmail_fetcher = create_gmail_fetcher
 
     def process_account(self, email_address: str) -> Dict:
@@ -61,7 +59,7 @@ class AccountEmailProcessorServiceProcessAccountService:
             Dictionary with processing results
         """
         logger.info(f"Processing emails for account: {email_address}")
-        self._send_start_log(email_address)
+        logger.info(f"Email processing started for {email_address}")
 
         try:
             return self._process_account_workflow(email_address)
@@ -85,15 +83,6 @@ class AccountEmailProcessorServiceProcessAccountService:
 
         return self._execute_processing(email_address, account.app_password)
 
-    def _send_start_log(self, email_address: str) -> None:
-        """Send log message for processing start."""
-        self.logs_collector.send_log(
-            "INFO",
-            f"Email processing started for {email_address}",
-            {"email": email_address},
-            "api-service"
-        )
-
     def _start_processing_session(self, email_address: str) -> bool:
         """
         Start a processing session.
@@ -116,7 +105,6 @@ class AccountEmailProcessorServiceProcessAccountService:
         """Handle case when account is not found."""
         error_msg = f"Account {email_address} not found in database"
         logger.error(f"Error: {error_msg}")
-        self._send_error_log(email_address, error_msg)
         self._update_error_status(error_msg)
         self.processing_status_manager.complete_processing()
         return self._create_error_response(email_address, error_msg)
@@ -125,7 +113,6 @@ class AccountEmailProcessorServiceProcessAccountService:
         """Handle case when account has no app password."""
         error_msg = f"No app password configured for {email_address}"
         logger.error(f"Error: {error_msg}")
-        self._send_error_log(email_address, error_msg)
         self._update_error_status(error_msg)
         self.processing_status_manager.complete_processing()
         return self._create_error_response(email_address, error_msg)
@@ -160,7 +147,7 @@ class AccountEmailProcessorServiceProcessAccountService:
         result = self._create_success_response(
             email_address, found, processed, processing_time
         )
-        self._send_completion_log(email_address, fetcher)
+        logger.info(f"Email processing completed successfully for {email_address}")
         self.processing_status_manager.complete_processing()
         fetcher.disconnect()
         return result
@@ -218,7 +205,7 @@ class AccountEmailProcessorServiceProcessAccountService:
 
         processor = EmailProcessorService(
             fetcher, email_address, self.llm_model,
-            self.email_categorizer_callback, self.logs_collector
+            self.email_categorizer_callback
         )
 
         for i, msg in enumerate(new_emails, 1):
@@ -345,23 +332,10 @@ class AccountEmailProcessorServiceProcessAccountService:
             "success": True
         }
 
-    def _send_completion_log(self, email_address: str, fetcher) -> None:
-        """Send completion log to remote collector."""
-        self.logs_collector.send_log(
-            "INFO",
-            f"Email processing completed successfully for {email_address}",
-            {
-                "processed": fetcher.stats['deleted'] + fetcher.stats['kept'],
-                "deleted": fetcher.stats['deleted'],
-                "kept": fetcher.stats['kept']
-            },
-            "api-service"
-        )
-
     def _handle_processing_error(self, email_address: str, error: Exception) -> Dict:
         """Handle processing errors."""
         logger.error(f"Error processing emails for {email_address}: {str(error)}")
-        self._send_error_log(email_address, str(error))
+        logger.error(f"Email processing failed for {email_address}: {str(error)}")
 
         try:
             self.processing_status_manager.update_status(
@@ -375,15 +349,6 @@ class AccountEmailProcessorServiceProcessAccountService:
             self.processing_status_manager.complete_processing()
 
         return self._create_error_response(email_address, str(error))
-
-    def _send_error_log(self, email_address: str, error_msg: str) -> None:
-        """Send error log to remote collector."""
-        self.logs_collector.send_log(
-            "ERROR",
-            f"Email processing failed for {email_address}: {error_msg}",
-            {"error": error_msg, "email": email_address},
-            "api-service"
-        )
 
     def _update_error_status(self, error_msg: str) -> None:
         """Update processing status to error."""

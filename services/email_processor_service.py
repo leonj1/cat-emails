@@ -9,8 +9,6 @@ from services.categorize_emails_interface import SimpleEmailCategory
 from services.email_categorizer_interface import EmailCategorizerInterface
 from services.interfaces.email_extractor_interface import EmailExtractorInterface
 from services.gmail_fetcher_service import GmailFetcher as ServiceGmailFetcher
-from services.logs_collector_interface import ILogsCollector
-from services.logs_collector_service import LogsCollectorService  # noqa: F401 - Imported for test patching only
 
 logger = get_logger(__name__)
 
@@ -29,7 +27,6 @@ class EmailProcessorService:
         model: str,
         email_categorizer: EmailCategorizerInterface,
         email_extractor: EmailExtractorInterface,
-        logs_collector: Optional[ILogsCollector] = None,
     ) -> None:
         """Initialize the service.
 
@@ -39,16 +36,12 @@ class EmailProcessorService:
             model: Model identifier for categorization
             email_categorizer: Service for categorizing emails
             email_extractor: Service for extracting email addresses
-            logs_collector: Optional service for collecting logs
         """
         self.fetcher = fetcher
         self.email_address = email_address
         self.model = model
         self.email_categorizer = email_categorizer
         self.email_extractor = email_extractor
-
-        # Initialize logs collector service
-        self.logs_collector = logs_collector
 
         # Aggregated results for the whole batch
         self.category_actions: Dict[str, Dict[str, int]] = {}
@@ -107,24 +100,12 @@ class EmailProcessorService:
                 category = "Blocked_Domain"
                 pre_categorized = True
                 deletion_candidate = True
-                if self.logs_collector:
-                    self.logs_collector.send_log(
-                        "INFO",
-                        f"Email from blocked domain: {sender_domain}",
-                        {"sender": sender_email, "domain": sender_domain, "subject": subject[:50]},
-                        "email-processor"
-                    )
+                logger.info(f"Email from blocked domain: {sender_domain}")
             elif self.fetcher._is_domain_allowed(from_header):
                 category = "Allowed_Domain"
                 pre_categorized = True
                 deletion_candidate = False
-                if self.logs_collector:
-                    self.logs_collector.send_log(
-                        "INFO",
-                        f"Email from allowed domain: {sender_domain}",
-                        {"sender": sender_email, "domain": sender_domain, "subject": subject[:50]},
-                        "email-processor"
-                    )
+                logger.info(f"Email from allowed domain: {sender_domain}")
             else:
                 category = "Other"  # placeholder, will be overwritten if not pre_categorized
 
@@ -272,20 +253,6 @@ class EmailProcessorService:
         except Exception as e:
             logger.error(f"Error processing email: {e}")
             print(f"Skipping email due to error: {e}")
-
-            # Send error log
-            if self.logs_collector:
-                self.logs_collector.send_log(
-                    "ERROR",
-                    f"Failed to process email: {str(e)}",
-                    {
-                        "message_id": message_id,
-                        "sender": from_header,
-                        "subject": subject[:50] if subject else "",
-                        "error": str(e)
-                    },
-                    "email-processor"
-                )
             return None
 
         return category

@@ -8,8 +8,6 @@ from services.account_email_processor_interface import AccountEmailProcessorInte
 from clients.account_category_client_interface import AccountCategoryClientInterface
 from services.email_deduplication_factory_interface import EmailDeduplicationFactoryInterface
 from services.email_categorizer_interface import EmailCategorizerInterface
-from services.logs_collector_interface import ILogsCollector
-from services.logs_collector_service import LogsCollectorService  # noqa: F401 - Imported for test patching only
 from services.gmail_fetcher_interface import GmailFetcherInterface
 from services.gmail_fetcher_service import GmailFetcher
 from services.email_processor_service import EmailProcessorService
@@ -34,7 +32,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         llm_model: str,
         account_category_client: AccountCategoryClientInterface,
         deduplication_factory: EmailDeduplicationFactoryInterface,
-        logs_collector: Optional[ILogsCollector] = None,
         create_gmail_fetcher: Optional[Callable[[str, str, str], GmailFetcherInterface]] = None,
         blocking_recommendation_collector: Optional[IBlockingRecommendationCollector] = None,
         recommendation_email_notifier: Optional[IRecommendationEmailNotifier] = None
@@ -50,7 +47,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             llm_model: LLM model identifier (e.g., "vertex/google/gemini-2.5-flash")
             account_category_client: AccountCategoryClientInterface implementation (required)
             deduplication_factory: EmailDeduplicationFactoryInterface implementation (required)
-            logs_collector: ILogsCollector instance (optional)
             create_gmail_fetcher: Optional callable to create GmailFetcherInterface instances (defaults to GmailFetcher constructor)
             blocking_recommendation_collector: Optional IBlockingRecommendationCollector for collecting domain recommendations
             recommendation_email_notifier: Optional IRecommendationEmailNotifier for sending recommendation emails
@@ -62,7 +58,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         self.llm_model = llm_model
         self.account_category_client = account_category_client
         self.deduplication_factory = deduplication_factory
-        self.logs_collector = logs_collector
         self.create_gmail_fetcher = create_gmail_fetcher if create_gmail_fetcher is not None else GmailFetcher
         self.blocking_recommendation_collector = blocking_recommendation_collector
         self.recommendation_email_notifier = recommendation_email_notifier
@@ -76,9 +71,8 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
         2. Fetches recent emails
         3. Categorizes them using AI
         4. Applies labels and actions
-        5. Sends logs to remote collector
-        6. Collects domain blocking recommendations (if collector provided)
-        7. Sends recommendation notification email (if notifier provided)
+        5. Collects domain blocking recommendations (if collector provided)
+        6. Sends recommendation notification email (if notifier provided)
 
         Args:
             email_address: The Gmail account to process
@@ -92,14 +86,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
               notification_sent, notification_error
         """
         logger.info(f"🔍 Processing emails for account: {email_address}")
-
-        if self.logs_collector:
-            self.logs_collector.send_log(
-                "INFO",
-                f"Email processing started for {email_address}",
-                {"email": email_address},
-                "api-service"
-            )
 
         try:
             # Start processing session
@@ -120,8 +106,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             if not account:
                 error_msg = f"Account {email_address} not found in database"
                 logger.error(f"❌ {error_msg}")
-                if self.logs_collector:
-                    self.logs_collector.send_log("ERROR", error_msg, {"email": email_address}, "api-service")
                 self.processing_status_manager.update_status(
                     ProcessingState.ERROR,
                     error_msg,
@@ -142,8 +126,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             if not app_password:
                 error_msg = f"No app password configured for {email_address}"
                 logger.error(f"❌ {error_msg}")
-                if self.logs_collector:
-                    self.logs_collector.send_log("ERROR", error_msg, {"email": email_address}, "api-service")
                 self.processing_status_manager.update_status(
                     ProcessingState.ERROR,
                     error_msg,
@@ -222,8 +204,7 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 email_address,
                 self.llm_model,
                 self.email_categorizer,
-                email_extractor,
-                self.logs_collector
+                email_extractor
             )
 
             # Get blocked domains once outside the loop if collector is present
@@ -379,19 +360,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
 
             logger.info(f"✅ Successfully processed {email_address}: {len(new_emails)} emails in {processing_time:.2f}s")
 
-            # Send completion log
-            if self.logs_collector:
-                self.logs_collector.send_log(
-                    "INFO",
-                    f"Email processing completed successfully for {email_address}",
-                    {
-                        "processed": fetcher.stats['deleted'] + fetcher.stats['kept'],
-                        "deleted": fetcher.stats['deleted'],
-                        "kept": fetcher.stats['kept']
-                    },
-                    "api-service"
-                )
-
             # Complete the processing session
             self.processing_status_manager.complete_processing()
 
@@ -402,15 +370,6 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
 
         except Exception as e:
             logger.error(f"❌ Error processing emails for {email_address}: {str(e)}")
-
-            # Send error log to remote collector
-            if self.logs_collector:
-                self.logs_collector.send_log(
-                    "ERROR",
-                    f"Email processing failed for {email_address}: {str(e)}",
-                    {"error": str(e), "email": email_address},
-                    "api-service"
-                )
 
             # Update status to error and complete processing
             try:
