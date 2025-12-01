@@ -19,7 +19,6 @@ from clients.account_category_client import AccountCategoryClient
 from services.account_email_processor_service import AccountEmailProcessorService
 from services.processing_status_manager import ProcessingStatusManager
 from services.settings_service import SettingsService
-from services.logs_collector_service import LogsCollectorService
 from services.email_deduplication_factory import EmailDeduplicationFactory
 from unittest.mock import Mock
 
@@ -90,7 +89,6 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         processing_status_manager = ProcessingStatusManager()
         settings_service = SettingsService()
         email_categorizer = Mock(return_value="Marketing")
-        logs_collector = LogsCollectorService()
         deduplication_factory = EmailDeduplicationFactory()
 
         # Create fake fetcher that will be used
@@ -119,7 +117,6 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
             llm_model="test-model",
             account_category_client=self.real_client,
             deduplication_factory=deduplication_factory,
-            logs_collector=logs_collector,
             create_gmail_fetcher=create_fake_fetcher
         )
 
@@ -146,7 +143,6 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         processing_status_manager = ProcessingStatusManager()
         settings_service = SettingsService()
         email_categorizer = Mock(return_value="Marketing")
-        logs_collector = LogsCollectorService()
         deduplication_factory = EmailDeduplicationFactory()
 
         service = AccountEmailProcessorService(
@@ -156,8 +152,7 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
             api_token=api_token,
             llm_model="test-model",
             account_category_client=self.real_client,
-            deduplication_factory=deduplication_factory,
-            logs_collector=logs_collector
+            deduplication_factory=deduplication_factory
         )
 
         # Process should fail with appropriate error

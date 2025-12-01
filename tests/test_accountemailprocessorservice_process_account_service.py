@@ -32,7 +32,6 @@ class TestAccountEmailProcessorServiceProcessAccountService:
             'llm_model': 'vertex/google/gemini-2.5-flash',
             'account_category_client': Mock(),
             'deduplication_factory': Mock(),
-            'logs_collector': Mock(),
             'create_gmail_fetcher': Mock()
         }
 
@@ -50,7 +49,6 @@ class TestAccountEmailProcessorServiceProcessAccountService:
         assert service.llm_model == mock_dependencies['llm_model']
         assert service.account_category_client == mock_dependencies['account_category_client']
         assert service.deduplication_factory == mock_dependencies['deduplication_factory']
-        assert service.logs_collector == mock_dependencies['logs_collector']
         assert service.create_gmail_fetcher == mock_dependencies['create_gmail_fetcher']
 
     def test_no_environment_variable_access(self):
@@ -92,7 +90,6 @@ class TestAccountEmailProcessorServiceProcessAccountService:
         assert 'Processing already in progress' in result['error']
         assert result['account'] == email
         assert 'timestamp' in result
-        mock_dependencies['logs_collector'].send_log.assert_called()
 
     def test_process_account_not_found(self, service, mock_dependencies):
         """Test process_account when account doesn't exist in database."""
@@ -233,7 +230,6 @@ class TestAccountEmailProcessorServiceProcessAccountService:
         assert result['account'] == email
 
         # Verify error handling
-        mock_dependencies['logs_collector'].send_log.assert_called()
         mock_dependencies['processing_status_manager'].complete_processing.assert_called()
 
     def test_status_progression_through_states(self, service, mock_dependencies):
@@ -344,35 +340,6 @@ class TestAccountEmailProcessorServiceProcessAccountService:
         # The important thing is that the method completes successfully
         assert result['emails_processed'] == 3
 
-    def test_logging_integration(self, service, mock_dependencies):
-        """Test that logs are sent to the logs collector service."""
-        # Setup
-        email = 'test@example.com'
-        mock_account = Mock()
-        mock_account.app_password = 'test-password'
-        mock_dependencies['account_category_client'].get_account_by_email.return_value = mock_account
-        mock_dependencies['settings_service'].get_lookback_hours.return_value = 2
-
-        # Mock fetcher
-        mock_fetcher = self._create_mock_fetcher()
-        mock_dependencies['create_gmail_fetcher'].return_value = mock_fetcher
-
-        # Mock deduplication
-        mock_dedup_client = Mock()
-        mock_dedup_client.filter_new_emails.return_value = []
-        mock_dedup_client.get_stats.return_value = {'total': 0, 'new': 0, 'duplicates': 0}
-        mock_dependencies['deduplication_factory'].create_deduplication_client.return_value = mock_dedup_client
-
-        # Execute
-        result = service.process_account(email)
-
-        # Verify logging calls
-        assert mock_dependencies['logs_collector'].send_log.call_count >= 2
-        # Check for start log
-        start_log_call = mock_dependencies['logs_collector'].send_log.call_args_list[0]
-        assert start_log_call[0][0] == "INFO"
-        assert email in start_log_call[0][1]
-
     def test_fetcher_disconnection_on_success(self, service, mock_dependencies):
         """Test that fetcher is properly disconnected after successful processing."""
         # Setup
@@ -464,7 +431,6 @@ class TestProcessAccountServiceEdgeCases:
             'llm_model': 'test-model',
             'account_category_client': Mock(),
             'deduplication_factory': Mock(),
-            'logs_collector': Mock(),
             'create_gmail_fetcher': Mock()
         }
 

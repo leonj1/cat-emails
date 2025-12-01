@@ -19,7 +19,6 @@ from services.account_email_processor_service import AccountEmailProcessorServic
 from services.processing_status_manager import ProcessingStatusManager
 from services.fake_email_deduplication_factory import FakeEmailDeduplicationFactory
 from services.settings_service import SettingsService
-from services.logs_collector_service import LogsCollectorService
 from repositories.sqlalchemy_repository import SQLAlchemyRepository
 
 # Fake implementations for testing
@@ -62,7 +61,6 @@ class TestTrackedCategoriesIntegration(unittest.TestCase):
         # Inject repository into SettingsService
         self.settings_service = SettingsService(repository=self.repository)
         self.deduplication_factory = FakeEmailDeduplicationFactory()
-        self.logs_collector = LogsCollectorService()
         
         # Create fake email categorizer that returns valid SimpleEmailCategory values
         # Valid categories are: "Advertising", "Marketing", "Wants-Money", and "Other"
@@ -153,7 +151,6 @@ class TestTrackedCategoriesIntegration(unittest.TestCase):
             llm_model="test-model",
             account_category_client=self.account_category_client,
             deduplication_factory=self.deduplication_factory,
-            logs_collector=self.logs_collector,
             create_gmail_fetcher=create_fake_fetcher
         )
 

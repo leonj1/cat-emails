@@ -11,6 +11,8 @@ from typing import Dict, Callable, List
 from utils.logger import get_logger
 from services.processing_status_manager import ProcessingState
 from services.email_processor_service import EmailProcessorService
+from services.extract_sender_email_service import ExtractSenderEmailService
+from services.email_categorizer_interface import EmailCategorizerInterface
 
 logger = get_logger(__name__)
 
@@ -58,7 +60,6 @@ class AccountEmailProcessorServiceProcessAccountService:
         Returns:
             Dictionary with processing results
         """
-        logger.info(f"Processing emails for account: {email_address}")
         logger.info(f"Email processing started for {email_address}")
 
         try:
@@ -203,9 +204,20 @@ class AccountEmailProcessorServiceProcessAccountService:
             {"current": 0, "total": total}
         )
 
+        # Create adapter to convert callback to EmailCategorizerInterface
+        class CallbackCategorizerAdapter(EmailCategorizerInterface):
+            def __init__(self, callback: Callable[[str, str], str]):
+                self.callback = callback
+
+            def categorize(self, email_content: str, model: str) -> str:
+                return self.callback(email_content, model)
+
+        email_categorizer = CallbackCategorizerAdapter(self.email_categorizer_callback)
+        email_extractor = ExtractSenderEmailService()
+
         processor = EmailProcessorService(
             fetcher, email_address, self.llm_model,
-            self.email_categorizer_callback
+            email_categorizer, email_extractor
         )
 
         for i, msg in enumerate(new_emails, 1):
@@ -334,8 +346,7 @@ class AccountEmailProcessorServiceProcessAccountService:
 
     def _handle_processing_error(self, email_address: str, error: Exception) -> Dict:
         """Handle processing errors."""
-        logger.error(f"Error processing emails for {email_address}: {str(error)}")
-        logger.error(f"Email processing failed for {email_address}: {str(error)}")
+        logger.error(f"Email processing failed for {email_address}: {error!s}")
 
         try:
             self.processing_status_manager.update_status(
