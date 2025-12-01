@@ -12,7 +12,7 @@ validate-env:
 		exit 1; \
 	fi
 
-.PHONY: build run clean test service-build service-run service-stop service-logs api-build api-run api-stop api-logs summary-morning summary-evening summary-weekly summary-monthly api-health
+.PHONY: build run clean test service-build service-run service-stop service-logs api-build api-run api-stop api-logs summary-morning summary-evening summary-weekly summary-monthly api-health test-llm-integration
 
 # Docker image name
 IMAGE_NAME = gmail-cleaner
@@ -258,3 +258,18 @@ test-pending-rollback-integration:
 # Clean up integration test containers
 test-integration-clean:
 	docker compose -f docker-compose.test.yml down -v --remove-orphans
+
+# Run LLM service integration test with RequestYAI
+LLM_TEST_IMAGE_NAME = test-llm-integration
+test-llm-integration:
+	@if [ -z "$(REQUESTYAI_API_KEY)" ]; then \
+		echo "Error: REQUESTYAI_API_KEY environment variable is required"; \
+		echo "Set it with: export REQUESTYAI_API_KEY='your-api-key'"; \
+		exit 1; \
+	fi
+	@echo "Building LLM integration test image..."
+	docker build -f Dockerfile.test-llm -t $(LLM_TEST_IMAGE_NAME) .
+	@echo "Running LLM integration tests with RequestYAI..."
+	docker run --rm \
+		-e REQUESTYAI_API_KEY="$(REQUESTYAI_API_KEY)" \
+		$(LLM_TEST_IMAGE_NAME)
