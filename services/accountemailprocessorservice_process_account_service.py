@@ -18,12 +18,32 @@ logger = get_logger(__name__)
 
 
 class CallbackCategorizerAdapter(EmailCategorizerInterface):
-    """Adapter to convert a categorization callback into EmailCategorizerInterface."""
+    """Adapter to convert a categorization callback into EmailCategorizerInterface.
 
-    def __init__(self, callback: Callable[[str, str], str]):
+    This adapter allows callback-based categorization functions to be used
+    wherever the EmailCategorizerInterface is required, enabling dependency
+    injection and testability without requiring immediate refactoring of
+    existing callback-based code.
+    """
+
+    def __init__(self, callback: Callable[[str, str], str]) -> None:
+        """Initialize the adapter with a categorization callback.
+
+        Args:
+            callback: Function that takes (email_content, model) and returns category name
+        """
         self.callback = callback
 
     def categorize(self, email_content: str, model: str) -> str:
+        """Delegate categorization to the wrapped callback.
+
+        Args:
+            email_content: The email content to categorize
+            model: The model identifier to use for categorization
+
+        Returns:
+            str: The category name
+        """
         return self.callback(email_content, model)
 
 

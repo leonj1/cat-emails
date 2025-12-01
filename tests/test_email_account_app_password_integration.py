@@ -49,6 +49,39 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         if hasattr(self, 'temp_db_path') and os.path.exists(self.temp_db_path):
             os.unlink(self.temp_db_path)
 
+    def _create_fake_fetcher(self):
+        """Create a properly configured fake fetcher for testing."""
+        fake_fetcher = Mock()
+        fake_fetcher.connect = Mock()
+        fake_fetcher.disconnect = Mock()
+        fake_fetcher.get_recent_emails = Mock(return_value=[])
+        fake_fetcher.summary_service = Mock()
+        fake_fetcher.summary_service.clear_tracked_data = Mock()
+        fake_fetcher.summary_service.start_processing_run = Mock()
+        fake_fetcher.summary_service.complete_processing_run = Mock()
+        fake_fetcher.summary_service.run_metrics = {'fetched': 0}
+        fake_fetcher.stats = {'deleted': 0, 'kept': 0}
+        fake_fetcher.account_service = None
+        return fake_fetcher
+
+    def _create_test_service(self, api_token, create_gmail_fetcher):
+        """Helper to create AccountEmailProcessorService with common test dependencies."""
+        processing_status_manager = ProcessingStatusManager()
+        settings_service = SettingsService()
+        email_categorizer = Mock(return_value="Marketing")
+        deduplication_factory = EmailDeduplicationFactory()
+
+        return AccountEmailProcessorService(
+            processing_status_manager=processing_status_manager,
+            settings_service=settings_service,
+            email_categorizer=email_categorizer,
+            api_token=api_token,
+            llm_model="test-model",
+            account_category_client=self.real_client,
+            deduplication_factory=deduplication_factory,
+            create_gmail_fetcher=create_gmail_fetcher
+        )
+
     def test_email_account_has_app_password_attribute(self):
         """Test that EmailAccount from real database has app_password attribute."""
         # Generate random test email
@@ -85,40 +118,16 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         self.session.add(account)
         self.session.commit()
 
-        # Create service with real AccountCategoryClient
-        processing_status_manager = ProcessingStatusManager()
-        settings_service = SettingsService()
-        email_categorizer = Mock(return_value="Marketing")
-        deduplication_factory = EmailDeduplicationFactory()
-
-        # Create fake fetcher that will be used
-        fake_fetcher = Mock()
-        fake_fetcher.connect = Mock()
-        fake_fetcher.disconnect = Mock()
-        fake_fetcher.get_recent_emails = Mock(return_value=[])
-        fake_fetcher.summary_service = Mock()
-        fake_fetcher.summary_service.clear_tracked_data = Mock()
-        fake_fetcher.summary_service.start_processing_run = Mock()
-        fake_fetcher.summary_service.complete_processing_run = Mock()
-        fake_fetcher.summary_service.run_metrics = {'fetched': 0}
-        fake_fetcher.stats = {'deleted': 0, 'kept': 0}
-        fake_fetcher.account_service = None
+        # Create fake fetcher
+        fake_fetcher = self._create_fake_fetcher()
 
         def create_fake_fetcher(email, password, token):
             # Verify that password is accessible
             self.assertEqual(password, test_password)
             return fake_fetcher
 
-        service = AccountEmailProcessorService(
-            processing_status_manager=processing_status_manager,
-            settings_service=settings_service,
-            email_categorizer=email_categorizer,
-            api_token=api_token,
-            llm_model="test-model",
-            account_category_client=self.real_client,
-            deduplication_factory=deduplication_factory,
-            create_gmail_fetcher=create_fake_fetcher
-        )
+        # Create service
+        service = self._create_test_service(api_token, create_fake_fetcher)
 
         # This should work without AttributeError
         result = service.process_account(test_email)
@@ -139,23 +148,11 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         self.session.add(account)
         self.session.commit()
 
-        # Create service
-        processing_status_manager = ProcessingStatusManager()
-        settings_service = SettingsService()
-        email_categorizer = Mock(return_value="Marketing")
-        deduplication_factory = EmailDeduplicationFactory()
-        fake_fetcher = Mock()
+        # Create fake fetcher
+        fake_fetcher = self._create_fake_fetcher()
 
-        service = AccountEmailProcessorService(
-            processing_status_manager=processing_status_manager,
-            settings_service=settings_service,
-            email_categorizer=email_categorizer,
-            api_token=api_token,
-            llm_model="test-model",
-            account_category_client=self.real_client,
-            deduplication_factory=deduplication_factory,
-            create_gmail_fetcher=Mock(return_value=fake_fetcher)
-        )
+        # Create service
+        service = self._create_test_service(api_token, Mock(return_value=fake_fetcher))
 
         # Process should fail with appropriate error
         result = service.process_account(test_email)
