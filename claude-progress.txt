@@ -266,8 +266,8 @@ Next: Invoking architect agent to create spec for logs collector removal
 === Session 20251202-054031 ===
 Workflow: debugger
 Task: API token is required but not provided - error occurring during Gmail authentication flow, causing domain data load failure
-Status: Initialized
-Context: Explored project structure and identified error source
+Status: Complete
+Context: CRASH-RCA forensic analysis completed - root cause identified and documented
 
 Error Message from Logs:
 ```
@@ -321,17 +321,24 @@ Call Chain Leading to Error:
 5. _load_domain_data() calls domain_service.fetch_allowed_domains()
 6. DomainService._fetch() checks if api_token is empty/None -> raises ValueError
 
-Root Cause Hypothesis:
-CONTROL_API_TOKEN environment variable is either:
-a) Not set in the Railway/Docker environment, OR
-b) Set to empty string ""
+Root Cause Confirmed (CRASH-RCA Session #20251202-054242):
+DomainService has inconsistent truthiness check at domain_service.py:
+- Line 25: mock_mode = api_token is None (evaluates to False for empty string "")
+- Line 58: if not self.api_token: (evaluates to True for empty string "")
 
-When api_token is "" (empty string):
-- mock_mode = (api_token is None) = False  (empty string is not None)
-- But api_token check: if not self.api_token: -> True for empty string
-- This causes the ValueError to be raised
+When CONTROL_API_TOKEN="" (default from api_service.py:181):
+1. Empty string flows through AccountEmailProcessorService → GmailFetcher → DomainService
+2. mock_mode = False (because "" is not None)
+3. Validation check fails (because not "" evaluates to True)
+4. ValueError raised instead of using mock mode
+
+Fix Options:
+- Option 1 (Preferred): Change domain_service.py:25 to `self.mock_mode = not api_token`
+- Option 2: Change api_service.py:357 to `api_token=CONTROL_API_TOKEN or None`
+
+Evidence: domain_service.py:25,58; api_service.py:181,357,388-390
 
 Features: 0/1 complete (feature_list.md)
 
-Next: Invoking debugger agent for CRASH-RCA forensic analysis
+Next: Implementation proceeding per PR #83 (fix domain_service.py mock_mode logic)
 ---
