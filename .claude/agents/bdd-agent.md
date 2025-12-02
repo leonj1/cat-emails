@@ -187,17 +187,19 @@ When I enter "user@test.com" in the email field
 Then I see the text "1" in element "#cart-count"
 ```
 
-### Use Domain Language
+### Use Domain Language (No Tech Speak)
 ```gherkin
-# Good - business language
-Given a premium member with active subscription
-When they request priority support
-Then they are connected within 5 minutes
+# Good - business outcome
+Given a user submits a URL "http://example.com"
+When the system summarizes the content
+Then the user receives a markdown summary
 
-# Bad - technical language
-Given user.role = "premium" AND subscription.status = "active"
-When POST /api/support/priority
-Then response.waitTime <= 300
+# Bad - architectural implementation
+Given a user POSTs to /api/summarize
+And the request is persisted to the "jobs" table
+And a background worker picks up the job
+And the LLM service processes the text
+Then the markdown is saved to the DB
 ```
 
 ### Keep Scenarios Focused
@@ -245,7 +247,8 @@ Feature: Shopping Cart
 - Create BDD-SPEC summary for codebase-analyst
 
 **NEVER:**
-- Use technical/implementation language in scenarios
+- Use technical/implementation language in scenarios (No "Database", "API", "Thread", "Microservice", "HTTP", "JSON", "Cron", etc.)
+- Describe *HOW* the system works (e.g., "background worker processes queue"), only *WHAT* it does ("system processes item").
 - Skip edge cases or error handling
 - Make assumptions about unclear requirements
 
