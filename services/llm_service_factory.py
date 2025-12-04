@@ -1,4 +1,5 @@
 import os
+from constants import DEFAULT_REQUESTYAI_BASE_URL
 from services.llm_service_factory_interface import LLMServiceFactoryInterface
 from services.llm_service_interface import LLMServiceInterface
 from services.openai_llm_service import OpenAILLMService
@@ -21,7 +22,7 @@ class LLMServiceFactory(LLMServiceFactoryInterface):
         base_url = (
             os.environ.get("REQUESTYAI_BASE_URL")
             or os.environ.get("REQUESTY_BASE_URL")
-            or "https://router.requesty.ai/v1"
+            or DEFAULT_REQUESTYAI_BASE_URL
         )
         api_key = (
             os.environ.get("REQUESTYAI_API_KEY")

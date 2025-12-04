@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import re
 from collections import Counter
 from tabulate import tabulate
+from constants import DEFAULT_REQUESTYAI_BASE_URL
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 from services.email_summary_service import EmailSummaryService
 from clients.account_category_client import AccountCategoryClient
@@ -53,12 +54,12 @@ if args.base_url:
 
 def _make_llm_service(model: str) -> LLMServiceInterface:
     """Construct an LLM service for RequestYAI (OpenAI-compatible) using env for base_url and api key.
-    Provide full OpenAI-compatible root (may include version), e.g. https://api.requesty.ai/openai/v1
+    Provide full OpenAI-compatible root (may include version), e.g. https://router.requesty.ai/v1
     """
     base_url = (
         os.environ.get("REQUESTYAI_BASE_URL")
         or os.environ.get("REQUESTY_API_URL")
-        or "https://api.requesty.ai/openai/v1"
+        or DEFAULT_REQUESTYAI_BASE_URL
     )
     api_key = (
         os.environ.get("REQUESTYAI_API_KEY")
