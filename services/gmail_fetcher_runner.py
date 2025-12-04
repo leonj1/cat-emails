@@ -2,6 +2,7 @@ import logging
 from utils.logger import get_logger
 import os
 from typing import Any
+from constants import DEFAULT_REQUESTYAI_BASE_URL
 
 
 class GmailFetcherRunner:
@@ -35,7 +36,7 @@ class GmailFetcherRunner:
 
         # Derive provider and base URL consistent with gmail_fetcher._make_llm_categorizer
         provider = "requestyai"
-        base_url = os.environ.get("REQUESTYAI_BASE_URL", "https://api.requesty.ai/openai/v1")
+        base_url = os.environ.get("REQUESTYAI_BASE_URL", DEFAULT_REQUESTYAI_BASE_URL)
 
         self.logger.info(
             "LLM configuration: provider=%s, model=%s, base_url=%s",

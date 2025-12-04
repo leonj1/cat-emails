@@ -18,6 +18,8 @@ from pydantic import BaseModel, ValidationError
 # Add the current directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from constants import DEFAULT_REQUESTYAI_BASE_URL
+
 from send_emails import send_summary_by_type
 from clients.account_category_client_interface import AccountCategoryClientInterface
 from clients.account_category_client import AccountCategoryClient
@@ -795,7 +797,7 @@ def _get_llm_config() -> LLMConfig:
     """Determine LLM service configuration from environment variables."""
     requestyai_key = os.getenv("REQUESTYAI_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("REQUESTYAI_BASE_URL", "https://api.requesty.ai/openai/v1")
+    base_url = os.getenv("REQUESTYAI_BASE_URL", DEFAULT_REQUESTYAI_BASE_URL)
     
     if requestyai_key:
         provider = "RequestYAI"

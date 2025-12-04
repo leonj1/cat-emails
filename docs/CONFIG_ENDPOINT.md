@@ -39,7 +39,7 @@ The endpoint returns a JSON response with the following structure:
   "llm": {
     "provider": "RequestYAI|OpenAI",
     "model": "vertex/google/gemini-2.5-flash",
-    "base_url": "https://api.requesty.ai/openai/v1",
+    "base_url": "https://router.requesty.ai/v1",
     "api_key_configured": true
   },
   "background_processing": {
@@ -156,7 +156,7 @@ The endpoint derives its information from these environment variables:
 
 ### LLM
 - `REQUESTYAI_API_KEY` - RequestYAI API key
-- `REQUESTYAI_BASE_URL` - RequestYAI endpoint (default: https://api.requesty.ai/openai/v1)
+- `REQUESTYAI_BASE_URL` - RequestYAI endpoint (default: https://router.requesty.ai/v1)
 - `OPENAI_API_KEY` - OpenAI API key
 - `OPENAI_BASE_URL` - OpenAI endpoint (default: https://api.openai.com/v1)
 - `LLM_MODEL` - Model name (default: vertex/google/gemini-2.5-flash)

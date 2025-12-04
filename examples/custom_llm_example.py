@@ -6,6 +6,7 @@ and use it with the email categorization system.
 """
 
 import os
+from constants import DEFAULT_REQUESTYAI_BASE_URL
 from services.llm_service_interface import LLMServiceInterface
 from services.categorize_emails_llm import LLMCategorizeEmails
 from services.openai_llm_service import OpenAILLMService
@@ -115,7 +116,7 @@ def example_with_real_llm():
 
     # Get API credentials from environment
     api_key = os.environ.get("REQUESTYAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
-    base_url = os.environ.get("REQUESTYAI_BASE_URL", "https://api.requesty.ai/openai/v1")
+    base_url = os.environ.get("REQUESTYAI_BASE_URL", DEFAULT_REQUESTYAI_BASE_URL)
     model = "vertex/google/gemini-2.5-flash"
 
     if not api_key:
