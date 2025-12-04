@@ -327,7 +327,7 @@ DomainService has inconsistent truthiness check at domain_service.py:
 - Line 58: if not self.api_token: (evaluates to True for empty string "")
 
 When CONTROL_API_TOKEN="" (default from api_service.py:181):
-1. Empty string flows through AccountEmailProcessorService → GmailFetcher → DomainService
+1. Empty string flows through AccountEmailProcessorService -> GmailFetcher -> DomainService
 2. mock_mode = False (because "" is not None)
 3. Validation check fails (because not "" evaluates to True)
 4. ValueError raised instead of using mock mode
@@ -341,4 +341,68 @@ Evidence: domain_service.py:25,58; api_service.py:181,357,388-390
 Features: 0/1 complete (feature_list.md)
 
 Next: Implementation proceeding per PR #83 (fix domain_service.py mock_mode logic)
+---
+
+=== Session 20251204-222218 ===
+Workflow: debugger
+Task: LLM categorization failing with 405 error - background process getting "Error code: 405" when talking to LLM
+Status: Initialized
+Context: Explored project structure and identified LLM service architecture
+
+Error Message:
+```
+Error: leonj1@gmail.com
+State: ERROR
+Step: Processing failed: LLM categorization failed: UnknownError - {'error': 'ProviderError', 'detail': 'Error code: 405'}
+```
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, OpenAI SDK, pytest, Docker
+
+Key Files Identified:
+
+1. /root/repo/services/categorize_emails_llm.py (lines 199-201) - ERROR ORIGIN
+   - Line 199-201: except block catches all exceptions and returns CategoryError
+   - Returns: CategoryError(error="ProviderError", detail=str(e))
+   - This is where "ProviderError" and "Error code: 405" originates
+
+2. /root/repo/services/email_categorizer_service.py (line 47) - ERROR WRAPPER
+   - Line 47: raises RuntimeError(f"LLM categorization failed: {error_type} - {error_detail}")
+   - This creates the "LLM categorization failed: UnknownError - ..." message
+
+3. /root/repo/services/openai_llm_service.py (line 169) - API CALL
+   - Line 169: self.client.beta.chat.completions.parse() - structured output API
+   - Uses OpenAI SDK's beta endpoint for structured outputs
+
+4. /root/repo/services/llm_service_factory.py (lines 21-25) - URL CONFIGURATION
+   - Line 21-24: base_url defaults to "https://requestyai.com/v1"
+   - This URL is WRONG - not a valid RequestYAI endpoint
+
+CRITICAL FINDING - Inconsistent Base URLs:
+- llm_service_factory.py:24 -> "https://requestyai.com/v1" (DEFAULT - WRONG)
+- tests/test_openai_llm_service_integration.py:27 -> "https://router.requesty.ai/v1" (CORRECT)
+- api_service.py:798 -> "https://api.requesty.ai/openai/v1" (ALSO USED)
+- gmail_fetcher.py:61 -> "https://api.requesty.ai/openai/v1" (ALSO USED)
+- .env.example:16 -> "https://api.requesty.ai/openai/v1" (DOCUMENTED)
+
+HTTP 405 "Method Not Allowed" Analysis:
+- The OpenAI SDK is calling the beta.chat.completions.parse endpoint
+- This uses POST method to /chat/completions with structured output
+- A 405 error means the server doesn't support the HTTP method at that URL
+- "https://requestyai.com/v1" likely does not exist or returns 405 for all requests
+
+Call Chain:
+1. EmailCategorizerService.categorize() creates LLMServiceFactory
+2. LLMServiceFactory.create_service() uses default "https://requestyai.com/v1" if env var not set
+3. OpenAILLMService.call_structured() calls client.beta.chat.completions.parse()
+4. Request goes to https://requestyai.com/v1/chat/completions
+5. Server returns HTTP 405 (likely invalid endpoint or domain)
+
+Likely Root Cause:
+- REQUESTYAI_BASE_URL environment variable is NOT set in the background process
+- LLMServiceFactory falls back to hardcoded "https://requestyai.com/v1"
+- This URL is invalid/misconfigured (should be router.requesty.ai or api.requesty.ai)
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
 ---

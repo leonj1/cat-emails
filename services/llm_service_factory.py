@@ -21,7 +21,7 @@ class LLMServiceFactory(LLMServiceFactoryInterface):
         base_url = (
             os.environ.get("REQUESTYAI_BASE_URL")
             or os.environ.get("REQUESTY_BASE_URL")
-            or "https://requestyai.com/v1"
+            or "https://router.requesty.ai/v1"
         )
         api_key = (
             os.environ.get("REQUESTYAI_API_KEY")
