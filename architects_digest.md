@@ -1,24 +1,24 @@
 # Architect's Digest
-> Status: In Progress
+> Status: Complete
 
 ## Active Stack
-1. Add Email Processing Audit Counts (Decomposed)
-   1.1 Add Database Columns and Migration (Completed)
-       - Add emails_reviewed, emails_tagged, emails_deleted columns to ProcessingRun model
-       - Create 005_add_audit_count_columns migration file
-       - Model layer only, no service/API changes
-   1.2 Add AccountStatus Tracking and Increment Methods (Completed)
-       - Add tracking fields to AccountStatus dataclass
-       - Add increment methods to ProcessingStatusManager
-       - Service layer only
-   1.3 Update API Responses to Expose New Fields (Completed)
-       - Updated DatabaseService.get_processing_runs() to expose audit fields
-       - Fixed hardcoded emails_deleted = 0 to read from database
-       - API layer only
-   1.4 Add Concurrency Safety and Edge Cases (Completed - already implemented in Phase 2)
-       - Thread-safe increment operations using self._lock
-       - Handle edge cases (null values with 'or 0' pattern, no-op when no session)
-       - Validation via nullable=False and default=0 in database
+(No active tasks)
+
+## Recently Completed
+1. Generate Mermaid Gantt Chart Text for Email Categorization Runs (COMPLETED)
+   1.1 State Transition Tracking (Completed)
+       - Record state transitions with timestamps during processing
+       - Calculate duration between transitions
+       - Store transitions in archived run data structure
+   1.2 Gantt Chart Generator Core (Completed)
+       - Generate Mermaid Gantt syntax from transition data
+       - Section groupings by processing phase
+       - Date/time formatting for Mermaid
+       - Task status modifiers (done, crit, active)
+   1.3 API Enhancement and Integration (Completed)
+       - Include gantt_chart_text in API response
+       - Backward compatibility
+       - Edge cases (zero duration, missing data)
 
 ## Completed
 - [x] Remove Remote Logs Collector Integration (Phase 1: Core files deleted)
@@ -26,34 +26,36 @@
 - [x] Phase 1.2: Update API Service and Gmail Fetcher Imports
 - [x] 1.1 Add Database Columns and Migration
 - [x] 1.2 Add AccountStatus Tracking and Increment Methods
+- [x] 1.3 Update API Responses to Expose New Fields
+- [x] 1.4 Add Concurrency Safety and Edge Cases
+- [x] Add Email Processing Audit Counts (All 4 phases completed)
+- [x] 1.1 State Transition Tracking (Sub-task of Gantt Chart feature)
+- [x] 1.2 Gantt Chart Generator Core (Sub-task of Gantt Chart feature)
+- [x] 1.3 API Enhancement and Integration (Sub-task of Gantt Chart feature)
+- [x] Generate Mermaid Gantt Chart Text for Email Categorization Runs (ALL SUB-TASKS COMPLETE)
 
 ## Context
 
 ### Task Description
-Add email processing audit entry that includes the number of emails reviewed, how many were tagged, and how many were deleted. Current audit entry only shows: email address, state, start/end time, duration, progress, and step. Need to add: emails_reviewed count, emails_tagged count, emails_deleted count
+Generate Mermaid Gantt chart text for email categorization runs. The system has a background
+process that categorizes emails from Gmail accounts. Create a feature that generates Gantt
+chart text (using Mermaid syntax) for each run per account. The Gantt chart text should be
+included in the historical audit response for the UI to render independently.
 
-### Current System Analysis
+### Decomposition Rationale
+Original spec failed scope check: 25 scenarios exceeded 15-scenario threshold. Introduced 4+
+new public interfaces/dataclasses and required 5+ files to modify.
 
-#### ProcessingRun Model (database.py:204-225)
-Current fields:
-- id, email_address, start_time, end_time
-- state, current_step
-- emails_found, emails_processed
-- error_message, created_at, updated_at
+Decomposed into 3 sequential features:
+1. **State Transition Tracking**: Foundation layer - tracking mechanism
+2. **Gantt Chart Generator Core**: Pure text generation service
+3. **API Enhancement**: Integration with existing API responses
 
-Missing fields (to be added):
-- emails_reviewed (Integer) - count of emails reviewed during processing
-- emails_tagged (Integer) - count of emails that received labels
-- emails_deleted (Integer) - count of emails deleted
-
-#### Key Files to Modify
-1. `/root/repo/models/database.py` - Add new columns to ProcessingRun
-2. `/root/repo/services/processing_status_manager.py` - Track new counts in AccountStatus
-3. `/root/repo/migrations/` - New migration for schema changes
-4. `/root/repo/gmail_fetcher.py` or `/root/repo/email_scanner_consumer.py` - Report counts during processing
-5. API endpoints - Return new fields in responses
-
-#### Related Existing Fields
-- EmailSummary has: total_emails_processed, total_emails_deleted, total_emails_archived
-- CategorySummary has: email_count, deleted_count, archived_count
-- These are aggregated summaries, not per-run audit entries
+### Processing States Timeline
+The Gantt chart should represent these processing phases:
+1. CONNECTING - Initial connection to Gmail IMAP
+2. FETCHING - Retrieving emails from mailbox
+3. PROCESSING - General email processing
+4. CATEGORIZING - AI categorization of emails
+5. LABELING - Applying Gmail labels
+6. COMPLETED/ERROR - Final state

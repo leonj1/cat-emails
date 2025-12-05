@@ -40,6 +40,8 @@ from enum import Enum, auto
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional, Any
 from collections import deque
+from services.state_transition import StateTransitionTracker
+from services.gantt_chart_generator import GanttChartGenerator
 
 
 class ProcessingState(Enum):
@@ -93,7 +95,7 @@ class ProcessingStatusManager:
     def __init__(self, max_history: int = 50):
         """
         Initialize the processing status manager.
-        
+
         Args:
             max_history: Maximum number of recent runs to keep in history
         """
@@ -101,17 +103,18 @@ class ProcessingStatusManager:
         self._current_status: Optional[AccountStatus] = None
         self._recent_runs: deque = deque(maxlen=max_history)
         self._max_history = max_history
+        self._transition_tracker = StateTransitionTracker()
         self.logger = get_logger(__name__)
-        
+
         self.logger.info(f"ProcessingStatusManager initialized with max_history={max_history}")
     
     def start_processing(self, email_address: str) -> None:
         """
         Start processing for a specific email account.
-        
+
         Args:
             email_address: The email address being processed
-            
+
         Raises:
             ValueError: If processing is already active for another account
         """
@@ -121,7 +124,7 @@ class ProcessingStatusManager:
                     f"Processing already active for {self._current_status.email_address}. "
                     f"Current state: {self._current_status.state.name}"
                 )
-            
+
             now = datetime.now(timezone.utc)
             self._current_status = AccountStatus(
                 email_address=email_address,
@@ -130,7 +133,11 @@ class ProcessingStatusManager:
                 start_time=now,
                 last_updated=now
             )
-            
+
+            # Clear and initialize transition tracker
+            self._transition_tracker.clear()
+            self._transition_tracker.record_transition("IDLE", "Initializing processing", now)
+
             self.logger.info(f"Started processing for account: {email_address}")
     
     def update_status(
@@ -142,63 +149,82 @@ class ProcessingStatusManager:
     ) -> None:
         """
         Update the current processing status.
-        
+
         Args:
             state: New processing state
             step: Description of the current processing step
             progress: Optional progress information (e.g., {'current': 5, 'total': 10})
             error_message: Optional error message if state is ERROR
-            
+
         Raises:
             RuntimeError: If no processing session is active
         """
         with self._lock:
             if not self._current_status:
                 raise RuntimeError("No active processing session to update")
-            
+
+            now = datetime.now(timezone.utc)
+
             self._current_status.state = state
             self._current_status.current_step = step
             self._current_status.progress = progress
             self._current_status.error_message = error_message
-            self._current_status.last_updated = datetime.now(timezone.utc)
-            
+            self._current_status.last_updated = now
+
+            # Record state transition - handle both ProcessingState enum and string
+            state_name = state.name if isinstance(state, ProcessingState) else str(state)
+            self._transition_tracker.record_transition(state_name, step, now)
+
             # Log status updates
             progress_str = ""
             if progress and 'current' in progress and 'total' in progress:
                 progress_str = f" ({progress['current']}/{progress['total']})"
-            
+
             if state == ProcessingState.ERROR:
                 self.logger.error(
                     f"Processing error for {self._current_status.email_address}: {step}{progress_str} - {error_message}"
                 )
             else:
                 self.logger.info(
-                    f"Processing update for {self._current_status.email_address}: {state.name} - {step}{progress_str}"
+                    f"Processing update for {self._current_status.email_address}: {state_name} - {step}{progress_str}"
                 )
     
     def complete_processing(self) -> None:
         """
         Complete the current processing session and archive it to history.
-        
+
         The current status is moved to the recent runs history and reset.
         """
         with self._lock:
             if not self._current_status:
                 self.logger.warning("Attempted to complete processing, but no session is active")
                 return
-            
+
             # Calculate duration
             duration_seconds = None
             if self._current_status.start_time and self._current_status.last_updated:
                 duration = self._current_status.last_updated - self._current_status.start_time
                 duration_seconds = duration.total_seconds()
-            
+
             # Mark as completed if not already in error state
             if self._current_status.state != ProcessingState.ERROR:
                 self._current_status.state = ProcessingState.COMPLETED
                 self._current_status.current_step = "Processing completed"
                 self._current_status.last_updated = datetime.now(timezone.utc)
-            
+
+            # Finalize transitions with duration calculations
+            transitions = self._transition_tracker.finalize()
+
+            # Generate Gantt chart text if we have transitions
+            gantt_chart_text = None
+            if transitions:
+                generator = GanttChartGenerator()
+                gantt_chart_text = generator.generate(
+                    transitions=transitions,
+                    title=self._current_status.email_address,
+                    include_zero_duration=False
+                )
+
             # Create archived run record
             archived_run = {
                 'email_address': self._current_status.email_address,
@@ -211,17 +237,22 @@ class ProcessingStatusManager:
                 'final_progress': self._current_status.progress,
                 'emails_reviewed': self._current_status.emails_reviewed,
                 'emails_tagged': self._current_status.emails_tagged,
-                'emails_deleted': self._current_status.emails_deleted
+                'emails_deleted': self._current_status.emails_deleted,
+                'state_transitions': [t.to_dict() for t in transitions],
+                'gantt_chart_text': gantt_chart_text
             }
-            
+
             # Add to history
             self._recent_runs.append(archived_run)
-            
+
             self.logger.info(
                 f"Completed processing for {self._current_status.email_address} "
                 f"in {duration_seconds:.2f} seconds" if duration_seconds else "Completed processing"
             )
-            
+
+            # Clear transition tracker for next run
+            self._transition_tracker.clear()
+
             # Reset current status
             self._current_status = None
 
