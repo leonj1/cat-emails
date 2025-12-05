@@ -17,7 +17,7 @@ Use this command to create implementation prompts following BDD and TDD best pra
 
 **Example**: `/architect Build a user authentication system with JWT`
 
-**Flow**: init-explorer → architect → bdd-agent → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → coder → standards → tester → bdd-test-runner
+**Flow**: init-explorer → architect → bdd-agent → test-consistency-validator → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → test-consistency-validator → coder → standards → tester → bdd-test-runner
 
 ### `/coder` - Orchestrated Development
 Use this command when you want to implement features with full orchestration:
@@ -102,6 +102,7 @@ Use this command to start a forensic Root Cause Analysis debugging session:
   - `codebase-analyst.md` - Finds reuse opportunities
   - `refactor-decision-engine.md` - Decides if refactoring needed
   - `test-creator.md` - TDD specialist that writes tests first
+  - `test-consistency-validator.md` - Validates test names match their contents
   - `coder.md` - Implementation specialist
   - `coding-standards-checker.md` - Code quality verifier
   - `tester.md` - Functionality verification
@@ -117,6 +118,10 @@ Use this command to start a forensic Root Cause Analysis debugging session:
 - `.claude/commands/` - Custom slash commands
 - `.claude/hooks/` - Automated workflow hooks
 - `.claude/config.json` - Project configuration
+- `.claude/skills/` - Reusable skills for Claude Code
+  - `context-initializer/` - Auto-invokes init-explorer when context is empty
+  - `strict-architecture/` - Enforces governance rules for code
+  - `exa-webfetch/` - Uses Exa API for intelligent web searches
 - `tests/bdd/` - Gherkin feature files for BDD scenarios
 
 ## Hooks System
@@ -198,10 +203,12 @@ If the project already has a `./sql` folder, you cannot modify any of these exis
 2. `architect` creates greenfield spec (or decomposes complex tasks)
 3. `bdd-agent` generates Gherkin scenarios
 4. `scope-manager` validates complexity (loops back to Architect if too complex)
-5. `gherkin-to-test` invokes codebase-analyst and creates prompts
-6. `run-prompt` executes prompts sequentially
-7. For each prompt:
+5. `test-consistency-validator` validates Gherkin scenario names match their steps (loops back to bdd-agent if inconsistent)
+6. `gherkin-to-test` invokes codebase-analyst and creates prompts
+7. `run-prompt` executes prompts sequentially
+8. For each prompt:
    - `test-creator` writes tests from Gherkin
+   - `test-consistency-validator` validates test names match content (loops back to test-creator if inconsistent)
    - `coder` implements to pass tests
    - `coding-standards-checker` verifies quality
    - `tester` validates functionality
@@ -244,6 +251,39 @@ If the project already has a `./sql` folder, you cannot modify any of these exis
 - Batch processing
 - Intelligent routing
 - BDD prompts always run sequentially
+
+## Available Skills
+
+### `context-initializer` - Auto-Context Gathering
+This skill automatically invokes the init-explorer agent when Claude Code lacks project context.
+
+**When it activates**:
+- No project context available (don't know tech stack, purpose, structure)
+- Missing `claude-progress.txt` or `architects_digest.md`
+- User asks context-dependent questions without prior exploration
+- Starting a new task without codebase understanding
+
+**What it does**: Invokes init-explorer to gather project context including tech stack, directory structure, coding patterns, test setup, and build commands.
+
+**Usage**: Invoke the skill with `skill: "context-initializer"` when you detect empty context.
+
+### `exa-webfetch` - Intelligent Web Search via Exa API
+This skill uses the Exa API for intelligent web searches instead of the default WebFetch tool. It provides semantic search capabilities that understand query meaning.
+
+**When it activates**:
+- User asks about current events, news, or recent developments
+- User needs up-to-date information beyond Claude's knowledge cutoff
+- User needs latest documentation, API versions, or technical references
+- User wants comprehensive research on a topic
+- User wants to verify current facts, prices, or statistics
+- User asks about time-sensitive data (stock prices, weather, sports)
+- User wants to find pages similar to a given URL
+
+**Prerequisites**: Requires `EXA_API_TOKEN` environment variable to be set.
+
+**What it does**: Performs web searches using Exa's neural/semantic search, which understands the meaning of queries rather than just matching keywords. Supports filtering by category (news, research paper, github, etc.), date ranges, and specific domains.
+
+**Usage**: Invoke the skill with `skill: "exa-webfetch"` when up-to-date information is needed.
 
 ## General Usage
 
