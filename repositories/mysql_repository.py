@@ -20,6 +20,7 @@ from models.database import (
     ProcessedEmailLog
 )
 from utils.logger import get_logger
+from migrations.add_audit_count_columns_mysql import run_audit_columns_migration
 
 logger = get_logger(__name__)
 
@@ -224,9 +225,12 @@ class MySQLRepository(DatabaseRepositoryInterface):
             
             # Create all tables if they don't exist
             Base.metadata.create_all(self.engine)
-            
+
+            # Run MySQL-specific migrations for columns that may be missing
+            run_audit_columns_migration(self.engine)
+
             self.SessionFactory = sessionmaker(bind=self.engine)
-            
+
             logger.info(f"MySQL repository connected to: {self.host}:{self.port}/{self.database}")
         except Exception as e:
             if self.engine:

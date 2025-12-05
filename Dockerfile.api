@@ -17,6 +17,7 @@ COPY api_service.py .
 COPY send_emails.py .
 COPY domain_service.py .
 COPY gmail_fetcher.py .
+COPY constants.py .
 COPY models/ ./models/
 COPY services/ ./services/
 COPY repositories/ ./repositories/
@@ -24,6 +25,7 @@ COPY clients/ ./clients/
 COPY utils/ ./utils/
 COPY email_providers/ ./email_providers/
 COPY templates/ ./templates/
+COPY migrations/ ./migrations/
 
 # Set environment variables
 ENV API_HOST="0.0.0.0"

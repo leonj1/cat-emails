@@ -35,16 +35,19 @@ class MigrationError(Exception):
     pass
 
 
-def get_engine(db_path: Optional[str] = None):
+def get_engine(db_path: Optional[str] = None, engine=None):
     """
     Get database engine.
 
     Args:
         db_path: Path to database file. If None, get_database_url will use its default.
+        engine: Optional existing SQLAlchemy engine (for MySQL support).
 
     Returns:
         SQLAlchemy engine instance
     """
+    if engine is not None:
+        return engine
     database_url = get_database_url(db_path)
     engine = create_engine(database_url, echo=False)
     return engine
@@ -63,11 +66,16 @@ def column_exists(engine, table_name: str, column_name: str) -> bool:
     return column_name in columns
 
 
-def upgrade(db_path: Optional[str] = None):
-    """Apply the migration (add audit count columns)"""
+def upgrade(db_path: Optional[str] = None, engine=None):
+    """Apply the migration (add audit count columns)
+
+    Args:
+        db_path: Path to database file. If None, get_database_url will use its default.
+        engine: Optional existing SQLAlchemy engine (for MySQL support).
+    """
     logger.info("Starting migration 005: Add Audit Count Columns to ProcessingRun")
 
-    engine = get_engine(db_path)
+    engine = get_engine(db_path, engine=engine)
     Session = sessionmaker(bind=engine)
     session = Session()
 
