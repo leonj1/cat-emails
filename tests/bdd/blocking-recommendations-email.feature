@@ -124,9 +124,9 @@ Feature: Blocking Recommendations Email Notification
   Scenario: Partial blocking - some domains blocked, some not
     Given the blocked domains list contains "marketing-spam.com"
     And the inbox contains:
-      | sender_email                 | category   |
-      | spam@marketing-spam.com      | Marketing  |
-      | ads@new-ads-domain.com       | Advertising|
+      | sender_email                 | category    |
+      | spam@marketing-spam.com      | Marketing   |
+      | ads@new-ads-domain.com       | Advertising |
     When the process_account function runs for "user@gmail.com"
     Then the recommendations should include only domain "new-ads-domain.com"
     And domain "marketing-spam.com" should not be in recommendations
@@ -217,24 +217,24 @@ Feature: Blocking Recommendations Email Notification
     And the inbox contains emails from "spam@test.com" categorized as "Marketing"
     When the process_account function runs for "user@gmail.com"
     Then each recommendation object should contain:
-      | field    | type   |
-      | domain   | string |
-      | category | string |
-      | count    | integer|
+      | field    | type    |
+      | domain   | string  |
+      | category | string  |
+      | count    | integer |
 
   Scenario: Response maintains existing fields
     Given the blocked domains list is empty
     And the inbox contains 10 emails with 3 categorized as "Marketing" from unblocked domains
     When the process_account function runs for "user@gmail.com"
     Then the response should include all existing fields:
-      | field                  |
-      | account                |
-      | emails_found           |
-      | emails_processed       |
-      | emails_categorized     |
-      | processing_time_seconds|
-      | timestamp              |
-      | success                |
+      | field                   |
+      | account                 |
+      | emails_found            |
+      | emails_processed        |
+      | emails_categorized      |
+      | processing_time_seconds |
+      | timestamp               |
+      | success                 |
     And the response should also include new recommendation fields
 
   # ============================================
