@@ -16,6 +16,7 @@ The implementation should add to models/database.py ProcessingRun class:
     emails_tagged = Column(Integer, default=0, nullable=False)
     emails_deleted = Column(Integer, default=0, nullable=False)
 """
+import shutil
 import tempfile
 import unittest
 from datetime import datetime
@@ -322,6 +323,7 @@ class TestProcessingRunStoresCustomAuditValues(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up database after all tests."""
         cls.engine.dispose()
+        shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
         """Set up a fresh session for each test."""
@@ -500,6 +502,7 @@ class TestProcessingRunDefaultsAuditCountsToZero(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up database after all tests."""
         cls.engine.dispose()
+        shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
         """Set up a fresh session for each test."""

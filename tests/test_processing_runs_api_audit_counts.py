@@ -25,6 +25,7 @@ The implementation should modify services/database_service.py get_processing_run
 
 Target: /root/repo/services/database_service.py - get_processing_runs() method (lines 287-305)
 """
+import shutil
 import tempfile
 import unittest
 from datetime import datetime
@@ -67,6 +68,7 @@ class TestApiResponseIncludesEmailsReviewedField(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up database after all tests."""
         cls.engine.dispose()
+        shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
         """Set up a fresh session for each test."""
@@ -245,6 +247,7 @@ class TestApiResponseIncludesEmailsTaggedField(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up database after all tests."""
         cls.engine.dispose()
+        shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
         """Set up a fresh session for each test."""
@@ -385,6 +388,7 @@ class TestApiResponseIncludesEmailsDeletedFromDatabase(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up database after all tests."""
         cls.engine.dispose()
+        shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
         """Set up a fresh session for each test."""
@@ -542,6 +546,7 @@ class TestNullAuditCountValuesDefaultToZero(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up database after all tests."""
         cls.engine.dispose()
+        shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
         """Set up a fresh session for each test."""
@@ -781,6 +786,7 @@ class TestApiResponseIncludesAllAuditFieldsTogether(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up database after all tests."""
         cls.engine.dispose()
+        shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
         """Set up a fresh session for each test."""
@@ -1009,6 +1015,7 @@ class TestApiResponseAuditFieldsIntegration(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up database after all tests."""
         cls.engine.dispose()
+        shutil.rmtree(cls.temp_dir, ignore_errors=True)
 
     def setUp(self):
         """Set up a fresh session for each test."""

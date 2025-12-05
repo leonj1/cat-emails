@@ -76,7 +76,7 @@ Based on the Gherkin scenarios, implement:
    - Nullable: False (NOT NULL)
 
 4. Create database migration script
-   - File: /root/repo/migrations/003_add_audit_count_columns.py
+   - File: /root/repo/migrations/005_add_audit_count_columns.py
    - Follow existing migration pattern from 002_modify_processing_runs.py
    - Add ALTER TABLE statements for each new column
 
@@ -104,7 +104,7 @@ Reuse Opportunities (from gap analysis):
 
 New Components Needed:
 - 3 new column definitions in ProcessingRun class
-- Migration script (003_add_audit_count_columns.py)
+- Migration script (005_add_audit_count_columns.py)
 - Test file (test_processing_run_audit_columns.py)
 
 Existing File to Modify:
@@ -128,7 +128,7 @@ Implementation Steps:
 1. Create test file: /root/repo/tests/test_processing_run_audit_columns.py
 2. Write failing tests for each Gherkin scenario
 3. Add columns to ProcessingRun model in /root/repo/models/database.py
-4. Create migration file: /root/repo/migrations/003_add_audit_count_columns.py
+4. Create migration file: /root/repo/migrations/005_add_audit_count_columns.py
 5. Run tests to verify all pass
 
 Column Definition Pattern:

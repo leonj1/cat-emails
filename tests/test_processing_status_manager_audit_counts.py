@@ -25,7 +25,6 @@ The implementation should add to ProcessingStatusManager:
 And modify complete_processing() to include audit counts in archived run.
 """
 import unittest
-from unittest.mock import Mock, patch
 
 from services.processing_status_manager import (
     ProcessingStatusManager,
