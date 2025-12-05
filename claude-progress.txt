@@ -549,3 +549,75 @@ Features: 0/1 complete (feature_list.md)
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
 ---
+
+=== Session 20251205-052500 ===
+Workflow: architect
+Task: Generate Mermaid Gantt chart text for email categorization runs
+Status: Initialized
+Context: Explored project structure and identified audit/historical data architecture
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for API service
+- Database: SQLAlchemy with MySQL/SQLite support
+- Testing: pytest with BDD (Gherkin feature files)
+- Visualization: matplotlib/seaborn (existing chart_generator.py), Mermaid (new)
+- Build: Docker, Makefile
+
+Task Description:
+The system has a background process that categorizes emails from Gmail accounts. Create a
+feature that generates Gantt chart text (using Mermaid syntax) for each run per account.
+The Gantt chart text should be included in the historical audit response for the UI to
+render independently.
+
+Key Files Identified for Audit/Historical Data:
+
+1. ProcessingRun Model (/root/repo/models/database.py lines 204-230):
+   - Tracks email processing sessions per account
+   - Fields: id, email_address, start_time, end_time, state, current_step
+   - Fields: emails_found, emails_processed, error_message
+   - Audit fields: emails_reviewed, emails_tagged, emails_deleted
+   - Has indexes: email_address, start_time, (email_address, start_time), state
+
+2. ProcessingStatusManager (/root/repo/services/processing_status_manager.py):
+   - In-memory tracking of processing state
+   - AccountStatus dataclass: email_address, state, current_step, progress, start_time, last_updated
+   - Audit fields: emails_reviewed, emails_tagged, emails_deleted
+   - get_recent_runs(limit): Returns list of archived run dictionaries
+   - archived_run dict includes: start_time, end_time, duration_seconds, final_state, final_step
+
+3. DatabaseService (/root/repo/services/database_service.py):
+   - get_processing_runs(limit): Queries ProcessingRun table
+   - Returns: run_id, started_at, completed_at, duration_seconds, emails_processed, emails_reviewed, emails_tagged, emails_deleted, success, error_message
+
+4. API Endpoints (/root/repo/api_service.py):
+   - GET /api/processing/history - Returns recent_runs from ProcessingStatusManager
+   - GET /api/status - Unified status with optional include_recent parameter
+   - WebSocket /ws/status - Real-time updates including get_recent_runs
+
+5. Frontend Display (/root/repo/frontend/static/js/dashboard.js):
+   - refreshProcessingRuns() - Fetches from /api/stats/processing-runs
+   - createProcessingRunRow(run) - Renders run_id, started_at, duration, emails_processed, emails_deleted, status
+
+6. Existing Chart Generator (/root/repo/services/chart_generator.py):
+   - Uses matplotlib/seaborn for visualizations
+   - Generates base64 PNG images
+   - Pattern to follow: generate_*_chart() methods
+
+Mermaid Gantt Requirements:
+- Reference: https://docs.mermaidchart.com/mermaid-oss/syntax/gantt.html
+- Generate text-based Gantt syntax for UI rendering
+- Chart should show processing steps/phases over time
+- Include: section per account, tasks for each processing phase
+- Time axis should show actual timestamps
+
+Implementation Approach:
+1. Create GanttChartGenerator service to generate Mermaid syntax
+2. Add gantt_chart_text field to audit response
+3. Modify get_processing_runs to include gantt chart text per run
+4. Frontend can render Mermaid using mermaid.js library
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for Mermaid Gantt chart generation
+---
