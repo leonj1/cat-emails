@@ -17,7 +17,7 @@ Use this command to create implementation prompts following BDD and TDD best pra
 
 **Example**: `/architect Build a user authentication system with JWT`
 
-**Flow**: init-explorer → architect → bdd-agent → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → coder → standards → tester → bdd-test-runner
+**Flow**: init-explorer → architect → bdd-agent → test-consistency-validator → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → test-consistency-validator → coder → standards → tester → bdd-test-runner
 
 ### `/coder` - Orchestrated Development
 Use this command when you want to implement features with full orchestration:
@@ -102,6 +102,7 @@ Use this command to start a forensic Root Cause Analysis debugging session:
   - `codebase-analyst.md` - Finds reuse opportunities
   - `refactor-decision-engine.md` - Decides if refactoring needed
   - `test-creator.md` - TDD specialist that writes tests first
+  - `test-consistency-validator.md` - Validates test names match their contents
   - `coder.md` - Implementation specialist
   - `coding-standards-checker.md` - Code quality verifier
   - `tester.md` - Functionality verification
@@ -198,10 +199,12 @@ If the project already has a `./sql` folder, you cannot modify any of these exis
 2. `architect` creates greenfield spec (or decomposes complex tasks)
 3. `bdd-agent` generates Gherkin scenarios
 4. `scope-manager` validates complexity (loops back to Architect if too complex)
-5. `gherkin-to-test` invokes codebase-analyst and creates prompts
-6. `run-prompt` executes prompts sequentially
-7. For each prompt:
+5. `test-consistency-validator` validates Gherkin scenario names match their steps (loops back to bdd-agent if inconsistent)
+6. `gherkin-to-test` invokes codebase-analyst and creates prompts
+7. `run-prompt` executes prompts sequentially
+8. For each prompt:
    - `test-creator` writes tests from Gherkin
+   - `test-consistency-validator` validates test names match content (loops back to test-creator if inconsistent)
    - `coder` implements to pass tests
    - `coding-standards-checker` verifies quality
    - `tester` validates functionality
