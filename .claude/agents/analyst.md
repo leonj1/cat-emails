@@ -3,7 +3,7 @@ name: analyst
 description: Root Cause Analysis specialist that synthesizes investigation findings into structured diagnosis reports.
 tools: Read, Bash, Task
 model: opus
-extended_thinking: true
+ultrathink: true
 color: purple
 ---
 
