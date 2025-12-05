@@ -56,7 +56,9 @@ def run_audit_columns_migration(engine: "Engine") -> bool:
         True if migration ran successfully, False otherwise
     """
     if not table_exists(engine, 'processing_runs'):
-        logger.debug("processing_runs table doesn't exist yet, skipping audit columns migration")
+        logger.debug(
+            "processing_runs table doesn't exist yet, skipping audit columns migration"
+        )
         return True
 
     Session = sessionmaker(bind=engine)
@@ -71,14 +73,23 @@ def run_audit_columns_migration(engine: "Engine") -> bool:
     try:
         for column_name, column_def in columns_to_add:
             if not column_exists(engine, 'processing_runs', column_name):
-                logger.info(f"Adding missing column {column_name} to processing_runs")
+                logger.info(
+                    "Adding missing column %s to processing_runs",
+                    column_name,
+                )
                 session.execute(text(
                     f"ALTER TABLE processing_runs ADD COLUMN {column_name} {column_def}"
                 ))
                 session.commit()
-                logger.info(f"Added {column_name} column to processing_runs")
+                logger.info(
+                    "Added %s column to processing_runs",
+                    column_name,
+                )
             else:
-                logger.debug(f"Column {column_name} already exists in processing_runs")
+                logger.debug(
+                    "Column %s already exists in processing_runs",
+                    column_name,
+                )
 
         return True
 
