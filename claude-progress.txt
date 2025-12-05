@@ -406,3 +406,57 @@ Features: 0/1 complete (feature_list.md)
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
 ---
+
+=== Session 20251204-235315 ===
+Workflow: architect
+Task: Add email processing audit entry that includes the number of emails reviewed, how many were tagged, and how many were deleted. Current audit entry only shows: email address, state, start/end time, duration, progress, and step. Need to add: emails_reviewed count, emails_tagged count, emails_deleted count
+Status: Initialized
+Context: Explored project structure, identified audit entry architecture
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker
+
+Current Audit System Analysis:
+
+1. ProcessingRun Model (/root/repo/models/database.py lines 204-225):
+   Current fields:
+   - id (Integer, primary key)
+   - email_address (Text, not null)
+   - start_time (DateTime, not null)
+   - end_time (DateTime, nullable)
+   - state (Text, not null) - current processing state
+   - current_step (Text, nullable) - description of current step
+   - emails_found (Integer, default=0)
+   - emails_processed (Integer, default=0)
+   - error_message (Text, nullable)
+   - created_at, updated_at (DateTime)
+
+   Missing fields (requested):
+   - emails_reviewed (count of emails reviewed)
+   - emails_tagged (count of emails that received labels)
+   - emails_deleted (count of emails deleted)
+
+2. ProcessingStatusManager (/root/repo/services/processing_status_manager.py):
+   - AccountStatus dataclass tracks in-memory processing state
+   - complete_processing() creates archived run record
+   - archived_run dict captures: email_address, start_time, end_time, duration_seconds, final_state, final_step, error_message, final_progress
+   - Does NOT currently track tagged/deleted counts
+
+3. Related Models:
+   - EmailSummary (database.py:53-82) HAS: total_emails_processed, total_emails_deleted, total_emails_archived
+   - CategorySummary (database.py:85-101) HAS: email_count, deleted_count, archived_count
+   - These exist but are NOT connected to ProcessingRun
+
+4. Migration System:
+   - migrations/002_modify_processing_runs.py - previous migration for ProcessingRun table
+   - New migration will be needed: migrations/003_add_audit_counts.py
+
+Key Implementation Points:
+- ProcessingRun table needs 3 new columns
+- ProcessingStatusManager must track these counts in-memory
+- email_scanner_consumer.py or gmail_fetcher.py should report counts on completion
+- API endpoints need to return these new fields
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for email processing audit enhancement
+---
