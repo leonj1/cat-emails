@@ -5,8 +5,8 @@ set -e
 if [ -n "$MYSQL_HOST" ]; then
     echo "Waiting for MySQL at $MYSQL_HOST:${MYSQL_PORT:-3306}..."
 
-    # Build connection string for Flyway
-    FLYWAY_URL="jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT:-3306}/${MYSQL_DATABASE}"
+    # Build connection string for Flyway (allowPublicKeyRetrieval needed for MySQL 8.0 caching_sha2_password auth)
+    FLYWAY_URL="jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT:-3306}/${MYSQL_DATABASE}?allowPublicKeyRetrieval=true&useSSL=false"
 
     # Wait up to 60 seconds for MySQL
     timeout=60

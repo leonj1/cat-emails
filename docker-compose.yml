@@ -22,7 +22,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: Dockerfile
     container_name: gmail-cleaner-api
     ports:
       - "${API_PORT:-8000}:8000"
