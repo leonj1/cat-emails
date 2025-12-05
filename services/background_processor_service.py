@@ -123,13 +123,22 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
                                 # Record categories in aggregator if enabled
                                 if self.category_aggregator:
                                     try:
-                                        category_actions = result.get("category_counts", {})
+                                        category_actions = result.get("category_counts") or {}
+                                        if not isinstance(category_actions, dict):
+                                            logger.warning(
+                                                "Skipping category aggregation for %s due to unexpected "
+                                                "category_counts type: %s",
+                                                account.email_address,
+                                                type(category_actions),
+                                            )
+                                            category_actions = {}
+
                                         # Extract totals from category_actions (Dict[str, Dict[str, int]])
                                         # to category_counts (Dict[str, int]) for the aggregator
                                         category_counts = {
-                                            cat: stats["total"]
+                                            cat: stats.get("total", 0)
                                             for cat, stats in category_actions.items()
-                                            if isinstance(stats, dict) and "total" in stats
+                                            if isinstance(stats, dict)
                                         }
                                         if category_counts:
                                             self.category_aggregator.record_batch(
