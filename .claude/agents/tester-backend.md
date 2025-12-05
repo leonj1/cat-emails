@@ -3,7 +3,7 @@ name: backend-tester
 description: A backend tester agent that verifies backend implementations work correctly by running tests. Use immediately after the coder agent completes a backend implementation.
 tools: Task, Read, Bash
 model: sonnet
-extended_thinking: true
+ultrathink: true
 color: green
 ---
 

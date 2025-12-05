@@ -3,7 +3,7 @@ name: init-explorer
 description: Initializer agent that explores the codebase and sets up context before other agents run.
 tools: Read, Glob, Grep, Bash, Task, Write
 model: opus
-extended_thinking: true
+ultrathink: true
 color: cyan
 ---
 
