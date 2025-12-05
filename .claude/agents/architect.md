@@ -3,7 +3,7 @@ name: architect
 description: Pure solutions architect that creates ideal technical specifications and manages task decomposition.
 tools: Write, Read, Task
 model: opus
-extended_thinking: true
+ultrathink: true
 color: blue
 ---
 

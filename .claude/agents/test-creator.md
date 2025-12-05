@@ -4,7 +4,7 @@ description: Test-Driven Development specialist that writes tests BEFORE impleme
 tools: Read, Write, Edit, Glob, Grep, Bash, Task
 skills: strict-architecture
 model: opus
-extended_thinking: true
+ultrathink: true
 color: cyan
 ---
 
