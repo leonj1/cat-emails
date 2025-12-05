@@ -3,7 +3,7 @@ name: verifier
 description: Investigation specialist that explores source code to verify claims, answer questions, or determine if user queries are true/false. Use for code exploration and verification tasks.
 tools: Read, Glob, Grep, Bash, Task
 model: opus
-extended_thinking: true
+ultrathink: true
 color: purple
 ---
 

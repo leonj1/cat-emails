@@ -9,6 +9,41 @@ Language-agnostic principles that apply to all code.
 - **No silent failures** - Handle errors explicitly
 - **No hardcoded values** - Use constants or configuration
 - **Reuse existing service classes** - Before creating a new service class always check if there is an existing one that can be reused
+- **No file duplication** - Always fix existing files instead of creating duplicates with fixes
+
+## File Modification Rules
+
+### No File Duplication
+When fixing or updating existing files, **always modify the original file directly**. Never create duplicate files with suffixes like `.fixed`, `.new`, `.backup`, `.api`, etc.
+
+**Prohibited patterns:**
+- `Dockerfile` → `Dockerfile.fixed` or `Dockerfile.api`
+- `config.yaml` → `config.yaml.new`
+- `main.py` → `main_fixed.py`
+- `docker-compose.yml` → `docker-compose.fixed.yml`
+- Any pattern that creates a copy of an existing file instead of fixing it
+
+**Why this matters:**
+- Duplicate files cause confusion about which file is the "real" one
+- Build systems and tools expect specific filenames
+- Duplicate files may not be picked up by the build process
+- Creates technical debt and maintenance burden
+- The original broken file remains in the codebase
+
+**Correct approach:**
+```
+// ❌ BAD - Creating a duplicate file with fixes
+# Found issues in Dockerfile, creating Dockerfile.fixed with corrections
+
+// ❌ BAD - Creating a "new" version
+# Creating docker-compose.new.yml with the updated configuration
+
+// ✅ GOOD - Fix the existing file directly
+# Updating Dockerfile to fix the identified issues
+# Editing docker-compose.yml to add the new service
+```
+
+**Exception:** Backup files created by version control or automated tools (e.g., `.bak` files from editors) are acceptable but should not be committed.
 
 ## Code Organization
 
@@ -49,23 +84,44 @@ Language-agnostic principles that apply to all code.
 
 ## Configuration Management
 
-### Environment Variables
+### Central Constants and Environment Variables
+- **All configuration values must be read from a central constant or environment variable** - Never hardcode configuration values directly in source code
 - Read environment variables at application startup/initialization
 - Pass configuration values down through function arguments
 - Never read `process.env`, `os.getenv()`, or equivalent directly in business logic
 - Use configuration objects/classes to encapsulate settings
+- Define constants in a dedicated configuration module (e.g., `config.py`, `constants.go`, `config.ts`)
 
 ### Example Pattern
 ```
+// ❌ BAD - Hardcoded configuration values
+function sendEmail(to, subject, body) {
+  const smtpHost = "smtp.example.com";  // Hardcoded!
+  const timeout = 5000;                  // Hardcoded!
+  return mailer.send(smtpHost, timeout, to, subject, body);
+}
+
 // ❌ BAD - Reading env var inside function
 function connectDatabase() {
   const host = process.env.DB_HOST;
   return connect(host);
 }
 
-// ✅ GOOD - Configuration passed as argument
+// ✅ GOOD - Configuration from central constants module
+// In config.ts:
+export const CONFIG = {
+  SMTP_HOST: process.env.SMTP_HOST || "localhost",
+  SMTP_TIMEOUT: parseInt(process.env.SMTP_TIMEOUT || "5000"),
+  DB_HOST: process.env.DB_HOST || "localhost",
+};
+
+// In application code:
+function sendEmail(config, to, subject, body) {
+  return mailer.send(config.SMTP_HOST, config.SMTP_TIMEOUT, to, subject, body);
+}
+
 function connectDatabase(config) {
-  return connect(config.dbHost);
+  return connect(config.DB_HOST);
 }
 ```
 
