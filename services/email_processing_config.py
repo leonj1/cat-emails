@@ -11,7 +11,7 @@ class EmailProcessingConfiguration(EmailProcessingConfigurationInterface):
         # Core credentials
         self._email_address = env.get("GMAIL_EMAIL")
         self._app_password = env.get("GMAIL_PASSWORD")
-        self._api_token = env.get("CONTROL_API_TOKEN")
+        self._api_token = env.get("CONTROL_TOKEN")
 
         # Lookback hours: prefer dynamic settings, fall back to env HOURS if default
         hours = settings_service.get_lookback_hours()
@@ -80,5 +80,5 @@ class EmailProcessingConfiguration(EmailProcessingConfigurationInterface):
         if not self._email_address or not self._app_password:
             raise SystemExit("GMAIL_EMAIL and GMAIL_PASSWORD environment variables are required")
         if not self._api_token:
-            raise SystemExit("CONTROL_API_TOKEN environment variable is required")
+            raise SystemExit("CONTROL_TOKEN environment variable is required")
 
