@@ -452,8 +452,8 @@ Current Audit System Analysis:
 
 Key Implementation Points:
 - ProcessingRun table needs 3 new columns
-- ProcessingStatusManager needs to track these counts
-- email_scanner_consumer.py or gmail_fetcher.py needs to report counts
+- ProcessingStatusManager must track these counts in-memory
+- email_scanner_consumer.py or gmail_fetcher.py should report counts on completion
 - API endpoints need to return these new fields
 
 Features: 0/1 complete (feature_list.md)

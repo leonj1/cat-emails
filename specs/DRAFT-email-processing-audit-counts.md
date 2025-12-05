@@ -49,7 +49,8 @@ ALTER TABLE processing_runs
     ADD COLUMN emails_tagged INT DEFAULT 0,
     ADD COLUMN emails_deleted INT DEFAULT 0;
 
--- Backfill existing records: set emails_reviewed = emails_processed for historical data
+-- Backfill: For historical runs, assume emails_processed were reviewed
+-- This is a conservative estimate; new runs will track these separately
 UPDATE processing_runs
 SET emails_reviewed = emails_processed
 WHERE emails_reviewed = 0 AND emails_processed > 0;
@@ -278,7 +279,7 @@ class ProcessingRunAuditCounts:
 
 ### Email Processing Flow with Audit Tracking
 
-```
+```text
 1. START Processing Run
    - Initialize audit counts to 0
    - Create ProcessingRun record in database
