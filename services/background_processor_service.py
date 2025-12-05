@@ -135,11 +135,24 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
 
                                         # Extract totals from category_actions (Dict[str, Dict[str, int]])
                                         # to category_counts (Dict[str, int]) for the aggregator
-                                        category_counts = {
-                                            cat: stats.get("total", 0)
-                                            for cat, stats in category_actions.items()
-                                            if isinstance(stats, dict)
-                                        }
+                                        category_counts = {}
+                                        filtered_entries = []
+                                        for cat, stats in category_actions.items():
+                                            if not isinstance(stats, dict):
+                                                filtered_entries.append(f"{cat} (non-dict)")
+                                                continue
+                                            total = stats.get("total", 0)
+                                            if not isinstance(total, int):
+                                                filtered_entries.append(f"{cat} (total={type(total).__name__})")
+                                                continue
+                                            category_counts[cat] = total
+
+                                        if filtered_entries:
+                                            logger.warning(
+                                                "Filtered invalid category entries for %s: %s",
+                                                account.email_address,
+                                                ", ".join(filtered_entries),
+                                            )
                                         if category_counts:
                                             self.category_aggregator.record_batch(
                                                 account.email_address,
