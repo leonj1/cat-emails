@@ -11,14 +11,14 @@
        - Add tracking fields to AccountStatus dataclass
        - Add increment methods to ProcessingStatusManager
        - Service layer only
-   1.3 Update API Responses to Expose New Fields (In Progress)
-       - Update ProcessingRunResponse schema
-       - Ensure new fields returned in GET endpoints
+   1.3 Update API Responses to Expose New Fields (Completed)
+       - Updated DatabaseService.get_processing_runs() to expose audit fields
+       - Fixed hardcoded emails_deleted = 0 to read from database
        - API layer only
-   1.4 Add Concurrency Safety and Edge Cases (Pending)
-       - Add thread-safe increment operations
-       - Handle edge cases (null values, overflow protection)
-       - Add validation
+   1.4 Add Concurrency Safety and Edge Cases (Completed - already implemented in Phase 2)
+       - Thread-safe increment operations using self._lock
+       - Handle edge cases (null values with 'or 0' pattern, no-op when no session)
+       - Validation via nullable=False and default=0 in database
 
 ## Completed
 - [x] Remove Remote Logs Collector Integration (Phase 1: Core files deleted)
