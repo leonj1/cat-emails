@@ -168,8 +168,8 @@ Apply both Option 1 and Option 2:
 ## Testing Requirements
 
 All refactoring must maintain:
-- 314 existing unit tests passing
-- BDD scenarios passing (25 scenarios across 4 feature files)
+- All 314 unit tests passing (specific to ProcessingStatusManager and related components)
+- All 147 BDD scenarios passing (across 16 feature files in entire test suite)
 - API backward compatibility
 - Thread safety guarantees
 

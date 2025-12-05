@@ -140,11 +140,11 @@ Processing runs completed before this feature was deployed:
 
 The feature follows a comprehensive BDD-TDD approach:
 
-### BDD Scenarios (25 total)
+### BDD Scenarios (39 total for Gantt Chart feature)
 Located in `tests/bdd/`:
 - `gantt_chart_generation.feature` - End-to-end scenarios (25)
 - `state_transition_tracking.feature` - State transition tracking (4)
-- `gantt_chart_generator_core.feature` - Generator core logic (4)
+- `gantt_chart_generator_core.feature` - Generator core logic (5)
 - `api_enhancement_gantt.feature` - API integration (5)
 
 ### Test Coverage Areas
@@ -156,11 +156,13 @@ Located in `tests/bdd/`:
 6. **Edge Cases**: Zero duration, minimal transitions, legacy data, special characters
 
 ### Unit Tests
-314 unit tests cover:
-- StateTransitionTracker implementation
-- GanttChartGenerator implementation
-- ProcessingStatusManager integration
+127 unit tests specific to Gantt Chart feature cover:
+- StateTransitionTracker implementation (41 tests)
+- GanttChartGenerator implementation (47 tests)
+- ProcessingStatusManager integration with Gantt Chart (39 tests)
 - Edge cases and error conditions
+
+Note: The project has 314 total unit tests across all features.
 
 ## Performance Considerations
 
@@ -175,7 +177,7 @@ The feature is designed for minimal performance impact:
 - Transition recording: O(1) append operation
 - Duration finalization: O(n) single pass through transitions
 - Gantt text generation: O(n) single pass with string building
-- Typical overhead: < 1ms per processing run
+- Typical overhead: less than 1ms per processing run
 
 ### API Response Size
 - Each `gantt_chart_text` adds ~500-1500 bytes per run
@@ -215,7 +217,7 @@ If extending the interfaces:
 
 ## References
 
-- **Mermaid Gantt Documentation**: https://mermaid.js.org/syntax/gantt.html
+- **Mermaid Gantt Documentation**: [https://mermaid.js.org/syntax/gantt.html](https://mermaid.js.org/syntax/gantt.html)
 - **BDD Feature Files**: `/tests/bdd/gantt_*.feature`
 - **Interface Definitions**: `/services/interfaces/*_interface.py`
 - **Implementation Files**: `/services/state_transition.py`, `/services/gantt_chart_generator.py`
