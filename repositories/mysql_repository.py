@@ -227,7 +227,16 @@ class MySQLRepository(DatabaseRepositoryInterface):
             Base.metadata.create_all(self.engine)
 
             # Run MySQL-specific migrations for columns that may be missing
-            run_audit_columns_migration(self.engine)
+            if not run_audit_columns_migration(self.engine):
+                logger.error(
+                    "Failed to run audit columns migration. "
+                    "Ensure MySQL user has ALTER privileges on database '%s'.",
+                    self.database,
+                )
+                raise ConnectionError(
+                    "Failed to run audit columns migration. "
+                    "Ensure MySQL user has ALTER privileges."
+                )
 
             self.SessionFactory = sessionmaker(bind=self.engine)
 
