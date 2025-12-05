@@ -109,45 +109,29 @@ class TestApiResponseIncludesEmailsReviewedField(unittest.TestCase):
         self.session.add(run)
         self.session.commit()
 
-        # Act: Call get_processing_runs through database service
-        # Create a mock that returns our test data
+        # Act: Call get_processing_runs through actual DatabaseService
         from services.database_service import DatabaseService
 
-        # We need to test the actual transformation in get_processing_runs
-        # Create a minimal mock that allows us to test the response format
-        mock_session_factory = MagicMock()
-        mock_session = MagicMock()
-        mock_session.__enter__ = MagicMock(return_value=self.session)
-        mock_session.__exit__ = MagicMock(return_value=False)
-        mock_session_factory.return_value = mock_session
-
-        # Create service with mocked Session
+        # Create a mock repository that mimics the real behavior
         mock_repo = Mock()
         mock_repo.is_connected.return_value = True
-        mock_repo.SessionFactory = mock_session_factory
 
-        # Directly test the get_processing_runs method output format
-        # by calling the method that queries the database
-        runs = self.session.query(ProcessingRun).order_by(
-            ProcessingRun.start_time.desc()
-        ).limit(100).all()
+        # Create a Session factory that returns our test session
+        session_factory = MagicMock()
+        session_context = MagicMock()
+        session_context.__enter__ = MagicMock(return_value=self.session)
+        session_context.__exit__ = MagicMock(return_value=False)
+        session_factory.return_value = session_context
 
-        # Simulate what get_processing_runs should return
-        # Current implementation does NOT include emails_reviewed - this test should FAIL
-        result = [
-            {
-                'run_id': f"run-{run.id}",
-                'started_at': run.start_time,
-                'completed_at': run.end_time,
-                'duration_seconds': (run.end_time - run.start_time).total_seconds() if run.end_time else None,
-                'emails_processed': run.emails_processed,
-                # Current implementation hardcodes: 'emails_deleted': 0
-                # We need to verify the API includes 'emails_reviewed' from DB
-                'emails_reviewed': run.emails_reviewed if run.emails_reviewed is not None else 0,
-                'success': run.state == 'completed' and not run.error_message,
-                'error_message': run.error_message
-            } for run in runs
-        ]
+        # Create DatabaseService instance with test session
+        db_service = object.__new__(DatabaseService)
+        db_service.repository = mock_repo
+        db_service.Session = session_factory
+        db_service.engine = self.engine
+        db_service.db_path = self.db_path
+
+        # Call the actual get_processing_runs method
+        result = db_service.get_processing_runs(limit=100)
 
         # Assert: Response includes emails_reviewed field
         self.assertGreater(len(result), 0, "Should have at least one processing run")
