@@ -1,94 +1,118 @@
-# Gap Analysis: Remove Logs Collector Phase 1
+# Gap Analysis: Audit Counts Phase 1 - Database Schema
 
-**Date**: 2025-12-01
-**Feature**: Remove Logs Collector Phase 1 - Delete Core Service Files
-**Source**: specs/BDD-SPEC-remove-logs-collector-phase1.md, tests/bdd/remove_logs_collector_phase1.feature
+**Date**: 2025-12-05
+**Feature**: Email Processing Audit Count Database Columns
+**Source**: specs/DRAFT-audit-counts-phase1-database.md, tests/bdd/audit-counts-phase1-database.feature
 
 ---
 
 ## Executive Summary
 
-This analysis evaluates the Phase 1 task of deleting logs collector infrastructure files. This is a **deletion-only** task with no code creation or modification required.
+Phase 1 adds three new integer columns (`emails_reviewed`, `emails_tagged`, `emails_deleted`) to the `ProcessingRun` model. This is a **greenfield addition** - no refactoring required.
 
 ---
 
-## Task Type: File Deletion
+## Current State Analysis
 
-**Operation**: Delete 5 files
-**New Code**: None
-**Refactoring**: None required
+### ProcessingRun Model (`/root/repo/models/database.py:204-225`)
 
----
+Current columns:
+- `id` (Integer, primary key)
+- `email_address` (Text, not null)
+- `start_time` (DateTime, not null)
+- `end_time` (DateTime, nullable)
+- `state` (Text, not null)
+- `current_step` (Text, nullable)
+- `emails_found` (Integer, default=0)
+- `emails_processed` (Integer, default=0)
+- `error_message` (Text, nullable)
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
 
-## Files to Delete
-
-| File | Exists | Size | Action |
-|------|--------|------|--------|
-| `services/logs_collector_service.py` | Yes | 13,944 bytes | DELETE |
-| `services/logs_collector_interface.py` | Yes | 1,031 bytes | DELETE |
-| `clients/logs_collector_client.py` | Yes | 6,297 bytes | DELETE |
-| `services/logging_service.py` | Yes | 9,926 bytes | DELETE |
-| `services/logging_factory.py` | Yes | 3,620 bytes | DELETE |
+**Missing columns** (to be added):
+- `emails_reviewed` (Integer, default=0, not null)
+- `emails_tagged` (Integer, default=0, not null)
+- `emails_deleted` (Integer, default=0, not null)
 
 ---
 
 ## Reuse Opportunities
 
-**None** - This is a deletion task with no code creation or modification.
+### 1. Pattern: Column Definition Style
+The existing columns use SQLAlchemy `Column()` with `Integer`, `default=0`:
+```python
+emails_found = Column(Integer, default=0)
+emails_processed = Column(Integer, default=0)
+```
 
----
+**Recommendation**: Follow this exact pattern for new columns.
 
-## Similar Patterns
+### 2. Pattern: Migration Directory Structure
+Project uses `/root/repo/migrations/` for Python-based migrations (not Flyway SQL).
 
-**N/A** - Deletion does not require pattern matching.
+Existing migrations:
+- `002_modify_processing_runs.py` - Previous ProcessingRun modifications
 
----
+**Recommendation**: Create `003_add_audit_count_columns.py` following the same pattern.
 
-## Code Needing Refactoring
+### 3. Pattern: Test Structure
+Integration tests for ProcessingRun exist in:
+- `/root/repo/tests/test_integration_background_processing.py`
 
-**N/A** - No refactoring in this phase. Dependent file updates will occur in Phase 2.
+No dedicated `test_models.py` exists - tests are embedded in feature-specific files.
+
+**Recommendation**: Create tests in a new file or extend existing integration tests.
 
 ---
 
 ## New Components Needed
 
-**None** - This phase only removes code, does not add any.
+| Component | Location | Lines Est. |
+|-----------|----------|------------|
+| 3 new columns | `/root/repo/models/database.py` | ~3 lines |
+| Migration script | `/root/repo/migrations/003_add_audit_count_columns.py` | ~50 lines |
+| Unit tests | `/root/repo/tests/test_processing_run_audit_columns.py` | ~80 lines |
 
 ---
 
-## Dependencies Affected
+## Refactoring Assessment
 
-The following files import from the deleted modules (will be fixed in Phase 2):
-- `services/api_service.py` - imports CentralLoggingService
-- `services/gmail_fetcher.py` - imports CentralLoggingService
+### Verdict: NO REFACTORING REQUIRED
 
----
-
-## Refactoring Decision
-
-### Recommendation: GO (No Refactoring Needed)
-
-This is a straightforward file deletion task. No refactoring is required before or during execution.
+Reasons:
+1. **Additive change only** - New columns do not modify existing functionality
+2. **No code conflicts** - ProcessingRun has no `emails_reviewed/tagged/deleted` references
+3. **Clean patterns exist** - Existing column definitions provide clear template
+4. **Migration structure clear** - Python-based migrations in `/root/repo/migrations/`
 
 ---
 
-## Risk Assessment
+## Files Affected
 
-| Risk | Level | Mitigation |
-|------|-------|------------|
-| Import errors after deletion | Expected | Phase 2 will update dependent files |
-| Test failures | Expected | Phase 4 will remove obsolete tests |
-| Build failures | Temporary | Will resolve after Phase 2 |
+| File | Action | Impact |
+|------|--------|--------|
+| `/root/repo/models/database.py` | MODIFY | Add 3 column definitions to ProcessingRun class |
+| `/root/repo/migrations/003_add_audit_count_columns.py` | CREATE | New migration file |
+| `/root/repo/tests/test_processing_run_audit_columns.py` | CREATE | New test file for audit columns |
 
 ---
 
-## Summary
+## Dependencies
 
-| Category | Value |
-|----------|-------|
-| Files to Delete | 5 |
-| New Files | 0 |
-| Files to Modify | 0 |
-| Refactoring Required | No |
+- None. This is the foundation layer for the audit counts feature.
 
-**GO Signal**: Approved - Proceed with file deletion.
+## Risks
+
+- **Low**: SQLite schema changes via ALTER TABLE are straightforward
+- **Low**: Default values ensure backward compatibility with existing records
+
+---
+
+## GO Signal
+
+**STATUS: READY FOR IMPLEMENTATION**
+
+- No refactoring needed
+- Clear patterns to follow
+- Minimal file changes
+- Low risk addition

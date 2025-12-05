@@ -204,7 +204,7 @@ class AccountCategoryStats(Base):
 class ProcessingRun(Base):
     """Historical tracking of email processing sessions"""
     __tablename__ = 'processing_runs'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     email_address = Column(Text, nullable=False)
     start_time = Column(DateTime, nullable=False)
@@ -216,6 +216,11 @@ class ProcessingRun(Base):
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Audit count columns
+    emails_reviewed = Column(Integer, default=0, nullable=False)
+    emails_tagged = Column(Integer, default=0, nullable=False)
+    emails_deleted = Column(Integer, default=0, nullable=False)
     
     __table_args__ = (
         Index('idx_processing_runs_email_address', 'email_address'),
