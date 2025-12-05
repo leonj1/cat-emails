@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import text, inspect
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
 
 from utils.logger import get_logger
 
@@ -77,25 +77,37 @@ def run_audit_columns_migration(engine: "Engine") -> bool:
                     "Adding missing column %s to processing_runs",
                     column_name,
                 )
-                session.execute(text(
-                    f"ALTER TABLE processing_runs ADD COLUMN {column_name} {column_def}"
-                ))
-                session.commit()
-                logger.info(
-                    "Added %s column to processing_runs",
-                    column_name,
-                )
+                try:
+                    session.execute(text(
+                        f"ALTER TABLE processing_runs ADD COLUMN {column_name} {column_def}"
+                    ))
+                    session.commit()
+                    logger.info(
+                        "Added %s column to processing_runs",
+                        column_name,
+                    )
+                except OperationalError as e:
+                    # Handle race condition: if another instance added the column
+                    # between our check and ALTER, MySQL error 1060 (duplicate column)
+                    session.rollback()
+                    if "1060" in str(e.orig) or "Duplicate column" in str(e.orig):
+                        logger.debug(
+                            "Column %s already exists (added by concurrent deployment)",
+                            column_name,
+                        )
+                    else:
+                        # Re-raise if it's a different operational error
+                        raise
             else:
                 logger.debug(
                     "Column %s already exists in processing_runs",
                     column_name,
                 )
-
-        return True
-
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Failed to run audit columns migration")
         return False
+    else:
+        return True
     finally:
         session.close()
