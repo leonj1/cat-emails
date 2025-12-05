@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 MySQL-specific migration for adding audit count columns to processing_runs.
 
@@ -25,9 +24,16 @@ def column_exists(engine: "Engine", table_name: str, column_name: str) -> bool:
     inspector = inspect(engine)
     try:
         columns = [col['name'] for col in inspector.get_columns(table_name)]
-        return column_name in columns
-    except Exception:
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "Failed to check column existence for %s.%s: %s",
+            table_name,
+            column_name,
+            exc,
+        )
         return False
+    else:
+        return column_name in columns
 
 
 def table_exists(engine: "Engine", table_name: str) -> bool:
