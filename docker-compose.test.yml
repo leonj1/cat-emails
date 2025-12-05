@@ -21,7 +21,7 @@ services:
   integration-test:
     build:
       context: .
-      dockerfile: Dockerfile.integration-test
+      dockerfile: Dockerfile
     container_name: cat-emails-integration-test
     environment:
       - MYSQL_HOST=mysql-test
@@ -32,3 +32,4 @@ services:
     depends_on:
       mysql-test:
         condition: service_healthy
+    command: ["python", "-m", "pytest", "tests/test_pending_rollback_integration.py", "-v"]
