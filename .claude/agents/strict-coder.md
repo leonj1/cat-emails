@@ -4,7 +4,7 @@ description: Implementation specialist that writes code strictly following archi
 tools: Read, Write, Edit, Glob, Grep, Bash, Task
 skills: strict-architecture
 model: sonnet
-extended_thinking: true
+ultrathink: true
 color: green
 ---
 
