@@ -5,7 +5,7 @@
 1. Add Email Processing Audit Counts (Decomposed)
    1.1 Add Database Columns and Migration (Completed)
        - Add emails_reviewed, emails_tagged, emails_deleted columns to ProcessingRun model
-       - Create V003 migration file
+       - Create 005_add_audit_count_columns migration file
        - Model layer only, no service/API changes
    1.2 Add AccountStatus Tracking and Increment Methods (Completed)
        - Add tracking fields to AccountStatus dataclass

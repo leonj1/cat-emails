@@ -14,10 +14,6 @@ Created: 2025-12-05
 """
 
 import logging
-from utils.logger import get_logger
-import sys
-from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import (
@@ -26,20 +22,29 @@ from sqlalchemy import (
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 
+from utils.logger import get_logger
+from models.database import get_database_url
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = get_logger(__name__)
 
-# Import the existing database module
-sys.path.append(str(Path(__file__).parent.parent))
-from models.database import get_database_url
+
+class MigrationError(Exception):
+    """Raised when a migration fails."""
+    pass
 
 
 def get_engine(db_path: Optional[str] = None):
-    """Get database engine"""
-    if db_path is None:
-        db_path = "./email_summaries/summaries.db"
+    """
+    Get database engine.
 
+    Args:
+        db_path: Path to database file. If None, get_database_url will use its default.
+
+    Returns:
+        SQLAlchemy engine instance
+    """
     database_url = get_database_url(db_path)
     engine = create_engine(database_url, echo=False)
     return engine
@@ -54,11 +59,8 @@ def table_exists(engine, table_name: str) -> bool:
 def column_exists(engine, table_name: str, column_name: str) -> bool:
     """Check if a column exists in a table"""
     inspector = inspect(engine)
-    try:
-        columns = [col['name'] for col in inspector.get_columns(table_name)]
-        return column_name in columns
-    except Exception:
-        return False
+    columns = [col['name'] for col in inspector.get_columns(table_name)]
+    return column_name in columns
 
 
 def upgrade(db_path: Optional[str] = None):
@@ -73,7 +75,7 @@ def upgrade(db_path: Optional[str] = None):
         # Check if processing_runs table exists
         if not table_exists(engine, 'processing_runs'):
             logger.error("processing_runs table doesn't exist. Cannot add columns.")
-            raise Exception("processing_runs table not found")
+            raise MigrationError("processing_runs table not found")
 
         logger.info("Found processing_runs table, adding audit count columns...")
 
@@ -132,13 +134,13 @@ def upgrade(db_path: Optional[str] = None):
         session.commit()
         logger.info("✓ Migration 005 completed successfully")
 
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         session.rollback()
-        logger.error(f"Migration failed: {e}")
+        logger.exception("Migration failed")
         raise
-    except Exception as e:
+    except Exception:
         session.rollback()
-        logger.error(f"Unexpected error during migration: {e}")
+        logger.exception("Unexpected error during migration")
         raise
     finally:
         session.close()
@@ -222,13 +224,13 @@ def downgrade(db_path: Optional[str] = None):
         session.commit()
         logger.info("✓ Migration 005 rollback completed")
 
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         session.rollback()
-        logger.error(f"Rollback failed: {e}")
+        logger.exception("Rollback failed")
         raise
-    except Exception as e:
+    except Exception:
         session.rollback()
-        logger.error(f"Unexpected error during rollback: {e}")
+        logger.exception("Unexpected error during rollback")
         raise
     finally:
         session.close()
@@ -242,14 +244,14 @@ def main():
     parser.add_argument('--action', choices=['upgrade', 'downgrade'], default='upgrade',
                        help='Migration action to perform')
     parser.add_argument('--db-path', type=str,
-                       help='Database path (default: ./email_summaries/summaries.db)')
+                       help='Database path')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable verbose logging')
 
     args = parser.parse_args()
 
     if args.verbose:
-        get_logger().setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)
 
     try:
         if args.action == 'upgrade':

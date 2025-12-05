@@ -53,7 +53,7 @@ Project uses `/root/repo/migrations/` for Python-based migrations (not Flyway SQ
 Existing migrations:
 - `002_modify_processing_runs.py` - Previous ProcessingRun modifications
 
-**Recommendation**: Create `003_add_audit_count_columns.py` following the same pattern.
+**Recommendation**: Create `005_add_audit_count_columns.py` following the same pattern.
 
 ### 3. Pattern: Test Structure
 Integration tests for ProcessingRun exist in:
@@ -70,7 +70,7 @@ No dedicated `test_models.py` exists - tests are embedded in feature-specific fi
 | Component | Location | Lines Est. |
 |-----------|----------|------------|
 | 3 new columns | `/root/repo/models/database.py` | ~3 lines |
-| Migration script | `/root/repo/migrations/003_add_audit_count_columns.py` | ~50 lines |
+| Migration script | `/root/repo/migrations/005_add_audit_count_columns.py` | ~50 lines |
 | Unit tests | `/root/repo/tests/test_processing_run_audit_columns.py` | ~80 lines |
 
 ---
@@ -92,7 +92,7 @@ Reasons:
 | File | Action | Impact |
 |------|--------|--------|
 | `/root/repo/models/database.py` | MODIFY | Add 3 column definitions to ProcessingRun class |
-| `/root/repo/migrations/003_add_audit_count_columns.py` | CREATE | New migration file |
+| `/root/repo/migrations/005_add_audit_count_columns.py` | CREATE | New migration file |
 | `/root/repo/tests/test_processing_run_audit_columns.py` | CREATE | New test file for audit columns |
 
 ---
