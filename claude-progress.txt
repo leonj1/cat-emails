@@ -460,3 +460,52 @@ Features: 0/1 complete (feature_list.md)
 
 Next: Invoking architect agent to create spec for email processing audit enhancement
 ---
+
+=== Session 20251205-020300 ===
+Workflow: debugger
+Task: MySQL runtime error: Unknown column 'emails_reviewed' in 'field list' when inserting into processing_runs table
+Status: Initialized
+Context: Explored project structure, identified root cause as migration not applied to production database
+
+Error Message:
+```
+(pymysql.err.OperationalError) (1054, "Unknown column 'emails_reviewed' in 'field list'")
+[SQL: INSERT INTO processing_runs (email_address, start_time, end_time, state, current_step, emails_found, emails_processed, error_message, created_at, updated_at, emails_reviewed, emails_tagged, emails_deleted) VALUES ...]
+```
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL, pytest, Docker
+
+Key Files Identified:
+
+1. /root/repo/models/database.py (lines 204-230) - ProcessingRun Model
+   - Model has audit columns defined:
+     - emails_reviewed = Column(Integer, default=0, nullable=False)
+     - emails_tagged = Column(Integer, default=0, nullable=False)
+     - emails_deleted = Column(Integer, default=0, nullable=False)
+   - These columns were added as part of the "Email Processing Audit Counts" feature
+
+2. /root/repo/migrations/005_add_audit_count_columns.py - Migration Script
+   - Migration exists to add these 3 columns to processing_runs table
+   - Uses ALTER TABLE to add emails_reviewed, emails_tagged, emails_deleted
+   - Includes backfill for existing records
+
+3. architects_digest.md shows all 4 phases of audit counts feature are marked "Completed":
+   - 1.1 Add Database Columns and Migration (Completed)
+   - 1.2 Add AccountStatus Tracking and Increment Methods (Completed)
+   - 1.3 Update API Responses to Expose New Fields (Completed)
+   - 1.4 Add Concurrency Safety and Edge Cases (Completed)
+
+Initial Analysis:
+- The SQLAlchemy model was updated with new columns (model layer)
+- The Python migration script was created (migration layer)
+- BUT the migration was NOT run against the production MySQL database
+- The code tries to INSERT with all columns, but MySQL table lacks 3 columns
+
+Related Previous Session (20251204-235315):
+- This was the architect session that designed the audit counts feature
+- The implementation was completed in code, but migration not deployed
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
