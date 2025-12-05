@@ -736,12 +736,12 @@ if __name__ == "__main__":
     # Get credentials from environment variables
     email_address = os.getenv("GMAIL_EMAIL")
     app_password = os.getenv("GMAIL_PASSWORD")
-    api_token = os.getenv("CONTROL_API_TOKEN")
+    api_token = os.getenv("CONTROL_TOKEN")
 
     if not email_address or not app_password:
         raise ValueError("Please set GMAIL_EMAIL and GMAIL_PASSWORD environment variables")
 
     if not api_token:
-        raise ValueError("Please set CONTROL_API_TOKEN environment variable")
+        raise ValueError("Please set CONTROL_TOKEN environment variable")
 
     main(email_address, app_password, api_token, args.hours)

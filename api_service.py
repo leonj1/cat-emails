@@ -180,7 +180,7 @@ app.add_middleware(
 
 # Optional API key authentication
 API_KEY = os.getenv("API_KEY")
-CONTROL_API_TOKEN = os.getenv("CONTROL_API_TOKEN", "")
+CONTROL_TOKEN = os.getenv("CONTROL_TOKEN", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "vertex/google/gemini-2.5-flash")
 
 
@@ -356,7 +356,7 @@ def _initialize_account_email_processor():
             processing_status_manager=processing_status_manager,
             settings_service=settings_service,
             email_categorizer=email_categorizer_service,
-            api_token=CONTROL_API_TOKEN,
+            api_token=CONTROL_TOKEN,
             llm_model=LLM_MODEL,
             account_category_client=AccountCategoryClient(repository=settings_service.repository),
             deduplication_factory=EmailDeduplicationFactory()
@@ -386,14 +386,14 @@ def get_recommendation_service() -> BlockingRecommendationService:
     if not recommendation_service:
         try:
             # Initialize domain service
-            # Use mock mode when no CONTROL_API_TOKEN is configured
-            use_mock = not bool(CONTROL_API_TOKEN)
+            # Use mock mode when no CONTROL_TOKEN is configured
+            use_mock = not bool(CONTROL_TOKEN)
             domain_service = DomainService(
-                api_token=CONTROL_API_TOKEN or None,
+                api_token=CONTROL_TOKEN or None,
                 mock_mode=use_mock
             )
             if use_mock:
-                logger.info("BlockingRecommendationService using DomainService in mock mode (no CONTROL_API_TOKEN configured)")
+                logger.info("BlockingRecommendationService using DomainService in mock mode (no CONTROL_TOKEN configured)")
 
             # Initialize category aggregation config
             config = CategoryAggregationConfig()
@@ -2369,7 +2369,7 @@ async def startup_event():
     # Log critical environment variables (without sensitive values)
     env_vars = {
         "API_KEY": "***" if API_KEY else None,
-        "CONTROL_API_TOKEN": "***" if CONTROL_API_TOKEN else None,
+        "CONTROL_TOKEN": "***" if CONTROL_TOKEN else None,
         "LLM_MODEL": LLM_MODEL,
         "BACKGROUND_PROCESSING_ENABLED": BACKGROUND_PROCESSING_ENABLED,
         "BACKGROUND_SCAN_INTERVAL": BACKGROUND_SCAN_INTERVAL,

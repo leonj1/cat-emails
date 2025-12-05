@@ -27,7 +27,7 @@ os.environ.setdefault("MYSQL_PASSWORD", "cat_emails_password")
 # Required API keys (use existing .env values or defaults)
 os.environ.setdefault("REQUESTYAI_API_KEY", "sk-XfUA7zpWQQKOa0pbc27aRYy/INsznmXksPmJidPYsJx2nXbYTHciNP1FTxp1gTQRk+BMOWS0g82S3VoTzzJinMdZg0I7Xsf9hPwJDaiNowI=")
 os.environ.setdefault("REQUESTYAI_BASE_URL", "https://router.requesty.ai/v1")
-os.environ.setdefault("CONTROL_API_TOKEN", "fXhS_j2zzsWOtEBnVz6w7egG65mNjxST-2ae62j3ZJI")
+os.environ.setdefault("CONTROL_TOKEN", "fXhS_j2zzsWOtEBnVz6w7egG65mNjxST-2ae62j3ZJI")
 
 # Mailtrap configuration (from environment - use MAILTRAP_KEY)
 os.environ.setdefault("MAILTRAP_KEY", "ed56366eab8188e73d6901428308bcde")
@@ -195,7 +195,7 @@ def main():
             deduplication_factory = MySQLDeduplicationFactory(settings_service.repository)
 
         # 6. Get API token and LLM model
-        api_token = os.getenv("CONTROL_API_TOKEN", "")
+        api_token = os.getenv("CONTROL_TOKEN", "")
         llm_model = os.getenv("LLM_MODEL", "vertex/google/gemini-2.5-flash")
 
         logger.info(f"  - API Token configured: {bool(api_token)}")
