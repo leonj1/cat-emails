@@ -3,7 +3,7 @@ name: forensic
 description: Investigation specialist for CRASH-RCA sessions. Executes targeted search and analysis operations in read-only mode.
 tools: Read, Glob, Grep, Bash, Task
 model: sonnet
-extended_thinking: true
+ultrathink: true
 color: orange
 ---
 
