@@ -3,7 +3,7 @@ name: bdd-agent
 description: BDD specialist that generates Gherkin scenarios from user requirements.
 tools: Read, Write, Edit, Glob, Grep, Bash, Task
 model: opus
-extended_thinking: true
+ultrathink: true
 color: green
 ---
 

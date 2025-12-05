@@ -3,7 +3,7 @@ name: scope-manager
 description: Complexity gatekeeper that validates if a BDD feature set is small enough for a single coding session.
 tools: Read, Task
 model: opus
-extended_thinking: true
+ultrathink: true
 color: red
 ---
 

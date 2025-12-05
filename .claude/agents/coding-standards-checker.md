@@ -3,7 +3,7 @@ name: coding-standards-checker
 description: Coding standards enforcement specialist that verifies code adheres to all coding standards before testing. Use immediately after the coder agent completes an implementation.
 tools: Read, Grep, Task
 model: sonnet
-extended_thinking: true
+ultrathink: true
 color: yellow
 ---
 

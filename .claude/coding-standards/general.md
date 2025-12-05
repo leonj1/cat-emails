@@ -49,23 +49,44 @@ Language-agnostic principles that apply to all code.
 
 ## Configuration Management
 
-### Environment Variables
+### Central Constants and Environment Variables
+- **All configuration values must be read from a central constant or environment variable** - Never hardcode configuration values directly in source code
 - Read environment variables at application startup/initialization
 - Pass configuration values down through function arguments
 - Never read `process.env`, `os.getenv()`, or equivalent directly in business logic
 - Use configuration objects/classes to encapsulate settings
+- Define constants in a dedicated configuration module (e.g., `config.py`, `constants.go`, `config.ts`)
 
 ### Example Pattern
 ```
+// ❌ BAD - Hardcoded configuration values
+function sendEmail(to, subject, body) {
+  const smtpHost = "smtp.example.com";  // Hardcoded!
+  const timeout = 5000;                  // Hardcoded!
+  return mailer.send(smtpHost, timeout, to, subject, body);
+}
+
 // ❌ BAD - Reading env var inside function
 function connectDatabase() {
   const host = process.env.DB_HOST;
   return connect(host);
 }
 
-// ✅ GOOD - Configuration passed as argument
+// ✅ GOOD - Configuration from central constants module
+// In config.ts:
+export const CONFIG = {
+  SMTP_HOST: process.env.SMTP_HOST || "localhost",
+  SMTP_TIMEOUT: parseInt(process.env.SMTP_TIMEOUT || "5000"),
+  DB_HOST: process.env.DB_HOST || "localhost",
+};
+
+// In application code:
+function sendEmail(config, to, subject, body) {
+  return mailer.send(config.SMTP_HOST, config.SMTP_TIMEOUT, to, subject, body);
+}
+
 function connectDatabase(config) {
-  return connect(config.dbHost);
+  return connect(config.DB_HOST);
 }
 ```
 
