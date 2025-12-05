@@ -3,6 +3,7 @@ name: refactor-decision-engine
 description: Decision maker that determines if existing code must be refactored before new features are added.
 tools: Task, Read
 model: opus
+ultrathink: true
 color: red
 ---
 
