@@ -2,8 +2,23 @@
 > Status: In Progress
 
 ## Active Stack
-1. Add Email Processing Audit Counts (In Progress)
-   - Add emails_reviewed, emails_tagged, emails_deleted counts to ProcessingRun audit entries
+1. Add Email Processing Audit Counts (Decomposed)
+   1.1 Add Database Columns and Migration (In Progress)
+       - Add emails_reviewed, emails_tagged, emails_deleted columns to ProcessingRun model
+       - Create V003 migration file
+       - Model layer only, no service/API changes
+   1.2 Add AccountStatus Tracking and Increment Methods (Pending)
+       - Add tracking fields to AccountStatus dataclass
+       - Add increment methods to ProcessingStatusManager
+       - Service layer only
+   1.3 Update API Responses to Expose New Fields (Pending)
+       - Update ProcessingRunResponse schema
+       - Ensure new fields returned in GET endpoints
+       - API layer only
+   1.4 Add Concurrency Safety and Edge Cases (Pending)
+       - Add thread-safe increment operations
+       - Handle edge cases (null values, overflow protection)
+       - Add validation
 
 ## Completed
 - [x] Remove Remote Logs Collector Integration (Phase 1: Core files deleted)
