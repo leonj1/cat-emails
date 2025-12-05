@@ -3,15 +3,15 @@
 
 ## Active Stack
 1. Add Email Processing Audit Counts (Decomposed)
-   1.1 Add Database Columns and Migration (In Progress)
+   1.1 Add Database Columns and Migration (Completed)
        - Add emails_reviewed, emails_tagged, emails_deleted columns to ProcessingRun model
        - Create V003 migration file
        - Model layer only, no service/API changes
-   1.2 Add AccountStatus Tracking and Increment Methods (Pending)
+   1.2 Add AccountStatus Tracking and Increment Methods (Completed)
        - Add tracking fields to AccountStatus dataclass
        - Add increment methods to ProcessingStatusManager
        - Service layer only
-   1.3 Update API Responses to Expose New Fields (Pending)
+   1.3 Update API Responses to Expose New Fields (In Progress)
        - Update ProcessingRunResponse schema
        - Ensure new fields returned in GET endpoints
        - API layer only
@@ -24,6 +24,8 @@
 - [x] Remove Remote Logs Collector Integration (Phase 1: Core files deleted)
 - [x] Phase 1.1: Delete Core Service Files (5 files deleted)
 - [x] Phase 1.2: Update API Service and Gmail Fetcher Imports
+- [x] 1.1 Add Database Columns and Migration
+- [x] 1.2 Add AccountStatus Tracking and Increment Methods
 
 ## Context
 

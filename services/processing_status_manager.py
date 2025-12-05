@@ -64,6 +64,9 @@ class AccountStatus:
     start_time: Optional[datetime] = None
     last_updated: Optional[datetime] = None
     error_message: Optional[str] = None
+    emails_reviewed: int = 0
+    emails_tagged: int = 0
+    emails_deleted: int = 0
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation"""
@@ -205,7 +208,10 @@ class ProcessingStatusManager:
                 'final_state': self._current_status.state.name,
                 'final_step': self._current_status.current_step,
                 'error_message': self._current_status.error_message,
-                'final_progress': self._current_status.progress
+                'final_progress': self._current_status.progress,
+                'emails_reviewed': self._current_status.emails_reviewed,
+                'emails_tagged': self._current_status.emails_tagged,
+                'emails_deleted': self._current_status.emails_deleted
             }
             
             # Add to history
@@ -218,7 +224,61 @@ class ProcessingStatusManager:
             
             # Reset current status
             self._current_status = None
-    
+
+    def increment_reviewed(self, count: int = 1) -> None:
+        """
+        Increment the count of emails reviewed during processing.
+
+        Args:
+            count: Number of emails to add to the reviewed count (default: 1)
+
+        Note:
+            This is a no-op if no processing session is active.
+            Thread-safe operation using internal lock.
+        """
+        with self._lock:
+            if not self._current_status:
+                # Silently ignore if no active session
+                return
+
+            self._current_status.emails_reviewed += count
+
+    def increment_tagged(self, count: int = 1) -> None:
+        """
+        Increment the count of emails tagged during processing.
+
+        Args:
+            count: Number of emails to add to the tagged count (default: 1)
+
+        Note:
+            This is a no-op if no processing session is active.
+            Thread-safe operation using internal lock.
+        """
+        with self._lock:
+            if not self._current_status:
+                # Silently ignore if no active session
+                return
+
+            self._current_status.emails_tagged += count
+
+    def increment_deleted(self, count: int = 1) -> None:
+        """
+        Increment the count of emails deleted during processing.
+
+        Args:
+            count: Number of emails to add to the deleted count (default: 1)
+
+        Note:
+            This is a no-op if no processing session is active.
+            Thread-safe operation using internal lock.
+        """
+        with self._lock:
+            if not self._current_status:
+                # Silently ignore if no active session
+                return
+
+            self._current_status.emails_deleted += count
+
     def get_current_status(self) -> Optional[Dict[str, Any]]:
         """
         Get the current processing status.
