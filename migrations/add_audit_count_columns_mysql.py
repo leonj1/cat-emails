@@ -6,16 +6,21 @@ This migration is designed to run at MySQL repository initialization time
 and adds the columns if they are missing.
 """
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import text, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 
 from utils.logger import get_logger
 
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Engine
+
 logger = get_logger(__name__)
 
 
-def column_exists(engine, table_name: str, column_name: str) -> bool:
+def column_exists(engine: "Engine", table_name: str, column_name: str) -> bool:
     """Check if a column exists in a table"""
     inspector = inspect(engine)
     try:
@@ -25,13 +30,13 @@ def column_exists(engine, table_name: str, column_name: str) -> bool:
         return False
 
 
-def table_exists(engine, table_name: str) -> bool:
+def table_exists(engine: "Engine", table_name: str) -> bool:
     """Check if a table exists in the database"""
     inspector = inspect(engine)
     return table_name in inspector.get_table_names()
 
 
-def run_audit_columns_migration(engine) -> bool:
+def run_audit_columns_migration(engine: "Engine") -> bool:
     """
     Add audit count columns to processing_runs table if they don't exist.
 

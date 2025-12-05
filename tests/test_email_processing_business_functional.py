@@ -19,9 +19,8 @@ behaves correctly from a user's perspective.
 import re
 import unittest
 from datetime import datetime, timedelta
-from email.message import EmailMessage
 from collections import Counter
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 from typing import List, Dict, Optional, Set
 
 from services.email_processor_service import EmailProcessorService
