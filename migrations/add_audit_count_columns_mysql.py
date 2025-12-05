@@ -71,9 +71,9 @@ def run_audit_columns_migration(engine) -> bool:
 
         return True
 
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         session.rollback()
-        logger.error(f"Failed to run audit columns migration: {e}")
+        logger.exception("Failed to run audit columns migration")
         return False
     finally:
         session.close()

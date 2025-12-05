@@ -14,6 +14,7 @@ Created: 2025-12-05
 """
 
 import logging
+import sys
 from typing import Optional
 
 from sqlalchemy import (
@@ -154,11 +155,16 @@ def upgrade(db_path: Optional[str] = None, engine=None):
         session.close()
 
 
-def downgrade(db_path: Optional[str] = None):
-    """Rollback the migration (remove audit count columns)"""
+def downgrade(db_path: Optional[str] = None, engine=None):
+    """Rollback the migration (remove audit count columns)
+
+    Args:
+        db_path: Path to database file. If None, get_database_url will use its default.
+        engine: Optional existing SQLAlchemy engine (for MySQL support).
+    """
     logger.info("Starting rollback of migration 005: Remove Audit Count Columns")
 
-    engine = get_engine(db_path)
+    engine = get_engine(db_path, engine=engine)
     Session = sessionmaker(bind=engine)
     session = Session()
 

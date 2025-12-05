@@ -16,6 +16,7 @@ These tests validate the core business workflows for email processing:
 These are end-to-end business functional tests that verify the system
 behaves correctly from a user's perspective.
 """
+import re
 import unittest
 from datetime import datetime, timedelta
 from email.message import EmailMessage
@@ -159,7 +160,6 @@ class FakeGmailFetcher:
 
     def remove_http_links(self, text: str) -> str:
         """Remove HTTP links from text."""
-        import re
         return re.sub(r'https?://\S+', '', text)
 
     def remove_images_from_email(self, text: str) -> str:
