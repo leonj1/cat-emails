@@ -79,12 +79,14 @@ All requested audit fields now exist in ProcessingRun:
 - **emails_categorized** - Count of emails successfully assigned a category (✅ ADDED in sub-task 1.1)
 - **emails_skipped** - Count of emails skipped (e.g., already processed, filtered out) (✅ ADDED in sub-task 1.1)
 
-Remaining work (sub-tasks 1.2-1.7):
-- Increment methods for categorized/skipped counts
-- Edge case handling (zero counts, no active session)
-- Data integrity and persistence verification
-- Thread safety and large count handling
-- API response enhancement
+Remaining work (sub-tasks 1.2-1.7 - implementation and test verification):
+- **1.2**: Add increment_categorized() and increment_skipped() methods to ProcessingStatusManager
+- **1.3-1.4**: Edge case handling (zero counts, no active session behavior)
+- **1.5**: Data integrity, persistence verification, and Python migration
+- **1.6**: Thread safety and large count handling tests
+- **1.7**: API response integration tests
+
+Note: Database fields exist (1.1 complete), but increment methods and comprehensive test coverage are pending.
 
 ### Key Files Modified/Created
 1. models/database.py - ProcessingRun model (✅ columns added)
