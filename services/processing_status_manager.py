@@ -69,7 +69,9 @@ class AccountStatus:
     emails_reviewed: int = 0
     emails_tagged: int = 0
     emails_deleted: int = 0
-    
+    emails_categorized: int = 0
+    emails_skipped: int = 0
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation"""
         result = asdict(self)
@@ -238,6 +240,8 @@ class ProcessingStatusManager:
                 'emails_reviewed': self._current_status.emails_reviewed,
                 'emails_tagged': self._current_status.emails_tagged,
                 'emails_deleted': self._current_status.emails_deleted,
+                'emails_categorized': self._current_status.emails_categorized,
+                'emails_skipped': self._current_status.emails_skipped,
                 'state_transitions': [t.to_dict() for t in transitions],
                 'gantt_chart_text': gantt_chart_text
             }
@@ -309,6 +313,42 @@ class ProcessingStatusManager:
                 return
 
             self._current_status.emails_deleted += count
+
+    def increment_categorized(self, count: int = 1) -> None:
+        """
+        Increment the count of emails categorized during processing.
+
+        Args:
+            count: Number of emails to add to the categorized count (default: 1)
+
+        Note:
+            This is a no-op if no processing session is active.
+            Thread-safe operation using internal lock.
+        """
+        with self._lock:
+            if not self._current_status:
+                # Silently ignore if no active session
+                return
+
+            self._current_status.emails_categorized += count
+
+    def increment_skipped(self, count: int = 1) -> None:
+        """
+        Increment the count of emails skipped during processing.
+
+        Args:
+            count: Number of emails to add to the skipped count (default: 1)
+
+        Note:
+            This is a no-op if no processing session is active.
+            Thread-safe operation using internal lock.
+        """
+        with self._lock:
+            if not self._current_status:
+                # Silently ignore if no active session
+                return
+
+            self._current_status.emails_skipped += count
 
     def get_current_status(self) -> Optional[Dict[str, Any]]:
         """

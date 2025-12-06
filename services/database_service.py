@@ -301,6 +301,8 @@ class DatabaseService:
                     'emails_reviewed': run.emails_reviewed or 0,
                     'emails_tagged': run.emails_tagged or 0,
                     'emails_deleted': run.emails_deleted or 0,
+                    'emails_categorized': run.emails_categorized or 0,
+                    'emails_skipped': run.emails_skipped or 0,
                     'success': run.state == 'completed' and not run.error_message,
                     'error_message': run.error_message
                 } for run in runs
