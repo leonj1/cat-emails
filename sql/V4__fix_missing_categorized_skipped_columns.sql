@@ -13,7 +13,7 @@ BEGIN
         AND TABLE_NAME = 'processing_runs'
         AND COLUMN_NAME = 'emails_categorized'
     ) THEN
-        ALTER TABLE processing_runs ADD COLUMN emails_categorized INT DEFAULT 0 NOT NULL;
+        ALTER TABLE processing_runs ADD COLUMN emails_categorized INT NOT NULL DEFAULT 0;
     END IF;
 
     -- Check and add emails_skipped if missing
@@ -23,7 +23,7 @@ BEGIN
         AND TABLE_NAME = 'processing_runs'
         AND COLUMN_NAME = 'emails_skipped'
     ) THEN
-        ALTER TABLE processing_runs ADD COLUMN emails_skipped INT DEFAULT 0 NOT NULL;
+        ALTER TABLE processing_runs ADD COLUMN emails_skipped INT NOT NULL DEFAULT 0;
     END IF;
 END //
 
