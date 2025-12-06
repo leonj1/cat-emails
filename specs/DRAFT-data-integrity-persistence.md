@@ -82,7 +82,7 @@ No changes needed to the model.
 
 ### Migration 006 Upgrade Flow
 
-```
+```text
 START upgrade()
     |
     v
@@ -112,7 +112,7 @@ END
 
 ### Migration 006 Downgrade Flow
 
-```
+```text
 START downgrade()
     |
     v
@@ -146,7 +146,7 @@ END
 
 ### Persistence Test Flow
 
-```
+```text
 START test_persistence()
     |
     v

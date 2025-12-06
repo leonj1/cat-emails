@@ -230,7 +230,7 @@ class TestMixedZeroNonZeroHistory(unittest.TestCase):
 
 ## Logic Flow (Test Execution)
 
-```
+```text
 For each edge case test:
   1. Arrange: Set up ProcessingStatusManager instance
   2. Act: Execute the edge case scenario

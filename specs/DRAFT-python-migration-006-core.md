@@ -57,7 +57,7 @@ class Migration006AddCategorizedSkippedColumns:
 ## Logic Flow
 
 ### upgrade() Pseudocode
-```
+```text
 1. For each column in [emails_categorized, emails_skipped]:
    a. Check if column exists in processing_runs table
    b. If column does NOT exist:
@@ -68,7 +68,7 @@ class Migration006AddCategorizedSkippedColumns:
 ```
 
 ### downgrade() Pseudocode
-```
+```text
 1. For each column in [emails_categorized, emails_skipped]:
    a. Check if column exists in processing_runs table
    b. If column exists:
@@ -83,7 +83,7 @@ class Migration006AddCategorizedSkippedColumns:
 ```
 
 ### check_applied() Pseudocode
-```
+```text
 1. Query sqlite_master or PRAGMA table_info for processing_runs
 2. Check if both emails_categorized and emails_skipped columns exist
 3. Return True if both exist, False otherwise
