@@ -127,3 +127,166 @@ This is well within the 60% context budget threshold.
 **Status**: GO
 
 The codebase is ready for implementation. No refactoring is required. The existing patterns and code can be directly reused and extended.
+
+---
+
+# Gap Analysis: Increment Methods for Audit Records (Sub-task 1.2)
+
+## Overview
+
+This section analyzes the existing codebase against the requirements for increment methods (`increment_categorized()` and `increment_skipped()`) for tracking categorized and skipped email counts during processing sessions.
+
+## BDD Feature Analyzed
+
+**Feature File**: `tests/bdd/increment_methods_audit_records.feature`
+**Scenarios**: 4
+- Scenario: Increment categorized count with default value
+- Scenario: Increment skipped count with batch value
+- Scenario: Increment is silent when no session is active
+- Scenario: Increments are cumulative within a session
+
+## Existing Code to Reuse
+
+### 1. AccountStatus Dataclass (Lines 59-86)
+
+**Status**: READY - No changes needed
+
+The dataclass already includes the required fields:
+```python
+emails_categorized: int = 0  # line 72
+emails_skipped: int = 0      # line 73
+```
+
+### 2. Existing Increment Methods Pattern (Lines 263-315)
+
+**Status**: PATTERN TO FOLLOW
+
+Three existing increment methods provide the exact implementation pattern:
+
+| Method | Lines | Pattern |
+|--------|-------|---------|
+| `increment_reviewed()` | 263-279 | Thread-safe silent no-op pattern |
+| `increment_tagged()` | 281-297 | Thread-safe silent no-op pattern |
+| `increment_deleted()` | 299-315 | Thread-safe silent no-op pattern |
+
+Pattern structure:
+```python
+def increment_xxx(self, count: int = 1) -> None:
+    """Docstring with Args and Note sections."""
+    with self._lock:
+        if not self._current_status:
+            # Silently ignore if no active session
+            return
+        self._current_status.emails_xxx += count
+```
+
+### 3. complete_processing() Method (Lines 194-261)
+
+**Status**: READY - No changes needed
+
+The archived run record already includes both new fields:
+```python
+'emails_categorized': self._current_status.emails_categorized,  # line 243
+'emails_skipped': self._current_status.emails_skipped,          # line 244
+```
+
+### 4. Thread Safety Mechanism
+
+**Status**: READY
+
+All methods use `self._lock` (RLock) for thread-safe operations. New methods must follow the same pattern.
+
+## New Components Required
+
+### 1. `increment_categorized()` Method
+
+**Location**: After line 315 in `/root/repo/services/processing_status_manager.py`
+
+**Implementation**:
+```python
+def increment_categorized(self, count: int = 1) -> None:
+    """
+    Increment the count of emails categorized during processing.
+
+    Args:
+        count: Number of emails to add to the categorized count (default: 1)
+
+    Note:
+        This is a no-op if no processing session is active.
+        Thread-safe operation using internal lock.
+    """
+    with self._lock:
+        if not self._current_status:
+            # Silently ignore if no active session
+            return
+
+        self._current_status.emails_categorized += count
+```
+
+### 2. `increment_skipped()` Method
+
+**Location**: After `increment_categorized()` method
+
+**Implementation**:
+```python
+def increment_skipped(self, count: int = 1) -> None:
+    """
+    Increment the count of emails skipped during processing.
+
+    Args:
+        count: Number of emails to add to the skipped count (default: 1)
+
+    Note:
+        This is a no-op if no processing session is active.
+        Thread-safe operation using internal lock.
+    """
+    with self._lock:
+        if not self._current_status:
+            # Silently ignore if no active session
+            return
+
+        self._current_status.emails_skipped += count
+```
+
+## Refactoring Assessment
+
+**Refactoring Needed**: NO
+
+**Justification**:
+1. Core audit fields (`emails_categorized`, `emails_skipped`) already exist in `AccountStatus`
+2. Existing increment method pattern is clean, consistent, and well-documented
+3. Archive/history mechanism already includes the new fields
+4. No code quality issues to address before implementation
+5. Simple additive implementation - no structural changes required
+
+## Implementation Readiness
+
+| Component | Status | Action Required |
+|-----------|--------|-----------------|
+| `AccountStatus.emails_categorized` | EXISTS | None |
+| `AccountStatus.emails_skipped` | EXISTS | None |
+| `increment_categorized()` method | MISSING | Implement |
+| `increment_skipped()` method | MISSING | Implement |
+| Archive record fields | EXISTS | None |
+| Thread safety pattern | EXISTS | Follow |
+
+## Test Patterns to Follow
+
+**Reference Test File**: `tests/test_processing_status_manager_core_audit_counts.py`
+
+Tests should cover all 4 Gherkin scenarios:
+1. Default increment (count=1) for categorized
+2. Batch increment (count=N) for skipped
+3. Silent no-op when no session active
+4. Cumulative increments within session
+
+## GO Signal for Sub-task 1.2
+
+**Status**: GO
+
+**Rationale**:
+- All prerequisite fields exist in the data model
+- Clear, consistent pattern to follow from existing increment methods
+- No refactoring required
+- Implementation is straightforward (~36 lines of code)
+- Tests can be written directly from Gherkin scenarios

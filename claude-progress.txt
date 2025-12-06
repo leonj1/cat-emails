@@ -756,3 +756,62 @@ Features: 0/1 complete (feature_list.md)
 
 Next: Invoking architect agent to create spec for audit enhancement
 ---
+
+=== Session 20251206-035949 ===
+Workflow: architect
+Task: Implement sub-task 1.2: Add increment_categorized() and increment_skipped() methods to ProcessingStatusManager
+Status: Initialized
+Context: Continuation of audit records enhancement - Sub-task 1.1 is COMPLETE
+
+Branch: terragon/enhance-audit-records-uep3xb
+Previous Work: Sub-task 1.1 (Core Fields) completed - 37 tests passing
+
+Current State Summary:
+- emails_categorized and emails_skipped columns EXIST in ProcessingRun model (models/database.py:224-225)
+- emails_categorized and emails_skipped fields EXIST in AccountStatus dataclass (processing_status_manager.py:72-73)
+- Flyway migration sql/V3__add_categorized_skipped_columns.sql EXISTS
+- Fields are included in archived_run dict (processing_status_manager.py:243-244)
+
+MISSING (Sub-task 1.2 scope):
+- increment_categorized() method in ProcessingStatusManager
+- increment_skipped() method in ProcessingStatusManager
+
+Pattern to Follow (from existing increment methods at lines 263-315):
+```python
+def increment_reviewed(self, count: int = 1) -> None:
+    """
+    Increment the count of emails reviewed during processing.
+
+    Args:
+        count: Number of emails to add to the reviewed count (default: 1)
+
+    Note:
+        This is a no-op if no processing session is active.
+        Thread-safe operation using internal lock.
+    """
+    with self._lock:
+        if not self._current_status:
+            # Silently ignore if no active session
+            return
+
+        self._current_status.emails_reviewed += count
+```
+
+Test Pattern (from tests/test_processing_status_manager_audit_counts.py):
+- test_processing_status_manager_has_increment_X_method - Method existence
+- test_increment_X_by_one - Default increment
+- test_increment_X_by_multiple - Batch increment with count parameter
+- test_multiple_increments_accumulate_X - Accumulation
+- test_increment_X_without_session_does_not_raise - No-op behavior
+
+Key Files:
+- /root/repo/services/processing_status_manager.py - Add methods here
+- /root/repo/tests/test_processing_status_manager_audit_counts.py - Test patterns
+- /root/repo/models/database.py - ProcessingRun model (fields exist)
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker, threading.RLock
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for increment methods
+---

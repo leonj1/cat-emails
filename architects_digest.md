@@ -4,12 +4,12 @@
 ## Active Stack
 1. Enhance Audit Records for Email Processing (Decomposed)
    1.1 Core Fields - Database Model and Basic Field Existence (Completed)
-       - ✅ Added emails_categorized and emails_skipped columns to ProcessingRun model
-       - ✅ Added fields to AccountStatus dataclass
-       - ✅ Database migration (Flyway SQL V3)
-       - ✅ Verified field initialization defaults to 0
-       - ✅ All 37 TDD tests passing
-   1.2 Increment Methods - Increment Behavior (Pending)
+       - Added emails_categorized and emails_skipped columns to ProcessingRun model
+       - Added fields to AccountStatus dataclass
+       - Database migration (Flyway SQL V3)
+       - Verified field initialization defaults to 0
+       - All 37 TDD tests passing
+   1.2 Increment Methods - Increment Behavior (In Progress)
        - Create increment_categorized() method
        - Create increment_skipped() method
        - Verify default increment of 1
@@ -76,8 +76,8 @@ total emails scanned, total emails categorized, total emails deleted, total emai
 All requested audit fields now exist in ProcessingRun:
 - email_address, start_time, end_time, current_step, error_message
 - emails_found (scanned), emails_deleted, emails_reviewed, emails_tagged
-- **emails_categorized** - Count of emails successfully assigned a category (✅ ADDED in sub-task 1.1)
-- **emails_skipped** - Count of emails skipped (e.g., already processed, filtered out) (✅ ADDED in sub-task 1.1)
+- **emails_categorized** - Count of emails successfully assigned a category (ADDED in sub-task 1.1)
+- **emails_skipped** - Count of emails skipped (e.g., already processed, filtered out) (ADDED in sub-task 1.1)
 
 Remaining work (sub-tasks 1.2-1.7 - implementation and test verification):
 - **1.2**: Add increment_categorized() and increment_skipped() methods to ProcessingStatusManager
@@ -89,9 +89,9 @@ Remaining work (sub-tasks 1.2-1.7 - implementation and test verification):
 Note: Database fields exist (1.1 complete), but increment methods and comprehensive test coverage are pending.
 
 ### Key Files Modified/Created
-1. models/database.py - ProcessingRun model (✅ columns added)
-2. services/processing_status_manager.py - AccountStatus dataclass (✅ fields added)
-3. sql/V3__add_categorized_skipped_columns.sql - Flyway migration (✅ created)
+1. models/database.py - ProcessingRun model (columns added)
+2. services/processing_status_manager.py - AccountStatus dataclass (fields added)
+3. sql/V3__add_categorized_skipped_columns.sql - Flyway migration (created)
 4. migrations/006_add_categorized_skipped_columns.py - Python migration (pending for sub-task 1.5)
 
 ### Processing States Timeline

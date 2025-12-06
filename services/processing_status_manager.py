@@ -314,6 +314,42 @@ class ProcessingStatusManager:
 
             self._current_status.emails_deleted += count
 
+    def increment_categorized(self, count: int = 1) -> None:
+        """
+        Increment the count of emails categorized during processing.
+
+        Args:
+            count: Number of emails to add to the categorized count (default: 1)
+
+        Note:
+            This is a no-op if no processing session is active.
+            Thread-safe operation using internal lock.
+        """
+        with self._lock:
+            if not self._current_status:
+                # Silently ignore if no active session
+                return
+
+            self._current_status.emails_categorized += count
+
+    def increment_skipped(self, count: int = 1) -> None:
+        """
+        Increment the count of emails skipped during processing.
+
+        Args:
+            count: Number of emails to add to the skipped count (default: 1)
+
+        Note:
+            This is a no-op if no processing session is active.
+            Thread-safe operation using internal lock.
+        """
+        with self._lock:
+            if not self._current_status:
+                # Silently ignore if no active session
+                return
+
+            self._current_status.emails_skipped += count
+
     def get_current_status(self) -> Optional[Dict[str, Any]]:
         """
         Get the current processing status.
