@@ -50,9 +50,12 @@
        - ✅ Mixed operations (read/write) thread-safe
        - ✅ All 13 tests passing
        - Test file: tests/test_thread_safety_concurrent_increments.py
-   1.7 API Response Enhancement (Pending)
-       - Status endpoint includes new fields
-       - History endpoint includes new fields
+   1.7 API Response Enhancement (Completed)
+       - ✅ Status endpoint includes emails_categorized and emails_skipped via AccountStatus.to_dict()
+       - ✅ History endpoint includes new fields via database_service.get_processing_runs()
+       - ✅ Both fields default to 0 for NULL/missing values
+       - ✅ All 9 API integration tests passing
+       - Test file: tests/test_api_response_categorized_skipped.py
 
 ## Recently Completed
 1. Generate Mermaid Gantt Chart Text for Email Categorization Runs (COMPLETED)
@@ -90,6 +93,7 @@
 - [x] 1.5a Python Migration 006 - Core (13 tests passing)
 - [x] 1.5b Persistence Verification (10 tests passing)
 - [x] 1.6 Thread Safety and Large Counts (13 tests passing)
+- [x] 1.7 API Response Enhancement (9 tests passing)
 
 ## Context
 
@@ -114,17 +118,19 @@ Completed work (continued):
 - **1.5a**: Python migration 006 for older SQLite databases (13 tests passing)
 - **1.5b**: Data integrity and persistence verification (10 tests passing)
 - **1.6**: Thread safety and large count handling tests (13 tests passing)
+- **1.7**: API response integration (9 tests passing)
 
-Remaining work (sub-task 1.7):
-- **1.7**: API response integration tests (PENDING)
+ALL SUB-TASKS COMPLETED (1.1 through 1.7)
 
-Note: Core implementation complete (1.1-1.6). Remaining task focuses on API integration.
+Note: Full implementation complete. All audit fields (emails_categorized and emails_skipped) are now tracked, persisted, and exposed via API endpoints.
 
 ### Key Files Modified/Created
 1. models/database.py - ProcessingRun model (columns added)
-2. services/processing_status_manager.py - AccountStatus dataclass (fields added)
-3. sql/V3__add_categorized_skipped_columns.sql - Flyway migration (created)
-4. migrations/migration_006_add_categorized_skipped_columns.py - Python migration (created for sub-task 1.5a)
+2. services/processing_status_manager.py - AccountStatus dataclass (fields added, increment methods)
+3. services/database_service.py - get_processing_runs() updated to include new fields
+4. sql/V3__add_categorized_skipped_columns.sql - Flyway migration (created)
+5. migrations/migration_006_add_categorized_skipped_columns.py - Python migration (created for sub-task 1.5a)
+6. tests/test_api_response_categorized_skipped.py - API integration tests (created for sub-task 1.7)
 
 ### Processing States Timeline
 The Gantt chart should represent these processing phases:
