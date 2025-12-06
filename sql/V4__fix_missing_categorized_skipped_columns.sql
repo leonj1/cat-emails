@@ -9,7 +9,7 @@ BEGIN
     -- Check and add emails_categorized if missing
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
+        WHERE TABLE_SCHEMA = DATABASE()  -- Use current Flyway schema context
         AND TABLE_NAME = 'processing_runs'
         AND COLUMN_NAME = 'emails_categorized'
     ) THEN
@@ -19,7 +19,7 @@ BEGIN
     -- Check and add emails_skipped if missing
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
+        WHERE TABLE_SCHEMA = DATABASE()  -- Use current Flyway schema context
         AND TABLE_NAME = 'processing_runs'
         AND COLUMN_NAME = 'emails_skipped'
     ) THEN
