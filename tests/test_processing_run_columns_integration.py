@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Integration test for ProcessingRun emails_categorized and emails_skipped columns.
 
@@ -94,47 +93,27 @@ class TestProcessingRunColumnsIntegration(unittest.TestCase):
         """Clean up after each test."""
         self._cleanup_test_processing_runs()
 
-    def test_emails_categorized_column_exists(self):
-        """
-        Test that emails_categorized column exists in processing_runs table.
-
-        This verifies V3 migration was applied.
-        """
+    def _verify_column_exists(self, column_name: str):
+        """Helper to verify a column exists in processing_runs table."""
         session = self.repository._get_session()
-
-        # Query the column from information_schema
         result = session.execute(text("""
             SELECT COLUMN_NAME
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_SCHEMA = :database
             AND TABLE_NAME = 'processing_runs'
-            AND COLUMN_NAME = 'emails_categorized'
-        """), {'database': self.mysql_database})
-
+            AND COLUMN_NAME = :column_name
+        """), {'database': self.mysql_database, 'column_name': column_name})
         row = result.fetchone()
-        self.assertIsNotNone(row, "emails_categorized column does not exist - V3 migration not applied")
-        self.assertEqual(row[0], 'emails_categorized')
+        self.assertIsNotNone(row, f"{column_name} column does not exist - V3 migration not applied")
+        self.assertEqual(row[0], column_name)
+
+    def test_emails_categorized_column_exists(self):
+        """Test that emails_categorized column exists in processing_runs table."""
+        self._verify_column_exists('emails_categorized')
 
     def test_emails_skipped_column_exists(self):
-        """
-        Test that emails_skipped column exists in processing_runs table.
-
-        This verifies V3 migration was applied.
-        """
-        session = self.repository._get_session()
-
-        # Query the column from information_schema
-        result = session.execute(text("""
-            SELECT COLUMN_NAME
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = :database
-            AND TABLE_NAME = 'processing_runs'
-            AND COLUMN_NAME = 'emails_skipped'
-        """), {'database': self.mysql_database})
-
-        row = result.fetchone()
-        self.assertIsNotNone(row, "emails_skipped column does not exist - V3 migration not applied")
-        self.assertEqual(row[0], 'emails_skipped')
+        """Test that emails_skipped column exists in processing_runs table."""
+        self._verify_column_exists('emails_skipped')
 
     def test_create_processing_run_with_categorized_skipped(self):
         """
@@ -173,6 +152,7 @@ class TestProcessingRunColumnsIntegration(unittest.TestCase):
             self.assertEqual(processing_run.emails_skipped, 1)
 
         except OperationalError as e:
+            session.rollback()
             self.fail(f"Failed to create ProcessingRun - migration V3 may not be applied: {e}")
 
     def test_update_processing_run_categorized_skipped(self):
