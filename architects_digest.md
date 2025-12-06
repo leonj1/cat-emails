@@ -87,6 +87,9 @@
 - [x] 1.2 Increment Methods - Increment Behavior (increment_categorized and increment_skipped)
 - [x] 1.3 Edge Cases - Zero and Empty Handling (10 tests passing)
 - [x] 1.4 Edge Cases - No Active Session (4 tests in 1.2)
+- [x] 1.5a Python Migration 006 - Core (13 tests passing)
+- [x] 1.5b Persistence Verification (10 tests passing)
+- [x] 1.6 Thread Safety and Large Counts (13 tests passing)
 
 ## Context
 

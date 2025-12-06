@@ -15,7 +15,6 @@ These tests verify that:
 """
 import threading
 import unittest
-import time
 
 from services.processing_status_manager import (
     ProcessingStatusManager,
