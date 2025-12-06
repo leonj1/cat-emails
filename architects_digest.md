@@ -9,11 +9,12 @@
        - Database migration (Flyway SQL V3)
        - Verified field initialization defaults to 0
        - All 37 TDD tests passing
-   1.2 Increment Methods - Increment Behavior (In Progress)
-       - Create increment_categorized() method
-       - Create increment_skipped() method
-       - Verify default increment of 1
-       - Verify batch increment with count parameter
+   1.2 Increment Methods - Increment Behavior (Completed)
+       - ✅ Created increment_categorized() method
+       - ✅ Created increment_skipped() method
+       - ✅ Verified default increment of 1
+       - ✅ Verified batch increment with count parameter
+       - ✅ All 20 TDD tests passing
    1.3 Edge Cases - Zero and Empty Handling (Pending)
        - Zero counts in completed runs
        - Empty batch processing
@@ -65,6 +66,7 @@
 - [x] 1.3 API Enhancement and Integration (Sub-task of Gantt Chart feature)
 - [x] Generate Mermaid Gantt Chart Text for Email Categorization Runs (ALL SUB-TASKS COMPLETE)
 - [x] 1.1 Core Fields - Database Model and Basic Field Existence (emails_categorized and emails_skipped)
+- [x] 1.2 Increment Methods - Increment Behavior (increment_categorized and increment_skipped)
 
 ## Context
 
@@ -79,14 +81,17 @@ All requested audit fields now exist in ProcessingRun:
 - **emails_categorized** - Count of emails successfully assigned a category (ADDED in sub-task 1.1)
 - **emails_skipped** - Count of emails skipped (e.g., already processed, filtered out) (ADDED in sub-task 1.1)
 
-Remaining work (sub-tasks 1.2-1.7 - implementation and test verification):
-- **1.2**: Add increment_categorized() and increment_skipped() methods to ProcessingStatusManager
+Completed work:
+- **1.1**: Database columns and dataclass fields ✅ (37 tests passing)
+- **1.2**: Increment methods ✅ (20 tests passing)
+
+Remaining work (sub-tasks 1.3-1.7 - implementation and test verification):
 - **1.3-1.4**: Edge case handling (zero counts, no active session behavior)
 - **1.5**: Data integrity, persistence verification, and Python migration
 - **1.6**: Thread safety and large count handling tests
 - **1.7**: API response integration tests
 
-Note: Database fields exist (1.1 complete), but increment methods and comprehensive test coverage are pending.
+Note: Core implementation complete (1.1-1.2). Remaining tasks focus on edge cases, data integrity, and API integration.
 
 ### Key Files Modified/Created
 1. models/database.py - ProcessingRun model (columns added)
