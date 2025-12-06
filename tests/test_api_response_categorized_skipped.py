@@ -34,7 +34,42 @@ class DatabaseSessionProtocol(Protocol):
     def close(self): ...
 
 
-class TestApiResponseIncludesEmailsCategorizedField(unittest.TestCase):
+class DatabaseServiceTestMixin:
+    """Mixin to provide DatabaseService mocking helpers for tests."""
+
+    def _create_database_service_with_session(self, session, engine, db_path):
+        """
+        Helper to create DatabaseService with mocked session.
+
+        Args:
+            session: SQLAlchemy session to use
+            engine: Database engine
+            db_path: Path to database file
+
+        Returns:
+            DatabaseService instance configured with test session
+        """
+        from services.database_service import DatabaseService
+
+        mock_repo = Mock()
+        mock_repo.is_connected.return_value = True
+
+        session_factory = MagicMock()
+        session_context = MagicMock()
+        session_context.__enter__ = MagicMock(return_value=session)
+        session_context.__exit__ = MagicMock(return_value=False)
+        session_factory.return_value = session_context
+
+        db_service = object.__new__(DatabaseService)
+        db_service.repository = mock_repo
+        db_service.Session = session_factory
+        db_service.engine = engine
+        db_service.db_path = db_path
+
+        return db_service
+
+
+class TestApiResponseIncludesEmailsCategorizedField(DatabaseServiceTestMixin, unittest.TestCase):
     """
     Scenario: Audit summary endpoint returns categorized count
 
@@ -89,23 +124,9 @@ class TestApiResponseIncludesEmailsCategorizedField(unittest.TestCase):
         run_id = run.id
 
         # Act: Call get_processing_runs through actual DatabaseService
-        from services.database_service import DatabaseService
-
-        mock_repo = Mock()
-        mock_repo.is_connected.return_value = True
-
-        session_factory = MagicMock()
-        session_context = MagicMock()
-        session_context.__enter__ = MagicMock(return_value=self.session)
-        session_context.__exit__ = MagicMock(return_value=False)
-        session_factory.return_value = session_context
-
-        db_service = object.__new__(DatabaseService)
-        db_service.repository = mock_repo
-        db_service.Session = session_factory
-        db_service.engine = self.engine
-        db_service.db_path = self.db_path
-
+        db_service = self._create_database_service_with_session(
+            self.session, self.engine, self.db_path
+        )
         result = db_service.get_processing_runs(limit=100)
 
         # Find our specific run
@@ -144,23 +165,9 @@ class TestApiResponseIncludesEmailsCategorizedField(unittest.TestCase):
         run_id = run.id
 
         # Act: Retrieve via DatabaseService.get_processing_runs()
-        from services.database_service import DatabaseService
-
-        mock_repo = Mock()
-        mock_repo.is_connected.return_value = True
-
-        session_factory = MagicMock()
-        session_context = MagicMock()
-        session_context.__enter__ = MagicMock(return_value=self.session)
-        session_context.__exit__ = MagicMock(return_value=False)
-        session_factory.return_value = session_context
-
-        db_service = object.__new__(DatabaseService)
-        db_service.repository = mock_repo
-        db_service.Session = session_factory
-        db_service.engine = self.engine
-        db_service.db_path = self.db_path
-
+        db_service = self._create_database_service_with_session(
+            self.session, self.engine, self.db_path
+        )
         result = db_service.get_processing_runs(limit=100)
 
         # Find our specific run
@@ -175,7 +182,7 @@ class TestApiResponseIncludesEmailsCategorizedField(unittest.TestCase):
         )
 
 
-class TestApiResponseIncludesEmailsSkippedField(unittest.TestCase):
+class TestApiResponseIncludesEmailsSkippedField(DatabaseServiceTestMixin, unittest.TestCase):
     """
     Scenario: Audit summary endpoint returns skipped count
 
@@ -230,23 +237,9 @@ class TestApiResponseIncludesEmailsSkippedField(unittest.TestCase):
         run_id = run.id
 
         # Act: Retrieve via DatabaseService.get_processing_runs()
-        from services.database_service import DatabaseService
-
-        mock_repo = Mock()
-        mock_repo.is_connected.return_value = True
-
-        session_factory = MagicMock()
-        session_context = MagicMock()
-        session_context.__enter__ = MagicMock(return_value=self.session)
-        session_context.__exit__ = MagicMock(return_value=False)
-        session_factory.return_value = session_context
-
-        db_service = object.__new__(DatabaseService)
-        db_service.repository = mock_repo
-        db_service.Session = session_factory
-        db_service.engine = self.engine
-        db_service.db_path = self.db_path
-
+        db_service = self._create_database_service_with_session(
+            self.session, self.engine, self.db_path
+        )
         result = db_service.get_processing_runs(limit=100)
 
         # Find our specific run
@@ -285,23 +278,9 @@ class TestApiResponseIncludesEmailsSkippedField(unittest.TestCase):
         run_id = run.id
 
         # Act: Retrieve via DatabaseService.get_processing_runs()
-        from services.database_service import DatabaseService
-
-        mock_repo = Mock()
-        mock_repo.is_connected.return_value = True
-
-        session_factory = MagicMock()
-        session_context = MagicMock()
-        session_context.__enter__ = MagicMock(return_value=self.session)
-        session_context.__exit__ = MagicMock(return_value=False)
-        session_factory.return_value = session_context
-
-        db_service = object.__new__(DatabaseService)
-        db_service.repository = mock_repo
-        db_service.Session = session_factory
-        db_service.engine = self.engine
-        db_service.db_path = self.db_path
-
+        db_service = self._create_database_service_with_session(
+            self.session, self.engine, self.db_path
+        )
         result = db_service.get_processing_runs(limit=100)
 
         # Find our specific run
@@ -316,7 +295,7 @@ class TestApiResponseIncludesEmailsSkippedField(unittest.TestCase):
         )
 
 
-class TestApiResponseBothFieldsDefaultToZero(unittest.TestCase):
+class TestApiResponseBothFieldsDefaultToZero(DatabaseServiceTestMixin, unittest.TestCase):
     """
     Test that null/missing emails_categorized and emails_skipped default to 0.
 
@@ -360,23 +339,9 @@ class TestApiResponseBothFieldsDefaultToZero(unittest.TestCase):
         run_id = run.id
 
         # Act
-        from services.database_service import DatabaseService
-
-        mock_repo = Mock()
-        mock_repo.is_connected.return_value = True
-
-        session_factory = MagicMock()
-        session_context = MagicMock()
-        session_context.__enter__ = MagicMock(return_value=self.session)
-        session_context.__exit__ = MagicMock(return_value=False)
-        session_factory.return_value = session_context
-
-        db_service = object.__new__(DatabaseService)
-        db_service.repository = mock_repo
-        db_service.Session = session_factory
-        db_service.engine = self.engine
-        db_service.db_path = self.db_path
-
+        db_service = self._create_database_service_with_session(
+            self.session, self.engine, self.db_path
+        )
         result = db_service.get_processing_runs(limit=100)
         our_run = next((r for r in result if r['run_id'] == f"run-{run_id}"), None)
 
@@ -402,23 +367,9 @@ class TestApiResponseBothFieldsDefaultToZero(unittest.TestCase):
         run_id = run.id
 
         # Act
-        from services.database_service import DatabaseService
-
-        mock_repo = Mock()
-        mock_repo.is_connected.return_value = True
-
-        session_factory = MagicMock()
-        session_context = MagicMock()
-        session_context.__enter__ = MagicMock(return_value=self.session)
-        session_context.__exit__ = MagicMock(return_value=False)
-        session_factory.return_value = session_context
-
-        db_service = object.__new__(DatabaseService)
-        db_service.repository = mock_repo
-        db_service.Session = session_factory
-        db_service.engine = self.engine
-        db_service.db_path = self.db_path
-
+        db_service = self._create_database_service_with_session(
+            self.session, self.engine, self.db_path
+        )
         result = db_service.get_processing_runs(limit=100)
         our_run = next((r for r in result if r['run_id'] == f"run-{run_id}"), None)
 
@@ -432,7 +383,7 @@ class TestApiResponseBothFieldsDefaultToZero(unittest.TestCase):
         )
 
 
-class TestApiResponseBothFieldsTogether(unittest.TestCase):
+class TestApiResponseBothFieldsTogether(DatabaseServiceTestMixin, unittest.TestCase):
     """
     Test that both emails_categorized and emails_skipped appear together.
 
@@ -481,23 +432,9 @@ class TestApiResponseBothFieldsTogether(unittest.TestCase):
         run_id = run.id
 
         # Act
-        from services.database_service import DatabaseService
-
-        mock_repo = Mock()
-        mock_repo.is_connected.return_value = True
-
-        session_factory = MagicMock()
-        session_context = MagicMock()
-        session_context.__enter__ = MagicMock(return_value=self.session)
-        session_context.__exit__ = MagicMock(return_value=False)
-        session_factory.return_value = session_context
-
-        db_service = object.__new__(DatabaseService)
-        db_service.repository = mock_repo
-        db_service.Session = session_factory
-        db_service.engine = self.engine
-        db_service.db_path = self.db_path
-
+        db_service = self._create_database_service_with_session(
+            self.session, self.engine, self.db_path
+        )
         result = db_service.get_processing_runs(limit=100)
         our_run = next((r for r in result if r['run_id'] == f"run-{run_id}"), None)
 
@@ -527,23 +464,9 @@ class TestApiResponseBothFieldsTogether(unittest.TestCase):
         run_id = run.id
 
         # Act
-        from services.database_service import DatabaseService
-
-        mock_repo = Mock()
-        mock_repo.is_connected.return_value = True
-
-        session_factory = MagicMock()
-        session_context = MagicMock()
-        session_context.__enter__ = MagicMock(return_value=self.session)
-        session_context.__exit__ = MagicMock(return_value=False)
-        session_factory.return_value = session_context
-
-        db_service = object.__new__(DatabaseService)
-        db_service.repository = mock_repo
-        db_service.Session = session_factory
-        db_service.engine = self.engine
-        db_service.db_path = self.db_path
-
+        db_service = self._create_database_service_with_session(
+            self.session, self.engine, self.db_path
+        )
         result = db_service.get_processing_runs(limit=100)
         our_run = next((r for r in result if r['run_id'] == f"run-{run_id}"), None)
 
@@ -580,23 +503,9 @@ class TestApiResponseBothFieldsTogether(unittest.TestCase):
         run_id = run.id
 
         # Act
-        from services.database_service import DatabaseService
-
-        mock_repo = Mock()
-        mock_repo.is_connected.return_value = True
-
-        session_factory = MagicMock()
-        session_context = MagicMock()
-        session_context.__enter__ = MagicMock(return_value=self.session)
-        session_context.__exit__ = MagicMock(return_value=False)
-        session_factory.return_value = session_context
-
-        db_service = object.__new__(DatabaseService)
-        db_service.repository = mock_repo
-        db_service.Session = session_factory
-        db_service.engine = self.engine
-        db_service.db_path = self.db_path
-
+        db_service = self._create_database_service_with_session(
+            self.session, self.engine, self.db_path
+        )
         result = db_service.get_processing_runs(limit=100)
         our_run = next((r for r in result if r['run_id'] == f"run-{run_id}"), None)
 
