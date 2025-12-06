@@ -1,8 +1,13 @@
 # Architect's Digest
-> Status: Complete
+> Status: In Progress
 
 ## Active Stack
-(No active tasks)
+1. Enhance Audit Records for Email Processing (In Progress)
+   - Add emails_categorized and emails_skipped columns to ProcessingRun
+   - Update AccountStatus dataclass with new tracking fields
+   - Create increment methods for new fields
+   - Add database migrations (Flyway SQL and Python)
+   - Update API responses to include new fields
 
 ## Recently Completed
 1. Generate Mermaid Gantt Chart Text for Email Categorization Runs (COMPLETED)
@@ -36,20 +41,24 @@
 
 ## Context
 
-### Task Description
-Generate Mermaid Gantt chart text for email categorization runs. The system has a background
-process that categorizes emails from Gmail accounts. Create a feature that generates Gantt
-chart text (using Mermaid syntax) for each run per account. The Gantt chart text should be
-included in the historical audit response for the UI to render independently.
+### Current Task Description
+Enhance the audit records to include email, start time, end time, duration, step, error,
+total emails scanned, total emails categorized, total emails deleted, total emails skipped.
 
-### Decomposition Rationale
-Original spec failed scope check: 25 scenarios exceeded 15-scenario threshold. Introduced 4+
-new public interfaces/dataclasses and required 5+ files to modify.
+### Current State Analysis
+Many requested fields already exist in ProcessingRun:
+- email_address, start_time, end_time, current_step, error_message
+- emails_found (scanned), emails_deleted, emails_reviewed, emails_tagged
 
-Decomposed into 3 sequential features:
-1. **State Transition Tracking**: Foundation layer - tracking mechanism
-2. **Gantt Chart Generator Core**: Pure text generation service
-3. **API Enhancement**: Integration with existing API responses
+Missing fields that need to be added:
+1. **emails_categorized** - Count of emails successfully assigned a category
+2. **emails_skipped** - Count of emails skipped (e.g., already processed, filtered out)
+
+### Key Files to Modify
+1. /root/repo/models/database.py - ProcessingRun model
+2. /root/repo/services/processing_status_manager.py - AccountStatus dataclass
+3. /root/repo/sql/V3__add_categorized_skipped_columns.sql - Flyway migration
+4. /root/repo/migrations/006_add_categorized_skipped_columns.py - Python migration
 
 ### Processing States Timeline
 The Gantt chart should represent these processing phases:

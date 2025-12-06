@@ -677,3 +677,82 @@ Features: 0/1 complete (feature_list.md)
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
 ---
+
+=== Session 20251206-024124 ===
+Workflow: architect
+Task: Enhance the audit records to include email, start time, end time, duration, step, error, total emails scanned, total emails categorized, total emails deleted, total emails skipped. The project has a background process that categorizes emails in gmail accounts and tracks status in history or audit table.
+Status: Initialized
+Context: Explored project structure, identified current audit system architecture
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for API service
+- Database: SQLAlchemy with MySQL/SQLite support (Flyway for SQL migrations in sql/ folder)
+- Testing: pytest with BDD (Gherkin feature files)
+- Build: Docker, Makefile
+
+Current Audit System Analysis:
+
+1. ProcessingRun Model (/root/repo/models/database.py lines 204-230):
+   EXISTING fields:
+   - id (Integer, primary key)
+   - email_address (Text, not null)
+   - start_time (DateTime, not null)
+   - end_time (DateTime, nullable)
+   - state (Text, not null) - current processing state
+   - current_step (Text, nullable) - description of current step
+   - emails_found (Integer, default=0)
+   - emails_processed (Integer, default=0)
+   - error_message (Text, nullable)
+   - created_at, updated_at (DateTime)
+   - emails_reviewed (Integer, default=0) - ALREADY EXISTS
+   - emails_tagged (Integer, default=0) - ALREADY EXISTS
+   - emails_deleted (Integer, default=0) - ALREADY EXISTS
+
+2. ProcessingStatusManager (/root/repo/services/processing_status_manager.py):
+   - AccountStatus dataclass tracks in-memory processing state
+   - Fields: email_address, state, current_step, progress, start_time, last_updated, error_message
+   - Audit fields: emails_reviewed, emails_tagged, emails_deleted (ALREADY EXISTS)
+   - Increment methods: increment_reviewed(), increment_tagged(), increment_deleted() (ALREADY EXISTS)
+   - get_recent_runs() returns: email_address, start_time, end_time, duration_seconds,
+     final_state, final_step, error_message, emails_reviewed, emails_tagged, emails_deleted,
+     state_transitions, gantt_chart_text
+
+3. Background Processor (/root/repo/services/background_processor_service.py):
+   - Processes Gmail accounts on schedule
+   - Calls process_account_callback for each account
+   - Records category counts via category_aggregator
+
+4. Database Migrations:
+   - SQL migrations in /root/repo/sql/ (Flyway - V1, V2)
+   - Python migrations in /root/repo/migrations/ (001-005)
+   - V1__initial_schema.sql already has: emails_reviewed, emails_tagged, emails_deleted columns
+
+REQUESTED FIELDS vs CURRENT STATE:
+| Requested Field | Current Status | Notes |
+|-----------------|----------------|-------|
+| email | EXISTS as email_address | Already tracked |
+| start time | EXISTS as start_time | Already tracked |
+| end time | EXISTS as end_time | Already tracked |
+| duration | CALCULATED | duration_seconds in get_recent_runs() |
+| step | EXISTS as current_step | Already tracked |
+| error | EXISTS as error_message | Already tracked |
+| total emails scanned | PARTIAL as emails_found | May need renaming for clarity |
+| total emails categorized | MISSING | Need to add emails_categorized column |
+| total emails deleted | EXISTS as emails_deleted | Already tracked |
+| total emails skipped | MISSING | Need to add emails_skipped column |
+
+MISSING FIELDS TO ADD:
+1. emails_categorized (Integer, default=0) - Count of successfully categorized emails
+2. emails_skipped (Integer, default=0) - Count of emails skipped during processing
+
+These need to be added to:
+- ProcessingRun model (models/database.py)
+- AccountStatus dataclass (services/processing_status_manager.py)
+- Flyway migration (sql/V3__add_skipped_categorized_columns.sql)
+- Python migration (migrations/006_add_skipped_categorized_columns.py)
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for audit enhancement
+---
