@@ -10,16 +10,19 @@
        - Verified field initialization defaults to 0
        - All 37 TDD tests passing
    1.2 Increment Methods - Increment Behavior (Completed)
-       - ✅ Created increment_categorized() method
-       - ✅ Created increment_skipped() method
-       - ✅ Verified default increment of 1
-       - ✅ Verified batch increment with count parameter
-       - ✅ All 20 TDD tests passing
-   1.3 Edge Cases - Zero and Empty Handling (Pending)
-       - Zero counts in completed runs
-       - Empty batch processing
-       - Field initialization verification
-       - Archived run includes new fields
+       - Created increment_categorized() method
+       - Created increment_skipped() method
+       - Verified default increment of 1
+       - Verified batch increment with count parameter
+       - All 20 TDD tests passing
+   1.3 Edge Cases - Zero and Empty Handling (Completed)
+       - ✅ DRAFT spec created: specs/DRAFT-edge-cases-zero-empty-handling.md
+       - ✅ Zero counts in completed runs
+       - ✅ Empty batch processing (increment with count=0)
+       - ✅ Field initialization verification
+       - ✅ Archived run includes new fields
+       - ✅ All 10 edge case tests passing
+       - Test file: tests/test_edge_cases_zero_empty_handling.py
    1.4 Edge Cases - No Active Session (Pending)
        - Increment categorized without active session (no-op)
        - Increment skipped without active session (no-op)
@@ -82,11 +85,12 @@ All requested audit fields now exist in ProcessingRun:
 - **emails_skipped** - Count of emails skipped (e.g., already processed, filtered out) (ADDED in sub-task 1.1)
 
 Completed work:
-- **1.1**: Database columns and dataclass fields ✅ (37 tests passing)
-- **1.2**: Increment methods ✅ (20 tests passing)
+- **1.1**: Database columns and dataclass fields (37 tests passing)
+- **1.2**: Increment methods (20 tests passing)
 
 Remaining work (sub-tasks 1.3-1.7 - implementation and test verification):
-- **1.3-1.4**: Edge case handling (zero counts, no active session behavior)
+- **1.3**: Edge case handling - zero counts, empty batch (IN PROGRESS)
+- **1.4**: Edge case handling - no active session behavior
 - **1.5**: Data integrity, persistence verification, and Python migration
 - **1.6**: Thread safety and large count handling tests
 - **1.7**: API response integration tests

@@ -290,3 +290,129 @@ Tests should cover all 4 Gherkin scenarios:
 - No refactoring required
 - Implementation is straightforward (~36 lines of code)
 - Tests can be written directly from Gherkin scenarios
+
+---
+
+# Gap Analysis: Edge Cases - Zero and Empty Handling (Sub-task 1.3)
+
+## Overview
+
+This section analyzes the existing codebase against the requirements for edge case tests for `emails_categorized` and `emails_skipped` audit fields. This is a TEST-FOCUSED task - no production code changes expected.
+
+## BDD Feature Analyzed
+
+**Feature File**: `tests/bdd/enhance_audit_records.feature` (lines 72-96)
+**DRAFT Spec**: `specs/DRAFT-edge-cases-zero-empty-handling.md`
+
+**Edge Case Scenarios**:
+1. Audit record handles zero categorized emails
+2. Audit record handles zero skipped emails
+3. Audit record handles empty batch
+4. New audit record initializes counts to zero
+
+## Implementation Status
+
+**Status**: COMPLETE
+
+The production code is already fully implemented:
+- `AccountStatus.emails_categorized: int = 0` (line 72)
+- `AccountStatus.emails_skipped: int = 0` (line 73)
+- `increment_categorized(count: int = 1)` method (lines 317-333)
+- `increment_skipped(count: int = 1)` method (lines 335-351)
+- Archived run records include both fields (lines 243-244)
+
+## Existing Test Coverage (57 tests passing)
+
+### From Sub-task 1.1 (test_processing_status_manager_core_audit_counts.py)
+- Field existence tests
+- Default value of 0 tests
+- Field type validation
+- to_dict() serialization tests
+- start_processing() initialization tests
+
+### From Sub-task 1.2 (test_increment_categorized_skipped.py)
+- increment_categorized(1) works
+- increment_skipped(5) works with batch
+- Silent no-op when no active session
+- Cumulative increments within session
+- Archived run includes both fields
+
+## Edge Cases Needing Test Coverage
+
+The following edge cases are NOT yet covered by existing tests:
+
+### 1. Zero Counts in Completed Runs
+- Verify archived run has `emails_categorized = 0` (not None) when no increments
+- Verify archived run has `emails_skipped = 0` (not None) when no increments
+
+### 2. Empty Batch Processing (increment with 0)
+- `increment_categorized(0)` does not change count
+- `increment_skipped(0)` does not change count
+- Zero increment followed by non-zero works correctly
+
+### 3. Complete Processing Immediately After Start
+- Start then complete produces valid archived run with both fields at 0
+- Minimal session archived run has all required keys
+
+### 4. Multiple Runs with Mixed Zero and Non-Zero Counts
+- History maintains independent counts per run
+- Zero-count runs don't affect subsequent non-zero runs
+
+## Test Pattern to Reuse
+
+**Reference Files**:
+- `/root/repo/tests/test_processing_status_manager_core_audit_counts.py` (~590 lines)
+- `/root/repo/tests/test_increment_categorized_skipped.py` (~630 lines)
+
+**Test Structure Pattern**:
+```python
+class TestEdgeCaseClassName(unittest.TestCase):
+    """Docstring referencing Gherkin scenario."""
+
+    def setUp(self):
+        self.status_manager = ProcessingStatusManager(max_history=10)
+
+    def tearDown(self):
+        if self.status_manager.is_processing():
+            self.status_manager.complete_processing()
+
+    def test_specific_edge_case(self):
+        """Given/When/Then docstring."""
+        # Arrange
+        # Act
+        # Assert
+```
+
+## Refactoring Assessment
+
+**Refactoring Needed**: NO
+
+**Justification**:
+1. Implementation is complete and all 57 existing tests pass
+2. Tests use existing API only - no implementation changes needed
+3. Simple additive tests following existing patterns
+4. No code quality issues
+
+## New Test File Required
+
+**Path**: `/root/repo/tests/test_edge_cases_zero_empty_handling.py`
+
+**Estimated Size**: ~80 lines
+
+**Test Classes**:
+1. `TestZeroCountsInCompletedRuns` (~20 lines)
+2. `TestEmptyBatchIncrement` (~25 lines)
+3. `TestImmediateCompleteAfterStart` (~20 lines)
+4. `TestMixedZeroNonZeroHistory` (~25 lines)
+
+## GO Signal for Sub-task 1.3
+
+**Status**: GO
+
+**Rationale**:
+- Production implementation is complete
+- All existing tests pass (57 tests)
+- Only edge case tests need to be added
+- Clear test patterns to follow from existing files
+- No refactoring required
+- Estimated ~80 lines of test code
