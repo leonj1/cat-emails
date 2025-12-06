@@ -3,11 +3,12 @@
 
 ## Active Stack
 1. Enhance Audit Records for Email Processing (Decomposed)
-   1.1 Core Fields - Database Model and Basic Field Existence (In Progress)
-       - Add emails_categorized and emails_skipped columns to ProcessingRun model
-       - Add fields to AccountStatus dataclass
-       - Database migration (Flyway SQL)
-       - Verify field initialization defaults to 0
+   1.1 Core Fields - Database Model and Basic Field Existence (Completed)
+       - ✅ Added emails_categorized and emails_skipped columns to ProcessingRun model
+       - ✅ Added fields to AccountStatus dataclass
+       - ✅ Database migration (Flyway SQL V3)
+       - ✅ Verified field initialization defaults to 0
+       - ✅ All 37 TDD tests passing
    1.2 Increment Methods - Increment Behavior (Pending)
        - Create increment_categorized() method
        - Create increment_skipped() method
@@ -63,6 +64,7 @@
 - [x] 1.2 Gantt Chart Generator Core (Sub-task of Gantt Chart feature)
 - [x] 1.3 API Enhancement and Integration (Sub-task of Gantt Chart feature)
 - [x] Generate Mermaid Gantt Chart Text for Email Categorization Runs (ALL SUB-TASKS COMPLETE)
+- [x] 1.1 Core Fields - Database Model and Basic Field Existence (emails_categorized and emails_skipped)
 
 ## Context
 
@@ -71,19 +73,24 @@ Enhance the audit records to include email, start time, end time, duration, step
 total emails scanned, total emails categorized, total emails deleted, total emails skipped.
 
 ### Current State Analysis
-Many requested fields already exist in ProcessingRun:
+All requested audit fields now exist in ProcessingRun:
 - email_address, start_time, end_time, current_step, error_message
 - emails_found (scanned), emails_deleted, emails_reviewed, emails_tagged
+- **emails_categorized** - Count of emails successfully assigned a category (✅ ADDED in sub-task 1.1)
+- **emails_skipped** - Count of emails skipped (e.g., already processed, filtered out) (✅ ADDED in sub-task 1.1)
 
-Missing fields that need to be added:
-1. **emails_categorized** - Count of emails successfully assigned a category
-2. **emails_skipped** - Count of emails skipped (e.g., already processed, filtered out)
+Remaining work (sub-tasks 1.2-1.7):
+- Increment methods for categorized/skipped counts
+- Edge case handling (zero counts, no active session)
+- Data integrity and persistence verification
+- Thread safety and large count handling
+- API response enhancement
 
-### Key Files to Modify
-1. /root/repo/models/database.py - ProcessingRun model
-2. /root/repo/services/processing_status_manager.py - AccountStatus dataclass
-3. /root/repo/sql/V3__add_categorized_skipped_columns.sql - Flyway migration
-4. /root/repo/migrations/006_add_categorized_skipped_columns.py - Python migration
+### Key Files Modified/Created
+1. models/database.py - ProcessingRun model (✅ columns added)
+2. services/processing_status_manager.py - AccountStatus dataclass (✅ fields added)
+3. sql/V3__add_categorized_skipped_columns.sql - Flyway migration (✅ created)
+4. migrations/006_add_categorized_skipped_columns.py - Python migration (pending for sub-task 1.5)
 
 ### Processing States Timeline
 The Gantt chart should represent these processing phases:
