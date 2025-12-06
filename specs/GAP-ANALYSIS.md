@@ -416,3 +416,130 @@ class TestEdgeCaseClassName(unittest.TestCase):
 - Clear test patterns to follow from existing files
 - No refactoring required
 - Estimated ~80 lines of test code
+
+---
+
+# Gap Analysis: Python Migration 006 - Core (Sub-task 1.5a)
+
+## Overview
+
+This section analyzes the existing codebase against the requirements for Python Migration 006, which adds `emails_categorized` and `emails_skipped` columns to the `processing_runs` table for SQLite databases.
+
+## DRAFT Spec Analyzed
+
+**Specification File**: `specs/DRAFT-python-migration-006-core.md`
+**Scenarios**: 3
+- Scenario: Migration creates columns when missing
+- Scenario: Migration is idempotent (safe to run multiple times)
+- Scenario: Migration downgrade removes columns
+
+## Existing Code to Reuse
+
+### 1. Migration 005 Pattern (`migrations/005_add_audit_count_columns.py`)
+
+**Status**: EXACT PATTERN TO COPY
+
+This migration provides the complete implementation pattern:
+
+| Component | Lines | Reusability |
+|-----------|-------|-------------|
+| `MigrationError` exception | 34-36 | Copy directly |
+| `get_engine()` function | 39-54 | Copy directly |
+| `table_exists()` function | 57-60 | Copy directly |
+| `column_exists()` function | 63-67 | Copy directly |
+| `upgrade()` function | 70-155 | Adapt for 2 columns |
+| `downgrade()` function | 158-250 | Adapt for 2 columns |
+| `main()` CLI | 253-279 | Copy with version update |
+
+**Key Adaptations Required:**
+- Change version from 005 to 006
+- Change column list from `[emails_reviewed, emails_tagged, emails_deleted]` to `[emails_categorized, emails_skipped]`
+- Update description and log messages
+- Adjust downgrade table schema (add emails_reviewed, emails_tagged, emails_deleted to preserved columns)
+
+### 2. Database Model Reference (`models/database.py`)
+
+**Status**: ALREADY UPDATED
+
+The `ProcessingRun` model (lines 204-232) already includes:
+```python
+emails_categorized = Column(Integer, default=0, nullable=False)  # line 224
+emails_skipped = Column(Integer, default=0, nullable=False)       # line 225
+```
+
+This confirms the migration is for SQLite databases that haven't run Flyway migrations.
+
+## New Components Required
+
+### 1. Migration File
+
+**Path**: `/root/repo/migrations/006_add_categorized_skipped_columns.py`
+
+**Structure** (following migration 005):
+```python
+#!/usr/bin/env python3
+"""Migration 006: Add Categorized and Skipped Columns"""
+
+# Imports (same as 005)
+# MigrationError class
+# get_engine(), table_exists(), column_exists() functions
+# upgrade() - add emails_categorized, emails_skipped
+# downgrade() - remove columns with table recreation
+# main() CLI
+```
+
+**Estimated Size**: ~250 lines
+
+### 2. Test File
+
+**Path**: `/root/repo/tests/test_migration_006.py`
+
+**Test Classes**:
+1. `TestMigration006UpgradeCreatesColumns` (~40 lines)
+2. `TestMigration006UpgradeIdempotent` (~30 lines)
+3. `TestMigration006DowngradeRemovesColumns` (~50 lines)
+
+**Estimated Size**: ~150 lines
+
+## Refactoring Assessment
+
+**Refactoring Needed**: NO
+
+**Justification**:
+1. Migration 005 provides a clean, working pattern
+2. No code quality issues in existing migrations
+3. Simple copy-and-adapt approach
+4. No structural changes needed
+5. Existing migration tests (if any) not affected
+
+## Downgrade Table Schema Considerations
+
+Migration 006 downgrade must preserve columns added by migration 005:
+- `emails_reviewed`
+- `emails_tagged`
+- `emails_deleted`
+
+The backup table schema in downgrade() must include ALL columns from the original table except `emails_categorized` and `emails_skipped`.
+
+## Implementation Readiness
+
+| Component | Status | Action Required |
+|-----------|--------|-----------------|
+| `ProcessingRun` model | EXISTS | None |
+| Migration 005 pattern | EXISTS | Copy and adapt |
+| `MigrationError` class | EXISTS | Reuse |
+| Helper functions | EXISTS | Reuse |
+| Migration 006 file | MISSING | Create |
+| Test file | MISSING | Create |
+
+## GO Signal for Sub-task 1.5a
+
+**Status**: GO
+
+**Rationale**:
+- Complete pattern available in migration 005
+- Database model already updated
+- Simple copy-and-adapt implementation
+- No refactoring required
+- Clear test requirements from Gherkin scenarios
+- Estimated ~400 lines total (250 migration + 150 tests)

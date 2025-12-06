@@ -16,21 +16,30 @@
        - Verified batch increment with count parameter
        - All 20 TDD tests passing
    1.3 Edge Cases - Zero and Empty Handling (Completed)
-       - ✅ DRAFT spec created: specs/DRAFT-edge-cases-zero-empty-handling.md
-       - ✅ Zero counts in completed runs
-       - ✅ Empty batch processing (increment with count=0)
-       - ✅ Field initialization verification
-       - ✅ Archived run includes new fields
-       - ✅ All 10 edge case tests passing
+       - DRAFT spec created: specs/DRAFT-edge-cases-zero-empty-handling.md
+       - Zero counts in completed runs
+       - Empty batch processing (increment with count=0)
+       - Field initialization verification
+       - Archived run includes new fields
+       - All 10 edge case tests passing
        - Test file: tests/test_edge_cases_zero_empty_handling.py
-   1.4 Edge Cases - No Active Session (Pending)
+   1.4 Edge Cases - No Active Session (Completed - Already Tested in 1.2)
        - Increment categorized without active session (no-op)
        - Increment skipped without active session (no-op)
-   1.5 Data Integrity and Persistence (Pending)
-       - Verify counts persist to database
-       - Verify accuracy after multiple increments
-       - Migration idempotency
-       - Python migration for older SQLite
+       - Verified in tests/test_increment_categorized_skipped.py (lines 166-260)
+       - 4 comprehensive tests covering all no-session scenarios
+   1.5 Data Integrity and Persistence (Decomposed)
+       1.5a Python Migration 006 - Core (Completed)
+           - ✅ Created migrations/migration_006_add_categorized_skipped_columns.py
+           - ✅ Migration creates columns when missing
+           - ✅ Migration is idempotent (safe to run multiple times)
+           - ✅ Migration downgrade removes columns
+           - ✅ All 13 tests passing
+           - Test file: tests/test_migration_006.py
+       1.5b Persistence Verification (Pending)
+           - Counts persist through database save/load cycle
+           - Accumulated increments persist as cumulative total
+           - Large values persist correctly
    1.6 Thread Safety and Large Counts (Pending)
        - Concurrent access safety
        - Large count handling (1000+)
@@ -70,6 +79,8 @@
 - [x] Generate Mermaid Gantt Chart Text for Email Categorization Runs (ALL SUB-TASKS COMPLETE)
 - [x] 1.1 Core Fields - Database Model and Basic Field Existence (emails_categorized and emails_skipped)
 - [x] 1.2 Increment Methods - Increment Behavior (increment_categorized and increment_skipped)
+- [x] 1.3 Edge Cases - Zero and Empty Handling (10 tests passing)
+- [x] 1.4 Edge Cases - No Active Session (4 tests in 1.2)
 
 ## Context
 
@@ -87,21 +98,24 @@ All requested audit fields now exist in ProcessingRun:
 Completed work:
 - **1.1**: Database columns and dataclass fields (37 tests passing)
 - **1.2**: Increment methods (20 tests passing)
+- **1.3**: Edge case handling - zero counts, empty batch (10 tests passing)
+- **1.4**: Edge case handling - no active session (4 tests in 1.2)
 
-Remaining work (sub-tasks 1.3-1.7 - implementation and test verification):
-- **1.3**: Edge case handling - zero counts, empty batch (IN PROGRESS)
-- **1.4**: Edge case handling - no active session behavior
-- **1.5**: Data integrity, persistence verification, and Python migration
-- **1.6**: Thread safety and large count handling tests
-- **1.7**: API response integration tests
+Completed work (continued):
+- **1.5a**: Python migration 006 for older SQLite databases (13 tests passing)
 
-Note: Core implementation complete (1.1-1.2). Remaining tasks focus on edge cases, data integrity, and API integration.
+Remaining work (sub-tasks 1.5b, 1.6-1.7):
+- **1.5b**: Data integrity and persistence verification (PENDING)
+- **1.6**: Thread safety and large count handling tests (PENDING)
+- **1.7**: API response integration tests (PENDING)
+
+Note: Core implementation complete (1.1-1.4, 1.5a). Remaining tasks focus on persistence verification, thread safety, and API integration.
 
 ### Key Files Modified/Created
 1. models/database.py - ProcessingRun model (columns added)
 2. services/processing_status_manager.py - AccountStatus dataclass (fields added)
 3. sql/V3__add_categorized_skipped_columns.sql - Flyway migration (created)
-4. migrations/006_add_categorized_skipped_columns.py - Python migration (pending for sub-task 1.5)
+4. migrations/migration_006_add_categorized_skipped_columns.py - Python migration (created for sub-task 1.5a)
 
 ### Processing States Timeline
 The Gantt chart should represent these processing phases:

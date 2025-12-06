@@ -266,7 +266,7 @@ For each edge case test:
 
 ## File to Create
 
-**Path**: `/root/repo/tests/test_edge_cases_zero_empty_handling.py`
+**Path**: `tests/test_edge_cases_zero_empty_handling.py`
 
 **Purpose**: Verify edge case behavior for emails_categorized and emails_skipped fields when dealing with zero values and empty batches.
 

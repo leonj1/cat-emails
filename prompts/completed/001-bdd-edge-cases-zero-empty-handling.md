@@ -152,12 +152,12 @@ from services.processing_status_manager import (
 
 ## New Test File to Create
 
-**Path**: `/root/repo/tests/test_edge_cases_zero_empty_handling.py`
+**Path**: `tests/test_edge_cases_zero_empty_handling.py`
 </context>
 
 <implementation>
 This is a TEST-FOCUSED task:
-1. Create test file: `/root/repo/tests/test_edge_cases_zero_empty_handling.py`
+1. Create test file: `tests/test_edge_cases_zero_empty_handling.py`
 2. Implement all 10 test methods across 4 test classes
 3. Follow existing test patterns from reference files
 4. Use existing ProcessingStatusManager API only
