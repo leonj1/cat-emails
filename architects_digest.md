@@ -2,12 +2,37 @@
 > Status: In Progress
 
 ## Active Stack
-1. Enhance Audit Records for Email Processing (In Progress)
-   - Add emails_categorized and emails_skipped columns to ProcessingRun
-   - Update AccountStatus dataclass with new tracking fields
-   - Create increment methods for new fields
-   - Add database migrations (Flyway SQL and Python)
-   - Update API responses to include new fields
+1. Enhance Audit Records for Email Processing (Decomposed)
+   1.1 Core Fields - Database Model and Basic Field Existence (In Progress)
+       - Add emails_categorized and emails_skipped columns to ProcessingRun model
+       - Add fields to AccountStatus dataclass
+       - Database migration (Flyway SQL)
+       - Verify field initialization defaults to 0
+   1.2 Increment Methods - Increment Behavior (Pending)
+       - Create increment_categorized() method
+       - Create increment_skipped() method
+       - Verify default increment of 1
+       - Verify batch increment with count parameter
+   1.3 Edge Cases - Zero and Empty Handling (Pending)
+       - Zero counts in completed runs
+       - Empty batch processing
+       - Field initialization verification
+       - Archived run includes new fields
+   1.4 Edge Cases - No Active Session (Pending)
+       - Increment categorized without active session (no-op)
+       - Increment skipped without active session (no-op)
+   1.5 Data Integrity and Persistence (Pending)
+       - Verify counts persist to database
+       - Verify accuracy after multiple increments
+       - Migration idempotency
+       - Python migration for older SQLite
+   1.6 Thread Safety and Large Counts (Pending)
+       - Concurrent access safety
+       - Large count handling (1000+)
+       - Lock mechanism verification
+   1.7 API Response Enhancement (Pending)
+       - Status endpoint includes new fields
+       - History endpoint includes new fields
 
 ## Recently Completed
 1. Generate Mermaid Gantt Chart Text for Email Categorization Runs (COMPLETED)
