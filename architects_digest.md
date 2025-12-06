@@ -36,10 +36,13 @@
            - ✅ Migration downgrade removes columns
            - ✅ All 13 tests passing
            - Test file: tests/test_migration_006.py
-       1.5b Persistence Verification (Pending)
-           - Counts persist through database save/load cycle
-           - Accumulated increments persist as cumulative total
-           - Large values persist correctly
+       1.5b Persistence Verification (Completed)
+           - ✅ Single value persistence through session close/reopen
+           - ✅ Cumulative increments persist as total
+           - ✅ Large values (1000+) persist correctly
+           - ✅ Zero values persist as 0 (not NULL)
+           - ✅ All 10 tests passing
+           - Test file: tests/test_data_integrity_persistence.py
    1.6 Thread Safety and Large Counts (Pending)
        - Concurrent access safety
        - Large count handling (1000+)
