@@ -29,7 +29,7 @@ class DatabaseSessionProtocol(Protocol):
 
     def query(self, model): ...
     def add(self, instance): ...
-    def commit(self, ): ...
+    def commit(self): ...
     def rollback(self): ...
     def close(self): ...
 
@@ -69,20 +69,14 @@ class DatabaseServiceTestMixin:
         return db_service
 
 
-class TestApiResponseIncludesEmailsCategorizedField(DatabaseServiceTestMixin, unittest.TestCase):
-    """
-    Scenario: Audit summary endpoint returns categorized count
-
-    Given audit records exist with categorized emails
-    When the audit summary is requested
-    Then the response should include the emails_categorized count
-    """
+class BaseApiResponseTest(DatabaseServiceTestMixin, unittest.TestCase):
+    """Base class for API response tests with common setup/teardown."""
 
     @classmethod
     def setUpClass(cls):
         """Set up database engine once for all tests in this class."""
         cls.temp_dir = tempfile.mkdtemp()
-        cls.db_path = f"{cls.temp_dir}/test_api_categorized.db"
+        cls.db_path = f"{cls.temp_dir}/test_{cls.__name__.lower()}.db"
         cls.engine = init_database(cls.db_path)
 
     @classmethod
@@ -100,6 +94,15 @@ class TestApiResponseIncludesEmailsCategorizedField(DatabaseServiceTestMixin, un
         self.session.rollback()
         self.session.close()
 
+
+class TestApiResponseIncludesEmailsCategorizedField(BaseApiResponseTest):
+    """
+    Scenario: Audit summary endpoint returns categorized count
+
+    Given audit records exist with categorized emails
+    When the audit summary is requested
+    Then the response should include the emails_categorized count
+    """
     def test_api_response_includes_emails_categorized_field(self):
         """
         Test that get_processing_runs response includes emails_categorized field.
@@ -182,7 +185,7 @@ class TestApiResponseIncludesEmailsCategorizedField(DatabaseServiceTestMixin, un
         )
 
 
-class TestApiResponseIncludesEmailsSkippedField(DatabaseServiceTestMixin, unittest.TestCase):
+class TestApiResponseIncludesEmailsSkippedField(BaseApiResponseTest):
     """
     Scenario: Audit summary endpoint returns skipped count
 
@@ -190,29 +193,6 @@ class TestApiResponseIncludesEmailsSkippedField(DatabaseServiceTestMixin, unitte
     When the audit summary is requested
     Then the response should include the emails_skipped count
     """
-
-    @classmethod
-    def setUpClass(cls):
-        """Set up database engine once for all tests in this class."""
-        cls.temp_dir = tempfile.mkdtemp()
-        cls.db_path = f"{cls.temp_dir}/test_api_skipped.db"
-        cls.engine = init_database(cls.db_path)
-
-    @classmethod
-    def tearDownClass(cls):
-        """Clean up database after all tests."""
-        cls.engine.dispose()
-        shutil.rmtree(cls.temp_dir, ignore_errors=True)
-
-    def setUp(self):
-        """Set up a fresh session for each test."""
-        self.session = get_session(self.engine)
-
-    def tearDown(self):
-        """Clean up session after each test."""
-        self.session.rollback()
-        self.session.close()
-
     def test_api_response_includes_emails_skipped_field(self):
         """
         Test that get_processing_runs response includes emails_skipped field.
@@ -295,7 +275,7 @@ class TestApiResponseIncludesEmailsSkippedField(DatabaseServiceTestMixin, unitte
         )
 
 
-class TestApiResponseBothFieldsDefaultToZero(DatabaseServiceTestMixin, unittest.TestCase):
+class TestApiResponseBothFieldsDefaultToZero(BaseApiResponseTest):
     """
     Test that null/missing emails_categorized and emails_skipped default to 0.
 
@@ -303,29 +283,6 @@ class TestApiResponseBothFieldsDefaultToZero(DatabaseServiceTestMixin, unittest.
     When I retrieve the processing runs via the API
     Then both fields should default to 0
     """
-
-    @classmethod
-    def setUpClass(cls):
-        """Set up database engine once for all tests in this class."""
-        cls.temp_dir = tempfile.mkdtemp()
-        cls.db_path = f"{cls.temp_dir}/test_api_defaults.db"
-        cls.engine = init_database(cls.db_path)
-
-    @classmethod
-    def tearDownClass(cls):
-        """Clean up database after all tests."""
-        cls.engine.dispose()
-        shutil.rmtree(cls.temp_dir, ignore_errors=True)
-
-    def setUp(self):
-        """Set up a fresh session for each test."""
-        self.session = get_session(self.engine)
-
-    def tearDown(self):
-        """Clean up session after each test."""
-        self.session.rollback()
-        self.session.close()
-
     def test_null_emails_categorized_defaults_to_zero(self):
         """Test that NULL emails_categorized returns 0 in API response."""
         # Arrange: Create a run without specifying categorized/skipped
@@ -383,7 +340,7 @@ class TestApiResponseBothFieldsDefaultToZero(DatabaseServiceTestMixin, unittest.
         )
 
 
-class TestApiResponseBothFieldsTogether(DatabaseServiceTestMixin, unittest.TestCase):
+class TestApiResponseBothFieldsTogether(BaseApiResponseTest):
     """
     Test that both emails_categorized and emails_skipped appear together.
 
@@ -391,29 +348,6 @@ class TestApiResponseBothFieldsTogether(DatabaseServiceTestMixin, unittest.TestC
     When the audit summary is requested
     Then both fields should be present with correct values
     """
-
-    @classmethod
-    def setUpClass(cls):
-        """Set up database engine once for all tests in this class."""
-        cls.temp_dir = tempfile.mkdtemp()
-        cls.db_path = f"{cls.temp_dir}/test_api_both_fields.db"
-        cls.engine = init_database(cls.db_path)
-
-    @classmethod
-    def tearDownClass(cls):
-        """Clean up database after all tests."""
-        cls.engine.dispose()
-        shutil.rmtree(cls.temp_dir, ignore_errors=True)
-
-    def setUp(self):
-        """Set up a fresh session for each test."""
-        self.session = get_session(self.engine)
-
-    def tearDown(self):
-        """Clean up session after each test."""
-        self.session.rollback()
-        self.session.close()
-
     def test_both_fields_present_in_response(self):
         """Test that both new fields are present in API response."""
         # Arrange
