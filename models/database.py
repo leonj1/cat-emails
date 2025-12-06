@@ -221,7 +221,9 @@ class ProcessingRun(Base):
     emails_reviewed = Column(Integer, default=0, nullable=False)
     emails_tagged = Column(Integer, default=0, nullable=False)
     emails_deleted = Column(Integer, default=0, nullable=False)
-    
+    emails_categorized = Column(Integer, default=0, nullable=False)
+    emails_skipped = Column(Integer, default=0, nullable=False)
+
     __table_args__ = (
         Index('idx_processing_runs_email_address', 'email_address'),
         Index('idx_processing_runs_start_time', 'start_time'),

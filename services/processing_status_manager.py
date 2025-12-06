@@ -69,7 +69,9 @@ class AccountStatus:
     emails_reviewed: int = 0
     emails_tagged: int = 0
     emails_deleted: int = 0
-    
+    emails_categorized: int = 0
+    emails_skipped: int = 0
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation"""
         result = asdict(self)
@@ -238,6 +240,8 @@ class ProcessingStatusManager:
                 'emails_reviewed': self._current_status.emails_reviewed,
                 'emails_tagged': self._current_status.emails_tagged,
                 'emails_deleted': self._current_status.emails_deleted,
+                'emails_categorized': self._current_status.emails_categorized,
+                'emails_skipped': self._current_status.emails_skipped,
                 'state_transitions': [t.to_dict() for t in transitions],
                 'gantt_chart_text': gantt_chart_text
             }
