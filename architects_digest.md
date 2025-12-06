@@ -109,13 +109,13 @@ Completed work:
 
 Completed work (continued):
 - **1.5a**: Python migration 006 for older SQLite databases (13 tests passing)
+- **1.5b**: Data integrity and persistence verification (10 tests passing)
+- **1.6**: Thread safety and large count handling tests (13 tests passing)
 
-Remaining work (sub-tasks 1.5b, 1.6-1.7):
-- **1.5b**: Data integrity and persistence verification (PENDING)
-- **1.6**: Thread safety and large count handling tests (PENDING)
+Remaining work (sub-task 1.7):
 - **1.7**: API response integration tests (PENDING)
 
-Note: Core implementation complete (1.1-1.4, 1.5a). Remaining tasks focus on persistence verification, thread safety, and API integration.
+Note: Core implementation complete (1.1-1.6). Remaining task focuses on API integration.
 
 ### Key Files Modified/Created
 1. models/database.py - ProcessingRun model (columns added)

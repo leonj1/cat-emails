@@ -249,6 +249,10 @@ class TestCumulativeIncrementsPersistence(unittest.TestCase):
         retrieved_run = new_session.query(ProcessingRun).filter_by(id=run_id).first()
 
         # Assert: Cumulative total persisted
+        self.assertIsNotNone(
+            retrieved_run,
+            "ProcessingRun should be retrievable after session close"
+        )
         self.assertEqual(
             retrieved_run.emails_categorized,
             15,
@@ -297,6 +301,10 @@ class TestCumulativeIncrementsPersistence(unittest.TestCase):
         retrieved_run = new_session.query(ProcessingRun).filter_by(id=run_id).first()
 
         # Assert: Cumulative total persisted
+        self.assertIsNotNone(
+            retrieved_run,
+            "ProcessingRun should be retrievable after session close"
+        )
         self.assertEqual(
             retrieved_run.emails_skipped,
             10,
@@ -342,6 +350,10 @@ class TestCumulativeIncrementsPersistence(unittest.TestCase):
         retrieved_run = new_session.query(ProcessingRun).filter_by(id=run_id).first()
 
         # Assert: Both cumulative totals persisted independently
+        self.assertIsNotNone(
+            retrieved_run,
+            "ProcessingRun should be retrievable after session close"
+        )
         self.assertEqual(
             retrieved_run.emails_categorized,
             15,
@@ -410,6 +422,10 @@ class TestLargeValuesPersistence(unittest.TestCase):
         retrieved_run = new_session.query(ProcessingRun).filter_by(id=run_id).first()
 
         # Assert: Large value persisted without overflow
+        self.assertIsNotNone(
+            retrieved_run,
+            "ProcessingRun should be retrievable after session close"
+        )
         self.assertEqual(
             retrieved_run.emails_categorized,
             large_value,
@@ -449,6 +465,10 @@ class TestLargeValuesPersistence(unittest.TestCase):
         retrieved_run = new_session.query(ProcessingRun).filter_by(id=run_id).first()
 
         # Assert: Large value persisted without overflow
+        self.assertIsNotNone(
+            retrieved_run,
+            "ProcessingRun should be retrievable after session close"
+        )
         self.assertEqual(
             retrieved_run.emails_skipped,
             large_value,
@@ -495,6 +515,10 @@ class TestLargeValuesPersistence(unittest.TestCase):
         retrieved_run = new_session.query(ProcessingRun).filter_by(id=run_id).first()
 
         # Assert: Very large cumulative values persisted correctly
+        self.assertIsNotNone(
+            retrieved_run,
+            "ProcessingRun should be retrievable after session close"
+        )
         self.assertEqual(
             retrieved_run.emails_categorized,
             12500,
