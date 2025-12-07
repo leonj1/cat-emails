@@ -1081,3 +1081,72 @@ Features: 0/1 complete (feature_list.md)
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
 ---
+
+=== Session 20251207-034155 ===
+Workflow: debugger
+Task: The /api/processing/history endpoint reports 0 emails processed (emails_reviewed=0, emails_tagged=0, emails_deleted=0, emails_categorized=0, emails_skipped=0) despite the state transitions showing that 1 email was fetched, processed, and categorized over a 325 second duration. The step descriptions say "Processing 1 emails" and "Categorizing email 1 with AI" but the counters remain at 0.
+Status: Initialized
+Context: Explored project structure, identified root cause pattern
+
+Branch: terragon/debug-email-processing-slow-t0r28k
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- Build: Docker, Makefile
+
+Key Discovery - Root Cause Identified:
+
+The ProcessingStatusManager has increment methods defined (processing_status_manager.py lines 263-351):
+- increment_reviewed(count: int = 1)
+- increment_tagged(count: int = 1)
+- increment_deleted(count: int = 1)
+- increment_categorized(count: int = 1)
+- increment_skipped(count: int = 1)
+
+These methods are called in TESTS ONLY - NOT in production code:
+- tests/test_processing_status_manager_audit_counts.py
+- tests/test_increment_categorized_skipped.py
+- tests/test_thread_safety_concurrent_increments.py
+- tests/test_edge_cases_zero_empty_handling.py
+- tests/unit/test_api_enhancement_gantt.py
+
+The AccountEmailProcessorService (account_email_processor_service.py):
+- Has access to self.processing_status_manager (line 54)
+- Calls update_status() throughout email processing (lines 161, 170, 193, 217, 225, 256, 265, 308)
+- Does NOT call any increment_* methods when emails are processed
+
+Key code section (account_email_processor_service.py lines 215-232):
+```python
+for i, msg in enumerate(new_emails, 1):
+    # Update status for categorization
+    self.processing_status_manager.update_status(
+        ProcessingState.CATEGORIZING,
+        f"Categorizing email {i} with AI",
+        {"current": i, "total": len(new_emails)}
+    )
+    
+    # Process the email
+    category = processor.process_email(msg)
+    
+    # MISSING: No increment_reviewed() call
+    # MISSING: No increment_categorized() call (when category is not None)
+```
+
+The result dict at line 344-359 shows emails_categorized = len(new_emails), but this value
+is NOT being tracked in the ProcessingStatusManager's AccountStatus dataclass.
+
+Evidence Chain:
+1. processing_status_manager.py:69-73 - AccountStatus fields exist (all default to 0)
+2. processing_status_manager.py:240-244 - archived_run includes these fields
+3. processing_status_manager.py:263-351 - increment methods exist and work correctly
+4. account_email_processor_service.py:215-269 - email processing loop NEVER calls increment methods
+5. Grep search confirms: "processing_status_manager\.increment_" returns NO matches outside tests
+
+Root Cause: The increment methods were implemented but never wired into the email processing flow.
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
