@@ -231,6 +231,9 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                 # Process the email
                 category = processor.process_email(msg)
 
+                # Track that this email was reviewed
+                self.processing_status_manager.increment_reviewed()
+
                 # Collect domain recommendation if collector is present and email was categorized
                 if self.blocking_recommendation_collector and category:
                     try:
