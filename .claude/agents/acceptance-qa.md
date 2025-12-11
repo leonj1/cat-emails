@@ -3,7 +3,7 @@ name: acceptance-qa
 description: User Acceptance Testing (UAT) specialist that validates the final implementation against the original user prompt.
 tools: Read, Glob, Grep, Task, Bash
 model: opus
-extended_thinking: true
+ultrathink: true
 color: yellow
 ---
 
