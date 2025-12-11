@@ -1081,3 +1081,72 @@ Features: 0/1 complete (feature_list.md)
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
 ---
+
+=== Session 20251211-120548 ===
+Workflow: debugger
+Task: Test emails_reviewed count bug - /api/processing/history shows emails_reviewed=0 even when emails were processed
+Status: Initialized
+Context: Explored project structure, identified ROOT CAUSE - increment_reviewed() is never called in production code
+
+Branch: terragon/test-emails-reviewed-count-l0zdon
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- Testing: pytest with BDD (Gherkin feature files in tests/bdd/)
+- Build: Docker, Makefile
+
+Error Description:
+When processing emails through the /api/processing/history endpoint, the emails_reviewed count
+shows 0 even when state transitions clearly show emails were processed (e.g., "Processing 1 emails",
+"Processing email 1 of 1", "Categorizing email 1 with AI", "Successfully processed 1 emails").
+
+KEY FINDING - ROOT CAUSE IDENTIFIED:
+
+The increment_reviewed() method EXISTS in ProcessingStatusManager (line 263-279) but is NEVER
+CALLED from any production code:
+
+1. /root/repo/services/processing_status_manager.py:263-279 - increment_reviewed() method EXISTS
+2. /root/repo/gmail_fetcher.py - NO calls to increment_reviewed()
+3. /root/repo/email_scanner_consumer.py - NO calls to increment_reviewed()
+4. /root/repo/api_service.py - NO calls to increment_reviewed()
+5. /root/repo/services/account_email_processor_service.py - NO calls to increment_reviewed()
+6. /root/repo/services/background_processor_service.py - NO calls to increment_reviewed()
+
+The same is true for the other increment methods:
+- increment_tagged() - NEVER called in production
+- increment_deleted() - NEVER called in production
+- increment_categorized() - NEVER called in production
+- increment_skipped() - NEVER called in production
+
+These methods are ONLY called in test files (tests/test_processing_status_manager_audit_counts.py, etc.)
+
+The archived_run dict in complete_processing() (line 240) correctly captures self._current_status.emails_reviewed,
+but since increment_reviewed() is never called during actual email processing, the value remains 0.
+
+Call Chain Analysis:
+1. Email processing starts via BackgroundProcessorService or AccountEmailProcessorService
+2. ProcessingStatusManager.start_processing() is called (emails_reviewed initialized to 0)
+3. ProcessingStatusManager.update_status() is called with state transitions
+4. Emails are processed (but increment_reviewed() is NEVER called)
+5. ProcessingStatusManager.complete_processing() archives the run with emails_reviewed=0
+6. /api/processing/history returns emails_reviewed=0
+
+Task for Debugger:
+Create a TDD test that:
+1. Verifies that when an email is processed, increment_reviewed() should be called
+2. Documents WHERE in the call chain increment_reviewed() should be called
+3. Ensures emails_reviewed count matches actual emails processed
+
+Key Files:
+- /root/repo/services/processing_status_manager.py:263-279 - increment_reviewed() method
+- /root/repo/services/processing_status_manager.py:240 - emails_reviewed in archived_run
+- /root/repo/api_service.py:920-940 - GET /api/processing/history endpoint
+- /root/repo/services/background_processor_service.py - likely location to add increment_reviewed() call
+- /root/repo/services/account_email_processor_service.py - likely location to add increment_reviewed() call
+
+Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from Gmail via API)
+
+Next: Invoking debugger agent to create TDD test for emails_reviewed count
+---
