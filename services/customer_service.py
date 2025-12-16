@@ -3,7 +3,7 @@ Customer Management Service
 
 Handles customer CRUD operations, account relationships, and OAuth token lifecycle.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from utils.logger import get_logger
@@ -63,7 +63,7 @@ class CustomerService:
 
             if customer:
                 # Update last login time
-                customer.last_login_at = datetime.utcnow()
+                customer.last_login_at = datetime.now(timezone.utc)
 
                 # Update email if changed
                 if customer.email_address != email_address:
@@ -88,7 +88,7 @@ class CustomerService:
                 email_address=email_address,
                 display_name=display_name,
                 is_active=True,
-                last_login_at=datetime.utcnow()
+                last_login_at=datetime.now(timezone.utc)
             )
 
             session.add(new_customer)
