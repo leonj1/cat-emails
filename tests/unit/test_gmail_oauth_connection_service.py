@@ -309,6 +309,7 @@ class TestOAuth2StringGeneration(unittest.TestCase):
     def test_oauth2_string_is_base64_encoded(self):
         """Test that XOAUTH2 string is properly base64 encoded."""
         from services.gmail_oauth_connection_service import GmailOAuthConnectionService
+        import binascii
 
         service = GmailOAuthConnectionService(
             email_address="test@example.com",
@@ -323,7 +324,7 @@ class TestOAuth2StringGeneration(unittest.TestCase):
         try:
             decoded = base64.b64decode(oauth2_string)
             self.assertIsInstance(decoded, bytes)
-        except Exception as e:
+        except (binascii.Error, ValueError) as e:
             self.fail(f"OAuth2 string should be valid base64: {e}")
 
 

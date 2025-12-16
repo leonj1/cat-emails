@@ -99,8 +99,8 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             self.client_id = self.client_id or installed.get("client_id")
             self.client_secret = self.client_secret or installed.get("client_secret")
             logger.info("Loaded OAuth credentials from file")
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.exception(f"Failed to parse credentials file: {e}")
+        except (json.JSONDecodeError, KeyError):
+            logger.exception("Failed to parse credentials file")
 
     def _load_token_file(self) -> None:
         """Load refresh_token from token.json."""
@@ -116,8 +116,8 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             self.refresh_token = self.refresh_token or data.get("refresh_token")
             self._access_token = data.get("access_token")
             logger.info("Loaded OAuth token from file")
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.exception(f"Failed to parse token file: {e}")
+        except (json.JSONDecodeError, KeyError):
+            logger.exception("Failed to parse token file")
 
     def _validate_credentials(self) -> None:
         """Validate that all required credentials are present."""
@@ -274,6 +274,6 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
                 logger.exception(f"Gmail OAuth authentication failed: {error_msg}. {guidance}")
                 raise Exception(f"Gmail OAuth authentication failed: {error_msg}. {guidance}") from auth_err
 
-        except (imaplib.IMAP4.error, OSError) as e:
-            logger.exception(f"Gmail OAuth connection error for {self.email_address}: {e}")
-            raise Exception(f"Failed to connect to Gmail via OAuth: {e}") from e
+        except (imaplib.IMAP4.error, OSError):
+            logger.exception(f"Gmail OAuth connection error for {self.email_address}")
+            raise
