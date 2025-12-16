@@ -9,7 +9,7 @@ import json
 import os
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 
 class TestGmailOAuthConnectionServiceExists(unittest.TestCase):
@@ -223,10 +223,6 @@ class TestCredentialValidation(unittest.TestCase):
         from services.gmail_oauth_connection_service import GmailOAuthConnectionService
 
         with patch.dict(os.environ, {}, clear=True):
-            # Remove any env vars
-            for key in ["GMAIL_OAUTH_CLIENT_ID", "GMAIL_OAUTH_CLIENT_SECRET", "GMAIL_OAUTH_REFRESH_TOKEN"]:
-                os.environ.pop(key, None)
-
             service = GmailOAuthConnectionService(
                 email_address="user@gmail.com",
                 client_secret="secret",

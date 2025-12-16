@@ -92,14 +92,14 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             return
 
         try:
-            with open(creds_path, "r") as f:
+            with open(creds_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             installed = data.get("installed") or data.get("web", {})
             self.client_id = self.client_id or installed.get("client_id")
             self.client_secret = self.client_secret or installed.get("client_secret")
             logger.info("Loaded OAuth credentials from file")
-        except (json.JSONDecodeError, KeyError):
+        except json.JSONDecodeError:
             logger.exception("Failed to parse credentials file")
 
     def _load_token_file(self) -> None:
@@ -110,13 +110,13 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             return
 
         try:
-            with open(token_path, "r") as f:
+            with open(token_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             self.refresh_token = self.refresh_token or data.get("refresh_token")
             self._access_token = data.get("access_token")
             logger.info("Loaded OAuth token from file")
-        except (json.JSONDecodeError, KeyError):
+        except json.JSONDecodeError:
             logger.exception("Failed to parse token file")
 
     def _validate_credentials(self) -> None:
@@ -186,7 +186,7 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
                 f"Details: {error_body}"
             ) from e
         except urllib.error.URLError as e:
-            logger.exception(f"Network error refreshing OAuth token: {e}")
+            logger.exception("Network error refreshing OAuth token")
             raise Exception(f"Network error during OAuth token refresh: {e}") from e
 
     def _save_token_file(self, token_data: dict) -> None:
@@ -198,7 +198,7 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             token_path = Path(self.token_file)
             existing = {}
             if token_path.exists():
-                with open(token_path, "r") as f:
+                with open(token_path, "r", encoding="utf-8") as f:
                     existing = json.load(f)
 
             existing.update(token_data)
