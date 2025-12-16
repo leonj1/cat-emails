@@ -7,6 +7,7 @@ via the GMAIL_AUTH_METHOD environment variable.
 from __future__ import annotations
 
 import os
+from enum import Enum
 from typing import Optional
 
 from utils.logger import get_logger
@@ -17,7 +18,7 @@ from services.gmail_oauth_connection_service import GmailOAuthConnectionService
 logger = get_logger(__name__)
 
 
-class GmailAuthMethod:
+class GmailAuthMethod(str, Enum):
     """Supported Gmail authentication methods."""
 
     IMAP = "imap"
@@ -26,7 +27,7 @@ class GmailAuthMethod:
     @classmethod
     def all_methods(cls) -> list[str]:
         """Return all supported authentication methods."""
-        return [cls.IMAP, cls.OAUTH]
+        return [m.value for m in cls]
 
 
 class GmailConnectionFactory:
@@ -53,7 +54,7 @@ class GmailConnectionFactory:
         - GMAIL_OAUTH_TOKEN_FILE: Path to token.json
     """
 
-    DEFAULT_AUTH_METHOD = GmailAuthMethod.IMAP
+    DEFAULT_AUTH_METHOD = GmailAuthMethod.IMAP.value
 
     @classmethod
     def get_auth_method(cls) -> str:
@@ -111,7 +112,7 @@ class GmailConnectionFactory:
         method = auth_method or cls.get_auth_method()
         logger.info(f"Creating Gmail connection using '{method}' authentication")
 
-        if method == GmailAuthMethod.OAUTH:
+        if method == GmailAuthMethod.OAUTH.value:
             return cls._create_oauth_connection(
                 email_address=email_address,
                 client_id=client_id,

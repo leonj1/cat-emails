@@ -10,8 +10,11 @@ import base64
 import imaplib
 import json
 import os
+import shutil
+import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import ClassVar, Optional
+from urllib.parse import urlparse
 
 from utils.logger import get_logger
 from services.gmail_connection_interface import GmailConnectionInterface
@@ -39,7 +42,7 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
     IMAP_SERVER = "imap.gmail.com"
     IMAP_PORT = 993
 
-    SCOPES = [
+    SCOPES: ClassVar[list[str]] = [
         "https://mail.google.com/",
     ]
 
@@ -97,7 +100,7 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             self.client_secret = self.client_secret or installed.get("client_secret")
             logger.info("Loaded OAuth credentials from file")
         except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Failed to parse credentials file: {e}")
+            logger.exception(f"Failed to parse credentials file: {e}")
 
     def _load_token_file(self) -> None:
         """Load refresh_token from token.json."""
@@ -114,7 +117,7 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             self._access_token = data.get("access_token")
             logger.info("Loaded OAuth token from file")
         except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Failed to parse token file: {e}")
+            logger.exception(f"Failed to parse token file: {e}")
 
     def _validate_credentials(self) -> None:
         """Validate that all required credentials are present."""
@@ -145,6 +148,11 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
 
         self._validate_credentials()
 
+        # Validate URL scheme for security
+        parsed_uri = urlparse(self.TOKEN_URI)
+        if parsed_uri.scheme != "https":
+            raise ValueError(f"Insecure URL scheme: {parsed_uri.scheme}. Only HTTPS is allowed.")
+
         data = urllib.parse.urlencode({
             "client_id": self.client_id,
             "client_secret": self.client_secret,
@@ -171,18 +179,18 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             return self._access_token
         except urllib.error.HTTPError as e:
             error_body = e.read().decode("utf-8")
-            logger.error(f"Failed to refresh OAuth token: {e.code} - {error_body}")
+            logger.exception(f"Failed to refresh OAuth token: {e.code} - {error_body}")
             raise Exception(
                 f"OAuth token refresh failed: {e.code}. "
                 "Ensure your refresh_token is valid and not revoked. "
                 f"Details: {error_body}"
-            )
+            ) from e
         except urllib.error.URLError as e:
-            logger.error(f"Network error refreshing OAuth token: {e}")
-            raise Exception(f"Network error during OAuth token refresh: {e}")
+            logger.exception(f"Network error refreshing OAuth token: {e}")
+            raise Exception(f"Network error during OAuth token refresh: {e}") from e
 
     def _save_token_file(self, token_data: dict) -> None:
-        """Save updated token data to token file."""
+        """Save updated token data to token file using atomic write."""
         if not self.token_file:
             return
 
@@ -195,8 +203,15 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
 
             existing.update(token_data)
 
-            with open(token_path, "w") as f:
-                json.dump(existing, f, indent=2)
+            # Atomic write to prevent corruption from concurrent access
+            fd, tmp_path = tempfile.mkstemp(dir=token_path.parent, suffix=".json")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(existing, f, indent=2)
+                shutil.move(tmp_path, token_path)
+            except Exception:
+                os.unlink(tmp_path)
+                raise
 
             logger.debug("Saved updated OAuth token to file")
         except Exception as e:
@@ -256,9 +271,9 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
                         "are correctly configured and the user has granted access."
                     )
 
-                logger.error(f"Gmail OAuth authentication failed: {error_msg}. {guidance}")
-                raise Exception(f"Gmail OAuth authentication failed: {error_msg}. {guidance}")
+                logger.exception(f"Gmail OAuth authentication failed: {error_msg}. {guidance}")
+                raise Exception(f"Gmail OAuth authentication failed: {error_msg}. {guidance}") from auth_err
 
         except (imaplib.IMAP4.error, OSError) as e:
-            logger.error(f"Gmail OAuth connection error for {self.email_address}: {e}")
-            raise Exception(f"Failed to connect to Gmail via OAuth: {e}")
+            logger.exception(f"Gmail OAuth connection error for {self.email_address}: {e}")
+            raise Exception(f"Failed to connect to Gmail via OAuth: {e}") from e
