@@ -216,40 +216,46 @@ class CustomerService:
         Raises:
             ValueError: If customer not found
         """
-        customer = self.get_customer_by_id(customer_id)
-        if not customer:
-            raise ValueError(f"Customer {customer_id} not found")
-
-        # Get all accounts before deletion
-        accounts = self.get_customer_accounts(customer_id)
-        account_count = len(accounts)
-        tokens_revoked = 0
-
-        # Revoke OAuth tokens for all accounts
-        for account in accounts:
-            if account.oauth_refresh_token:
-                try:
-                    if self.token_service.revoke_token(account.oauth_refresh_token):
-                        tokens_revoked += 1
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to revoke token for account {account.email_address}: {e}"
-                    )
-
         # Delete customer (accounts will be cascade deleted)
         session = self.repository.get_session()
         try:
+            # Query customer within active session to avoid detached object issues
+            customer = session.query(Customer).get(customer_id)
+            if not customer:
+                raise ValueError(f"Customer {customer_id} not found")
+
+            # Get accounts within same session
+            accounts = session.query(EmailAccount).filter(
+                EmailAccount.customer_id == customer_id
+            ).all()
+
+            account_count = len(accounts)
+            tokens_revoked = 0
+            customer_email = customer.email_address
+
+            # Revoke OAuth tokens for all accounts
+            for account in accounts:
+                if account.oauth_refresh_token:
+                    try:
+                        if self.token_service.revoke_token(account.oauth_refresh_token):
+                            tokens_revoked += 1
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to revoke token for account {account.email_address}: {e}"
+                        )
+
+            # Delete customer (accounts will be cascade deleted)
             session.delete(customer)
             session.commit()
 
             logger.info(
-                f"Deleted customer {customer_id} ({customer.email_address}). "
+                f"Deleted customer {customer_id} ({customer_email}). "
                 f"Accounts deleted: {account_count}, Tokens revoked: {tokens_revoked}"
             )
 
             return {
                 "customer_id": customer_id,
-                "customer_email": customer.email_address,
+                "customer_email": customer_email,
                 "accounts_deleted": account_count,
                 "tokens_revoked": tokens_revoked
             }
@@ -274,12 +280,13 @@ class CustomerService:
         Raises:
             ValueError: If customer not found
         """
-        customer = self.get_customer_by_id(customer_id)
-        if not customer:
-            raise ValueError(f"Customer {customer_id} not found")
-
         session = self.repository.get_session()
         try:
+            # Query customer within active session to avoid detached object issues
+            customer = session.query(Customer).get(customer_id)
+            if not customer:
+                raise ValueError(f"Customer {customer_id} not found")
+
             customer.is_active = False
             session.commit()
             session.refresh(customer)
@@ -307,12 +314,13 @@ class CustomerService:
         Raises:
             ValueError: If customer not found
         """
-        customer = self.get_customer_by_id(customer_id)
-        if not customer:
-            raise ValueError(f"Customer {customer_id} not found")
-
         session = self.repository.get_session()
         try:
+            # Query customer within active session to avoid detached object issues
+            customer = session.query(Customer).get(customer_id)
+            if not customer:
+                raise ValueError(f"Customer {customer_id} not found")
+
             customer.is_active = True
             session.commit()
             session.refresh(customer)

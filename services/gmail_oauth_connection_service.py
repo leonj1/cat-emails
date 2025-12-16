@@ -95,9 +95,9 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
         try:
             access_token = self.token_service.get_access_token(self.account_id)
         except ValueError as e:
-            logger.error(f"Failed to get access token for account {self.account_id}: {e}")
+            logger.exception(f"Failed to get access token for account {self.account_id}: {e}")
             raise Exception(
-                f"OAuth token not available for account. "
+                "OAuth token not available for account. "
                 "User must re-authorize via /api/oauth/authorize"
             ) from e
 

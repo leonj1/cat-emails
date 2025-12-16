@@ -7,7 +7,7 @@ Uses JWT for secure, signed state tokens with expiration.
 import os
 import json
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import base64
 import hashlib
@@ -36,14 +36,12 @@ class OAuthStateService:
         self.expiry_minutes = int(os.getenv("OAUTH_STATE_EXPIRY_MINUTES", "10"))
 
         if not self.secret:
-            logger.warning(
+            error_msg = (
                 "OAUTH_STATE_SECRET not configured. "
-                "State parameters will be insecure. "
-                "Set OAUTH_STATE_SECRET environment variable."
+                "Set OAUTH_STATE_SECRET environment variable for secure OAuth state management."
             )
-            # Generate temporary secret for development
-            self.secret = secrets.token_urlsafe(32)
-            logger.warning(f"Using temporary secret for OAuth state: {self.secret[:10]}...")
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
     def generate_state(
         self,
@@ -67,7 +65,7 @@ class OAuthStateService:
         Returns:
             str: Base64url-encoded signed state token
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expiry = now + timedelta(minutes=self.expiry_minutes)
 
         # Create state data
@@ -131,8 +129,8 @@ class OAuthStateService:
 
         # Decode payload
         try:
-            # Add padding if needed
-            padding = '=' * (4 - len(payload_b64) % 4)
+            # Add padding if needed (correct calculation using modulo)
+            padding = '=' * (-len(payload_b64) % 4)
             payload_json = base64.urlsafe_b64decode(payload_b64 + padding).decode()
             payload = json.loads(payload_json)
         except Exception as e:
@@ -150,7 +148,7 @@ class OAuthStateService:
             raise ValueError(f"Invalid timestamp format in state: {e}") from e
 
         # Check expiration
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if now >= expiry:
             raise ValueError(
                 f"State expired at {expiry}. Current time: {now}. "
