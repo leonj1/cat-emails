@@ -11,6 +11,30 @@ from sqlalchemy.orm import relationship, sessionmaker
 Base = declarative_base()
 
 
+class Customer(Base):
+    """Customer who uses the application - can manage multiple Gmail accounts"""
+    __tablename__ = 'customers'
+
+    id = Column(Integer, primary_key=True)
+    google_user_id = Column(String(255), unique=True, nullable=False)
+    email_address = Column(String(255), unique=True, nullable=False)
+    display_name = Column(String(255))
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_login_at = Column(DateTime)
+
+    # Relationships
+    email_accounts = relationship("EmailAccount", back_populates="customer", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index('idx_google_user_id', 'google_user_id', unique=True),
+        Index('idx_customer_email', 'email_address', unique=True),
+        Index('idx_is_active', 'is_active'),
+        Index('idx_created_at', 'created_at'),
+    )
+
+
 class UserSettings(Base):
     """Global user settings and preferences"""
     __tablename__ = 'user_settings'
@@ -34,19 +58,34 @@ class EmailAccount(Base):
 
     id = Column(Integer, primary_key=True)
     email_address = Column(String(255), unique=True, nullable=False, index=True)
-    app_password = Column(String(255))  # Gmail app-specific password for IMAP access
+    app_password = Column(String(255))  # Gmail app-specific password for IMAP access (deprecated, use OAuth)
     display_name = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True, index=True)
     last_scan_at = Column(DateTime)
-    
+
+    # Customer relationship and OAuth support
+    customer_id = Column(Integer, ForeignKey('customers.id'))
+    auth_method = Column(String(20), default='app_password', nullable=False)  # 'app_password' or 'oauth'
+    oauth_refresh_token = Column(Text)
+    oauth_access_token = Column(Text)
+    oauth_token_expires_at = Column(DateTime)
+    oauth_scope = Column(Text)
+    oauth_token_type = Column(String(50), default='Bearer')
+    oauth_authorized_at = Column(DateTime)
+
     # Relationships
+    customer = relationship("Customer", back_populates="email_accounts")
     email_summaries = relationship("EmailSummary", back_populates="email_account", cascade="all, delete-orphan")
     category_stats = relationship("AccountCategoryStats", back_populates="email_account", cascade="all, delete-orphan")
-    
+
     __table_args__ = (
         Index('idx_email_active', 'email_address', 'is_active'),
+        Index('idx_customer_id', 'customer_id'),
+        Index('idx_auth_method', 'auth_method'),
+        Index('idx_customer_email', 'customer_id', 'email_address'),
+        Index('idx_oauth_expires', 'oauth_token_expires_at'),
     )
 
 
