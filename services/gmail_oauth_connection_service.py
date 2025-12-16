@@ -99,8 +99,8 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             self.client_id = self.client_id or installed.get("client_id")
             self.client_secret = self.client_secret or installed.get("client_secret")
             logger.info("Loaded OAuth credentials from file")
-        except json.JSONDecodeError:
-            logger.exception("Failed to parse credentials file")
+        except (json.JSONDecodeError, OSError):
+            logger.exception("Failed to load or parse credentials file")
 
     def _load_token_file(self) -> None:
         """Load refresh_token from token.json."""
@@ -116,8 +116,8 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
             self.refresh_token = self.refresh_token or data.get("refresh_token")
             self._access_token = data.get("access_token")
             logger.info("Loaded OAuth token from file")
-        except json.JSONDecodeError:
-            logger.exception("Failed to parse token file")
+        except (json.JSONDecodeError, OSError):
+            logger.exception("Failed to load or parse token file")
 
     def _validate_credentials(self) -> None:
         """Validate that all required credentials are present."""
@@ -169,6 +169,11 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 result = json.loads(response.read().decode("utf-8"))
+
+            if "access_token" not in result:
+                raise Exception(
+                    f"OAuth token response missing 'access_token'. Response keys: {list(result.keys())}"
+                )
 
             self._access_token = result["access_token"]
             logger.info("Successfully refreshed OAuth access token")

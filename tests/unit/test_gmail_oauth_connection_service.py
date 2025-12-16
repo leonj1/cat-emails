@@ -238,16 +238,17 @@ class TestCredentialValidation(unittest.TestCase):
         """Test that missing client_secret raises ValueError when connecting."""
         from services.gmail_oauth_connection_service import GmailOAuthConnectionService
 
-        service = GmailOAuthConnectionService(
-            email_address="user@gmail.com",
-            client_id="client_id",
-            refresh_token="token",
-        )
+        with patch.dict(os.environ, {}, clear=True):
+            service = GmailOAuthConnectionService(
+                email_address="user@gmail.com",
+                client_id="client_id",
+                refresh_token="token",
+            )
 
-        with self.assertRaises(ValueError) as context:
-            service._validate_credentials()
+            with self.assertRaises(ValueError) as context:
+                service._validate_credentials()
 
-        self.assertIn("client_secret", str(context.exception))
+            self.assertIn("client_secret", str(context.exception))
 
     def test_missing_refresh_token_raises_error_on_connect(self):
         """Test that missing refresh_token raises ValueError when connecting."""
