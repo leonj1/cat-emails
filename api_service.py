@@ -301,6 +301,20 @@ category_aggregator = None
 category_tally_repository: Optional[CategoryTallyRepository] = None
 tally_cleanup_service = None
 
+# Register OAuth and Customer Management endpoints
+from api.oauth_endpoints import create_oauth_endpoints
+from api.customer_endpoints import create_customer_endpoints
+
+# Create and include OAuth endpoints
+oauth_router = create_oauth_endpoints(repository=settings_service.repository)
+app.include_router(oauth_router)
+logger.info("✓ OAuth endpoints registered")
+
+# Create and include Customer endpoints
+customer_router = create_customer_endpoints(repository=settings_service.repository)
+app.include_router(customer_router)
+logger.info("✓ Customer endpoints registered")
+
 
 # Initialize category aggregation components
 def _initialize_category_aggregation():
