@@ -153,7 +153,7 @@ class CustomerService:
             query = session.query(Customer)
 
             if active_only:
-                query = query.filter(Customer.is_active == True)
+                query = query.filter(Customer.is_active.is_(True))
 
             customers = query.order_by(Customer.created_at.desc()).all()
             return customers

@@ -79,17 +79,8 @@ class OAuthStateService:
             exp=expiry
         )
 
-        # Convert to JSON
-        payload = {
-            "nonce": state_data.nonce,
-            "timestamp": state_data.timestamp.isoformat(),
-            "exp": state_data.exp.isoformat(),
-        }
-
-        if customer_email:
-            payload["customer_email"] = customer_email
-        if account_email:
-            payload["account_email"] = account_email
+        # Convert to JSON using Pydantic serialization
+        payload = state_data.model_dump(mode='json', exclude_none=True)
 
         # Encode payload
         payload_json = json.dumps(payload, separators=(',', ':'))
@@ -145,7 +136,7 @@ class OAuthStateService:
             payload_json = base64.urlsafe_b64decode(payload_b64 + padding).decode()
             payload = json.loads(payload_json)
         except Exception as e:
-            raise ValueError(f"Failed to decode state payload: {e}")
+            raise ValueError(f"Failed to decode state payload: {e}") from e
 
         # Validate required fields
         if "nonce" not in payload or "timestamp" not in payload or "exp" not in payload:
@@ -156,7 +147,7 @@ class OAuthStateService:
             timestamp = datetime.fromisoformat(payload["timestamp"])
             expiry = datetime.fromisoformat(payload["exp"])
         except Exception as e:
-            raise ValueError(f"Invalid timestamp format in state: {e}")
+            raise ValueError(f"Invalid timestamp format in state: {e}") from e
 
         # Check expiration
         now = datetime.utcnow()

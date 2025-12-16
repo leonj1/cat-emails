@@ -58,10 +58,12 @@ class GmailOAuthConnectionService(GmailConnectionInterface):
         self.client_secret = os.getenv("OAUTH_CLIENT_SECRET")
 
         if not self.client_id or not self.client_secret:
-            logger.warning(
+            error_msg = (
                 "OAUTH_CLIENT_ID or OAUTH_CLIENT_SECRET not configured. "
-                "OAuth authentication will fail."
+                "Set these environment variables for OAuth authentication."
             )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
 
     def _generate_oauth2_string(self, access_token: str) -> str:
