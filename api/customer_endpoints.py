@@ -3,6 +3,7 @@ Customer Management Endpoints
 
 Provides CRUD operations for customers and their email accounts.
 """
+import os
 from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Header, status, Path
@@ -27,7 +28,6 @@ router = APIRouter(prefix="/api/customers", tags=["Customers"])
 
 def verify_api_key_dependency(x_api_key: Optional[str] = Header(None)) -> bool:
     """Dependency for API key verification"""
-    import os
     api_key = os.getenv("API_KEY")
     if api_key and (not x_api_key or x_api_key != api_key):
         raise HTTPException(

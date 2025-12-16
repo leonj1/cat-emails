@@ -3,9 +3,10 @@ OAuth 2.0 Authorization Flow Endpoints
 
 Provides OAuth authorization and callback endpoints for Gmail account authentication.
 """
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Header, status
+from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 
 from utils.logger import get_logger
@@ -44,8 +45,7 @@ def create_oauth_endpoints(repository: DatabaseRepositoryInterface):
     )
     async def oauth_authorize(
         customer_email: Optional[str] = Query(None, description="Email hint for Google login"),
-        account_email: Optional[str] = Query(None, description="Specific Gmail account to add"),
-        x_api_key: Optional[str] = Header(None)
+        account_email: Optional[str] = Query(None, description="Specific Gmail account to add")
     ):
         """
         Initiate OAuth 2.0 authorization flow.
@@ -63,8 +63,6 @@ def create_oauth_endpoints(repository: DatabaseRepositoryInterface):
         Raises:
             500: OAuth configuration error
         """
-        # Note: No API key validation - this is the entry point for user authorization
-
         try:
             # Generate secure state parameter for CSRF protection
             state_service = OAuthStateService()
@@ -74,7 +72,6 @@ def create_oauth_endpoints(repository: DatabaseRepositoryInterface):
             )
 
             # Get OAuth configuration from environment
-            import os
             redirect_uri = os.getenv("OAUTH_REDIRECT_URI")
             if not redirect_uri:
                 raise ValueError("OAUTH_REDIRECT_URI not configured in environment")
@@ -150,7 +147,6 @@ def create_oauth_endpoints(repository: DatabaseRepositoryInterface):
             logger.info(f"State validated successfully (nonce: {state_data['nonce'][:8]}...)")
 
             # Step 2: Exchange authorization code for tokens
-            import os
             redirect_uri = os.getenv("OAUTH_REDIRECT_URI")
             token_response = exchange_authorization_code_for_tokens(
                 authorization_code=code,
@@ -221,7 +217,6 @@ def create_oauth_endpoints(repository: DatabaseRepositoryInterface):
                     logger.info(f"Updated existing account {account_email} with OAuth tokens")
                 else:
                     # Create new account
-                    from datetime import timedelta
                     account = EmailAccount(
                         email_address=account_email,
                         customer_id=customer.id,
