@@ -13,10 +13,12 @@ from typing import Dict
 
 # Ensure we have the real services.settings_service module, not a mock
 # (other tests may have injected mocks into sys.modules)
+from unittest.mock import Mock, MagicMock
+
 if 'services.settings_service' in sys.modules:
     # Check if it's a mock
     settings_mod = sys.modules['services.settings_service']
-    if hasattr(settings_mod, '_mock_name') or 'MagicMock' in str(type(settings_mod)):
+    if isinstance(settings_mod, (Mock, MagicMock)):
         # It's a mock - remove it and force reimport
         del sys.modules['services.settings_service']
 
