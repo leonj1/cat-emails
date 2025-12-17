@@ -15,7 +15,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # This prevents validate_environment() from exiting during module load
 os.environ.setdefault('REQUESTYAI_API_KEY', 'test-key-for-unit-tests')
 
-from api_service import app, get_account_service
+# Mock SettingsService to prevent MySQL initialization during import
+with patch('services.settings_service.SettingsService') as mock_settings:
+    mock_settings_instance = MagicMock()
+    mock_settings.return_value = mock_settings_instance
+    from api_service import app, get_account_service
 from models.account_models import EmailAccountInfo, AccountListResponse
 from tests.fake_account_category_client import FakeAccountCategoryClient
 

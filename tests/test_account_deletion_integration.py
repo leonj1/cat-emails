@@ -31,7 +31,8 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         # Create session and client
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
-        self.client = AccountCategoryClient(db_path=self.temp_db_path)
+        # Pass session directly instead of db_path
+        self.client = AccountCategoryClient(db_session=self.session)
 
     def tearDown(self):
         """Clean up the temporary database after each test."""

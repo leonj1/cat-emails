@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.database import init_database, EmailAccount
 from clients.account_category_client import AccountCategoryClient
+from repositories.sqlalchemy_repository import SQLAlchemyRepository
 
 
 class TestAccountSessionDetachmentIntegration(unittest.TestCase):
@@ -54,8 +55,9 @@ class TestAccountSessionDetachmentIntegration(unittest.TestCase):
         This simulates the API scenario where AccountCategoryClient is created without
         a session parameter, causing owns_session to be True.
         """
-        # Create client without session (owns_session will be True)
-        client = AccountCategoryClient(db_path=self.temp_db_path)
+        # Create repository and client (owns_session will be True)
+        repository = SQLAlchemyRepository(self.temp_db_path)
+        client = AccountCategoryClient(repository=repository)
 
         # Create test account
         test_email = "test_detached@example.com"
@@ -98,8 +100,9 @@ class TestAccountSessionDetachmentIntegration(unittest.TestCase):
         """
         Test that updating an existing account with owns_session=True returns a detached object.
         """
-        # Create client without session (owns_session will be True)
-        client = AccountCategoryClient(db_path=self.temp_db_path)
+        # Create repository and client (owns_session will be True)
+        repository = SQLAlchemyRepository(self.temp_db_path)
+        client = AccountCategoryClient(repository=repository)
 
         test_email = "test_update@example.com"
 
@@ -140,8 +143,9 @@ class TestAccountSessionDetachmentIntegration(unittest.TestCase):
         """
         Test that retrieving an account with owns_session=True returns a detached object.
         """
-        # Create client without session (owns_session will be True)
-        client = AccountCategoryClient(db_path=self.temp_db_path)
+        # Create repository and client (owns_session will be True)
+        repository = SQLAlchemyRepository(self.temp_db_path)
+        client = AccountCategoryClient(repository=repository)
 
         test_email = "test_retrieve@example.com"
 
@@ -180,8 +184,9 @@ class TestAccountSessionDetachmentIntegration(unittest.TestCase):
 
         Note: get_all_accounts already had the fix, but let's verify it still works.
         """
-        # Create client without session (owns_session will be True)
-        client = AccountCategoryClient(db_path=self.temp_db_path)
+        # Create repository and client (owns_session will be True)
+        repository = SQLAlchemyRepository(self.temp_db_path)
+        client = AccountCategoryClient(repository=repository)
 
         # Create multiple test accounts
         test_accounts = [
@@ -263,8 +268,9 @@ class TestAccountSessionDetachmentIntegration(unittest.TestCase):
         """
         Test that get_account_by_email returns None for non-existent accounts.
         """
-        # Create client without session (owns_session will be True)
-        client = AccountCategoryClient(db_path=self.temp_db_path)
+        # Create repository and client (owns_session will be True)
+        repository = SQLAlchemyRepository(self.temp_db_path)
+        client = AccountCategoryClient(repository=repository)
 
         # Try to retrieve non-existent account
         account = client.get_account_by_email("nonexistent@example.com")
