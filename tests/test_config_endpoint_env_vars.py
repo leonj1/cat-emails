@@ -20,6 +20,11 @@ import sys
 # we must inject a mock into sys.modules BEFORE api_service is imported.
 # This ensures that 'from services.settings_service import SettingsService' inside
 # api_service uses our mock class.
+
+# IMPORTANT: Save the original module so we can restore it after tests complete
+# This prevents polluting other tests that import SettingsService
+_original_settings_module = sys.modules.get('services.settings_service')
+
 mock_settings_module = MagicMock()
 # Configure the mock to return a dictionary with strings when get_connection_status is called
 mock_repo = MagicMock()
@@ -39,6 +44,28 @@ mock_settings_instance.repository = mock_repo
 mock_settings_module.SettingsService.return_value = mock_settings_instance
 
 sys.modules['services.settings_service'] = mock_settings_module
+
+
+def _restore_settings_module():
+    """Restore the original settings_service module after tests."""
+    if _original_settings_module is not None:
+        sys.modules['services.settings_service'] = _original_settings_module
+    elif 'services.settings_service' in sys.modules:
+        del sys.modules['services.settings_service']
+
+
+# Register cleanup with atexit for when run standalone
+import atexit
+atexit.register(_restore_settings_module)
+
+# Also use pytest module-level teardown to restore after this test module completes
+import pytest
+
+@pytest.fixture(scope="module", autouse=True)
+def restore_settings_module_after_tests():
+    """Pytest fixture to restore settings_service module after all tests in this module."""
+    yield  # Run all tests in this module
+    _restore_settings_module()
 
 # Set minimal environment variables before importing api_service
 os.environ.setdefault("REQUESTYAI_API_KEY", "test-key")
@@ -138,6 +165,7 @@ class TestDatabaseConfigWithEnvVars(unittest.TestCase):
 class TestGetDatabaseConfigEnvVars(unittest.TestCase):
     """Unit tests for _get_database_config() env_vars handling."""
 
+    @patch('api_service.settings_service')
     @patch.dict(os.environ, {
         "MYSQL_HOST": "mysql.example.com",
         "MYSQL_DATABASE": "production_db",
@@ -146,8 +174,16 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         "MYSQL_PORT": "3307",  # Should NOT appear in env_vars
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
-    def test_mysql_config_includes_env_vars(self):
+    def test_mysql_config_includes_env_vars(self, mock_settings_service):
         """Test that MySQL configuration includes env_vars with correct values."""
+        # Mock repository to return proper connection status
+        mock_settings_service.repository.get_connection_status.return_value = {
+            "connected": False,
+            "status": "Mocked Connection",
+            "error": None,
+            "details": {}
+        }
+
         # Import here to get fresh module with patched env
         from api_service import _get_database_config
 
@@ -166,13 +202,22 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         self.assertEqual(config.env_vars.name_value, "production_db")
         self.assertEqual(config.env_vars.user_value, "prod_user")
 
+    @patch('api_service.settings_service')
     @patch.dict(os.environ, {
         "MYSQL_HOST": "mysql.example.com",
         "MYSQL_PASSWORD": "super_secret",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
-    def test_env_vars_excludes_password(self):
+    def test_env_vars_excludes_password(self, mock_settings_service):
         """Test that password is never included in env_vars."""
+        # Mock repository to return proper connection status
+        mock_settings_service.repository.get_connection_status.return_value = {
+            "connected": False,
+            "status": "Mocked Connection",
+            "error": None,
+            "details": {}
+        }
+
         from api_service import _get_database_config
 
         config = _get_database_config()
@@ -189,13 +234,22 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
             if value is not None:
                 self.assertNotEqual(value, "super_secret")
 
+    @patch('api_service.settings_service')
     @patch.dict(os.environ, {
         "MYSQL_HOST": "mysql.example.com",
         "MYSQL_PORT": "3307",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
-    def test_env_vars_excludes_port(self):
+    def test_env_vars_excludes_port(self, mock_settings_service):
         """Test that port is never included in env_vars."""
+        # Mock repository to return proper connection status
+        mock_settings_service.repository.get_connection_status.return_value = {
+            "connected": False,
+            "status": "Mocked Connection",
+            "error": None,
+            "details": {}
+        }
+
         from api_service import _get_database_config
 
         config = _get_database_config()
@@ -207,18 +261,27 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         self.assertNotIn("port_var", env_vars_dict)
         self.assertNotIn("port_value", env_vars_dict)
 
+    @patch('api_service.settings_service')
     @patch.dict(os.environ, {
         "MYSQL_HOST": "mysql.example.com",
         "MYSQL_PORT": "",  # Empty string - Railway sets this
         "MYSQL_POOL_SIZE": "",  # Empty string
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
-    def test_empty_string_port_uses_default(self):
+    def test_empty_string_port_uses_default(self, mock_settings_service):
         """Test that empty string MYSQL_PORT falls back to default 3306.
 
         Railway may set environment variables to empty strings instead of
         leaving them unset, which would cause int('') to fail.
         """
+        # Mock repository to return proper connection status
+        mock_settings_service.repository.get_connection_status.return_value = {
+            "connected": False,
+            "status": "Mocked Connection",
+            "error": None,
+            "details": {}
+        }
+
         from api_service import _get_database_config
 
         # This should NOT raise ValueError: invalid literal for int() with base 10: ''
@@ -262,12 +325,21 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
             # Restore env vars
             os.environ.update(env_backup)
 
+    @patch('api_service.settings_service')
     @patch.dict(os.environ, {
         "MYSQL_USER": "only_user_set",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
-    def test_partial_env_vars_handled(self):
+    def test_partial_env_vars_handled(self, mock_settings_service):
         """Test that partial environment configuration is handled correctly."""
+        # Mock repository to return proper connection status
+        mock_settings_service.repository.get_connection_status.return_value = {
+            "connected": False,
+            "status": "Mocked Connection",
+            "error": None,
+            "details": {}
+        }
+
         from api_service import _get_database_config
 
         config = _get_database_config()
@@ -280,14 +352,23 @@ class TestGetDatabaseConfigEnvVars(unittest.TestCase):
         # Host should be None since not set
         self.assertIsNone(config.env_vars.host_value)
 
+    @patch('api_service.settings_service')
     @patch.dict(os.environ, {
         "MYSQL_HOST": "mysql.example.com",
         "MYSQL_DATABASE": "test_db",
         "MYSQL_USER": "test_user",
         "REQUESTYAI_API_KEY": "test-key"
     }, clear=False)
-    def test_only_mysql_env_vars_in_config_response(self):
+    def test_only_mysql_env_vars_in_config_response(self, mock_settings_service):
         """Test that only MYSQL_* env vars are returned in config, not DATABASE_*."""
+        # Mock repository to return proper connection status
+        mock_settings_service.repository.get_connection_status.return_value = {
+            "connected": False,
+            "status": "Mocked Connection",
+            "error": None,
+            "details": {}
+        }
+
         from api_service import _get_database_config
 
         config = _get_database_config()

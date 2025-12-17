@@ -22,6 +22,7 @@ import sys
 import time
 import unittest
 from datetime import datetime
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,6 +31,28 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from repositories.mysql_repository import MySQLRepository
 from models.database import ProcessingRun
+
+
+def is_mysql_available():
+    """Check if MySQL is available for connection."""
+    import socket
+    host = os.getenv('MYSQL_HOST', 'localhost')
+    port = int(os.getenv('MYSQL_PORT', '3308'))
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        return result == 0
+    except Exception:
+        return False
+
+
+# Skip all tests if MySQL is not available
+pytestmark = pytest.mark.skipif(
+    not is_mysql_available(),
+    reason="MySQL database is not available for integration tests"
+)
 
 
 class TestProcessingRunColumnsIntegration(unittest.TestCase):

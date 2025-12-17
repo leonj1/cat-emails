@@ -15,6 +15,7 @@ import os
 import sys
 from datetime import datetime
 from typing import List
+import pytest
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,6 +23,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pydantic import BaseModel
 
 from services.openai_llm_service import OpenAILLMService
+
+# Check if we have a real API key (not a test stub)
+def _has_real_api_key():
+    """Check if REQUESTYAI_API_KEY is set to a real value, not a test stub."""
+    api_key = os.getenv("REQUESTYAI_API_KEY", "")
+    # Test stubs typically contain "test" in the key name
+    if not api_key:
+        return False
+    if "test" in api_key.lower():
+        return False
+    # Real API keys are typically longer than 20 characters
+    if len(api_key) < 20:
+        return False
+    return True
+
+
+# Skip all tests if API key is not a real key (test stubs don't count)
+pytestmark = pytest.mark.skipif(
+    not _has_real_api_key(),
+    reason="REQUESTYAI_API_KEY must be a real API key for external API tests (not a test stub)"
+)
 
 
 REQUESTYAI_BASE_URL = "https://router.requesty.ai/v1"

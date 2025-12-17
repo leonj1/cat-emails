@@ -5,10 +5,22 @@ This test uses repository-based persistence and fake classes for Gmail interacti
 ensuring that category statistics are correctly stored and retrieved.
 """
 import os
+import sys
 import tempfile
 import unittest
 from datetime import datetime, date
 from typing import Dict
+
+# Ensure we have the real services.settings_service module, not a mock
+# (other tests may have injected mocks into sys.modules)
+from unittest.mock import Mock, MagicMock
+
+if 'services.settings_service' in sys.modules:
+    # Check if it's a mock
+    settings_mod = sys.modules['services.settings_service']
+    if isinstance(settings_mod, (Mock, MagicMock)):
+        # It's a mock - remove it and force reimport
+        del sys.modules['services.settings_service']
 
 # Database models and initialization
 from models.database import Base, init_database
