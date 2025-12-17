@@ -226,18 +226,23 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         email = "rollback@example.com"
         account = self.client.get_or_create_account(email, "Rollback Test")
 
-        # Create a new client instance that will have owns_session=True
-        test_client = AccountCategoryClient(db_path=self.temp_db_path)
+        # Create a new session for the second client
+        Session = sessionmaker(bind=self.engine)
+        new_session = Session()
+        test_client = AccountCategoryClient(db_session=new_session)
 
-        # Verify account exists before attempting deletion
-        self.assertIsNotNone(test_client.get_account_by_email(email))
+        try:
+            # Verify account exists before attempting deletion
+            self.assertIsNotNone(test_client.get_account_by_email(email))
 
-        # The delete should work normally in this case
-        result = test_client.delete_account(email)
-        self.assertTrue(result)
+            # The delete should work normally in this case
+            result = test_client.delete_account(email)
+            self.assertTrue(result)
 
-        # Verify account is deleted
-        self.assertIsNone(test_client.get_account_by_email(email))
+            # Verify account is deleted
+            self.assertIsNone(test_client.get_account_by_email(email))
+        finally:
+            new_session.close()
 
 
 if __name__ == "__main__":

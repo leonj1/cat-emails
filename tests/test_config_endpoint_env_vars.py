@@ -20,6 +20,11 @@ import sys
 # we must inject a mock into sys.modules BEFORE api_service is imported.
 # This ensures that 'from services.settings_service import SettingsService' inside
 # api_service uses our mock class.
+
+# IMPORTANT: Save the original module so we can restore it after tests complete
+# This prevents polluting other tests that import SettingsService
+_original_settings_module = sys.modules.get('services.settings_service')
+
 mock_settings_module = MagicMock()
 # Configure the mock to return a dictionary with strings when get_connection_status is called
 mock_repo = MagicMock()
@@ -39,6 +44,28 @@ mock_settings_instance.repository = mock_repo
 mock_settings_module.SettingsService.return_value = mock_settings_instance
 
 sys.modules['services.settings_service'] = mock_settings_module
+
+
+def _restore_settings_module():
+    """Restore the original settings_service module after tests."""
+    if _original_settings_module is not None:
+        sys.modules['services.settings_service'] = _original_settings_module
+    elif 'services.settings_service' in sys.modules:
+        del sys.modules['services.settings_service']
+
+
+# Register cleanup with atexit for when run standalone
+import atexit
+atexit.register(_restore_settings_module)
+
+# Also use pytest module-level teardown to restore after this test module completes
+import pytest
+
+@pytest.fixture(scope="module", autouse=True)
+def restore_settings_module_after_tests():
+    """Pytest fixture to restore settings_service module after all tests in this module."""
+    yield  # Run all tests in this module
+    _restore_settings_module()
 
 # Set minimal environment variables before importing api_service
 os.environ.setdefault("REQUESTYAI_API_KEY", "test-key")

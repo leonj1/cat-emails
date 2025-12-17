@@ -229,8 +229,9 @@ class TestAccountSessionDetachmentIntegration(unittest.TestCase):
 
         This reproduces exactly what happens when the API's create_account endpoint is called.
         """
-        # Step 1: API creates AccountCategoryClient without session (like in get_account_service)
-        client = AccountCategoryClient(db_path=self.temp_db_path)
+        # Step 1: API creates AccountCategoryClient with repository (like in get_account_service)
+        repository = SQLAlchemyRepository(self.temp_db_path)
+        client = AccountCategoryClient(repository=repository)
 
         # Step 2: API calls get_or_create_account (like in create_account endpoint)
         test_email = "api_test@example.com"
