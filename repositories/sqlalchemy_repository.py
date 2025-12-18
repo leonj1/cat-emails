@@ -735,7 +735,8 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             account.oauth_scopes = None
             account.updated_at = datetime.utcnow()
             session.commit()
-            logger.info(f"Cleared OAuth tokens for account: {email_address}")
+            email_hash = hashlib.sha256(email_address.encode()).hexdigest()[:8]
+            logger.info(f"Cleared OAuth tokens for account: {email_hash}")
             return True
         except SQLAlchemyError as e:
             session.rollback()
@@ -769,7 +770,8 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             account.oauth_token_expiry = token_expiry
             account.updated_at = datetime.utcnow()
             session.commit()
-            logger.debug(f"Updated access token for account: {email_address}")
+            email_hash = hashlib.sha256(email_address.encode()).hexdigest()[:8]
+            logger.debug(f"Updated access token for account: {email_hash}")
             return True
         except SQLAlchemyError as e:
             session.rollback()

@@ -15,7 +15,7 @@ import secrets
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import ClassVar, Optional
 
 from utils.logger import get_logger
 
@@ -34,7 +34,7 @@ class OAuthFlowService:
     GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
     GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 
-    REQUIRED_SCOPES = [
+    REQUIRED_SCOPES: ClassVar[list[str]] = [
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/gmail.labels",
         "https://www.googleapis.com/auth/gmail.modify",

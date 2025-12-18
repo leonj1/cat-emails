@@ -206,8 +206,6 @@ class TestEmailAccountOAuthFields(unittest.TestCase):
         """Test that auth_method defaults to 'imap'."""
         from models.database import EmailAccount
 
-        account = EmailAccount(email_address="test@gmail.com")
-
         # Default should be 'imap' when not specified
         # Note: This tests the Column default, actual value may be None until DB insert
         auth_method_column = EmailAccount.__table__.columns['auth_method']

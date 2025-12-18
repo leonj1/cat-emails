@@ -78,6 +78,9 @@ class TestAccountEmailProcessorOAuthSupport(unittest.TestCase):
             # Should not raise for missing app_password when using OAuth
             result = processor.process_account("oauth_user@gmail.com")
 
+            # Verify processing succeeded
+            self.assertIsNotNone(result)
+
             # Verify the fetcher was created with refresh_token as password (OAuth flow)
             self.assertEqual(len(fetcher_calls), 1)
             self.assertEqual(fetcher_calls[0]['email'], "oauth_user@gmail.com")
@@ -231,6 +234,9 @@ class TestProcessorOAuthConnectionFactory(unittest.TestCase):
                 auth_method="oauth",
                 refresh_token="test_refresh_token",
             )
+
+            # Verify connection was created
+            self.assertIsNotNone(connection)
 
             mock_oauth.assert_called_once()
             call_kwargs = mock_oauth.call_args[1]
