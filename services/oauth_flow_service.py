@@ -260,7 +260,7 @@ class OAuthFlowService:
             error_body = e.read().decode("utf-8")
             logger.exception(f"Token revocation failed: {e.code} - {error_body}")
             return False
-        except urllib.error.URLError as e:
+        except urllib.error.URLError:
             logger.exception("Network error during token revocation")
             return False
 

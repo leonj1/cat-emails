@@ -5,14 +5,15 @@ from typing import Optional
 class CreateAccountRequest(BaseModel):
     """Request model for creating new accounts"""
     email_address: str = Field(..., description="Gmail email address")
-    app_password: Optional[str] = Field(
-        None,
-        description="Gmail app-specific password for IMAP access (required if auth_method is 'imap')"
-    )
     display_name: Optional[str] = Field(None, description="Optional display name for the account")
+    # auth_method must come before app_password and oauth_refresh_token for validator order
     auth_method: str = Field(
         default="imap",
         description="Authentication method: 'imap' for app password or 'oauth' for OAuth 2.0"
+    )
+    app_password: Optional[str] = Field(
+        None,
+        description="Gmail app-specific password for IMAP access (required if auth_method is 'imap')"
     )
     oauth_refresh_token: Optional[str] = Field(
         None,

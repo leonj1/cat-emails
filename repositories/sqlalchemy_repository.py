@@ -4,6 +4,8 @@ SQLAlchemy implementation of DatabaseRepositoryInterface.
 This concrete implementation uses SQLAlchemy ORM to interact with SQLite databases
 (both local file-based and remote SQLite Cloud).
 """
+import hashlib
+import json
 import os
 from typing import List, Dict, Optional, Any, TypeVar, Type
 from datetime import datetime, date, timedelta
@@ -652,11 +654,10 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
         Returns:
             Updated EmailAccount or None if not found
         """
-        import json
-
         account = self.get_account_by_email(email_address)
         if not account:
-            logger.warning(f"Account not found for OAuth update: {email_address}")
+            email_hash = hashlib.sha256(email_address.encode()).hexdigest()[:8]
+            logger.warning(f"Account not found for OAuth update: {email_hash}")
             return None
 
         session = self._get_session()
@@ -669,7 +670,8 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             account.updated_at = datetime.utcnow()
             session.commit()
             session.refresh(account)
-            logger.info(f"Updated OAuth tokens for account: {email_address}")
+            email_hash = hashlib.sha256(email_address.encode()).hexdigest()[:8]
+            logger.info(f"Updated OAuth tokens for account: {email_hash}")
             return account
         except SQLAlchemyError as e:
             session.rollback()
@@ -684,10 +686,9 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             email_address: Account email address
 
         Returns:
-            Dict with OAuth token data or None if not found/not OAuth
+            Dict with OAuth token data or None if not found/not OAuth.
+            Note: Does not include client_id/client_secret for security reasons.
         """
-        import json
-
         account = self.get_account_by_email(email_address)
         if not account:
             return None
@@ -709,8 +710,6 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             'access_token': account.oauth_access_token,
             'token_expiry': account.oauth_token_expiry,
             'scopes': scopes,
-            'client_id': account.oauth_client_id,
-            'client_secret': account.oauth_client_secret,
         }
 
     def clear_account_oauth_tokens(self, email_address: str) -> bool:
