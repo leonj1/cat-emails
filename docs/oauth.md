@@ -24,9 +24,27 @@ GMAIL_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GMAIL_OAUTH_CLIENT_SECRET=your-client-secret
 ```
 
+**Create a `.env` file** (excluded from git via `.gitignore`) with your actual credentials:
+
+```bash
+# .env file example
+GMAIL_OAUTH_CLIENT_ID=123456789.apps.googleusercontent.com
+GMAIL_OAUTH_CLIENT_SECRET=GOCSPX-abcdefghijklmnop
+API_HOST=https://your-api-host.com
+GMAIL_API_KEY=your-actual-api-key-here
+```
+
 ### API Key
 
 All endpoints require an API key passed via the `X-API-Key` header.
+
+**For testing with curl**, export your API key as an environment variable:
+
+```bash
+export GMAIL_API_KEY="your-actual-api-key-here"
+```
+
+This allows you to reference `${GMAIL_API_KEY}` in curl commands instead of hardcoding credentials.
 
 ### Required OAuth Scopes
 
@@ -55,7 +73,7 @@ Start the OAuth authorization process by requesting an authorization URL.
 
 ```bash
 curl -X GET "https://your-api-host/api/auth/gmail/authorize?redirect_uri=https://your-app.com/oauth/callback" \
-  -H "X-API-Key: your-api-key"
+  -H "X-API-Key: ${GMAIL_API_KEY}"
 ```
 
 ### With Login Hint (Optional)
@@ -64,7 +82,7 @@ Pre-fill the user's email in Google's consent screen:
 
 ```bash
 curl -X GET "https://your-api-host/api/auth/gmail/authorize?redirect_uri=https://your-app.com/oauth/callback&login_hint=user@gmail.com" \
-  -H "X-API-Key: your-api-key"
+  -H "X-API-Key: ${GMAIL_API_KEY}"
 ```
 
 ### Parameters
@@ -112,7 +130,7 @@ After the user completes consent on Google's site, they are redirected back to y
 
 ```bash
 curl -X POST "https://your-api-host/api/auth/gmail/callback?redirect_uri=https://your-app.com/oauth/callback" \
-  -H "X-API-Key: your-api-key" \
+  -H "X-API-Key: ${GMAIL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
     "code": "4/0AfJohXnN...",
@@ -196,7 +214,7 @@ Check whether an account has OAuth connected and what scopes are granted.
 
 ```bash
 curl -X GET "https://your-api-host/api/accounts/user%40gmail.com/oauth-status" \
-  -H "X-API-Key: your-api-key"
+  -H "X-API-Key: ${GMAIL_API_KEY}"
 ```
 
 **Note:** URL-encode the email address (`@` becomes `%40`).
@@ -271,7 +289,7 @@ Revoke OAuth tokens and disconnect the account from OAuth. The account reverts t
 
 ```bash
 curl -X DELETE "https://your-api-host/api/accounts/user%40gmail.com/oauth" \
-  -H "X-API-Key: your-api-key"
+  -H "X-API-Key: ${GMAIL_API_KEY}"
 ```
 
 ### Response (Success)
@@ -534,10 +552,64 @@ The backend automatically refreshes access tokens when needed. The `token_expiry
 
 ## Google Cloud Console Setup
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create or select a project
-3. Enable the Gmail API
-4. Configure OAuth consent screen
-5. Create OAuth 2.0 credentials (Web application type)
-6. Add your redirect URI(s) to authorized redirect URIs
-7. Copy Client ID and Client Secret to your environment variables
+Follow these detailed steps to set up OAuth 2.0 credentials for Gmail API access:
+
+### 1. Create or Select a Project
+
+- Go to [Google Cloud Console](https://console.cloud.google.com/)
+- Click the project dropdown at the top
+- Create a new project or select an existing one
+
+### 2. Enable Gmail API
+
+- Navigate to **APIs & Services** > **Library**
+- Search for "Gmail API"
+- Click on it and press **Enable**
+
+### 3. Configure OAuth Consent Screen
+
+- Go to **APIs & Services** > **OAuth consent screen**
+- Choose **External** user type (or Internal if using Google Workspace)
+- Fill in the required fields:
+  - **App name**: Your application name
+  - **User support email**: Your email
+  - **Developer contact information**: Your email
+- Click **Save and Continue**
+- On the **Scopes** page, click **Add or Remove Scopes**
+- Add these Gmail scopes:
+  - `https://www.googleapis.com/auth/gmail.readonly`
+  - `https://www.googleapis.com/auth/gmail.labels`
+  - `https://www.googleapis.com/auth/gmail.modify`
+- Click **Save and Continue**
+- Add test users if your app is in testing mode
+- Click **Save and Continue** through the summary
+
+### 4. Create OAuth 2.0 Credentials
+
+- Go to **APIs & Services** > **Credentials**
+- Click **Create Credentials** > **OAuth client ID**
+- Select **Web application** as the application type
+- Give it a name (e.g., "Gmail OAuth Client")
+- Under **Authorized redirect URIs**, click **Add URI** and add:
+  - `https://your-app.com/oauth/callback` (your production callback URL)
+  - `http://localhost:3000/oauth/callback` (for local development, if needed)
+
+  **Important**: The redirect URI in your API requests must **exactly match** one of these registered URIs
+
+- Click **Create**
+
+### 5. Save Your Credentials
+
+- Copy the **Client ID** and **Client Secret** from the popup
+- Add them to your `.env` file:
+  ```bash
+  GMAIL_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+  GMAIL_OAUTH_CLIENT_SECRET=GOCSPX-your-client-secret
+  ```
+- **Never commit these credentials to version control**
+
+### 6. Additional Resources
+
+- [Gmail API Documentation](https://developers.google.com/gmail/api)
+- [OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)
+- [Google API Scopes](https://developers.google.com/identity/protocols/oauth2/scopes#gmail)
