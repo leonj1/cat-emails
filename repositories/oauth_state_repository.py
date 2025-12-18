@@ -132,7 +132,7 @@ class OAuthStateRepository:
 
         except Exception:
             logger.exception("Failed to retrieve OAuth state")
-            return None
+            raise
         finally:
             connection.close()
 
@@ -159,8 +159,9 @@ class OAuthStateRepository:
             deleted = result.rowcount > 0
             if deleted:
                 logger.debug("Deleted used OAuth state token")
-
-            return deleted
+                return True
+            else:
+                return False
 
         except Exception:
             connection.rollback()
@@ -189,8 +190,9 @@ class OAuthStateRepository:
             count = result.rowcount
             if count > 0:
                 logger.info(f"Cleaned up {count} expired OAuth state tokens")
-
-            return count
+                return count
+            else:
+                return 0
 
         except Exception:
             connection.rollback()
