@@ -38,6 +38,15 @@ The application requests the following Gmail scopes:
 
 ---
 
+> ⚠️ **SECURITY NOTICE**
+>
+> All values in the examples below such as `your-api-key`, `your-api-host`, `your-client-id`, etc. are **PLACEHOLDERS**.
+> Replace them with your actual credentials.
+>
+> **Never commit real API keys or secrets to version control.** Use environment variables, `.env` files (excluded from git), or your deployment platform's secret management system.
+
+---
+
 ## 1. Initiate OAuth Flow
 
 Start the OAuth authorization process by requesting an authorization URL.
@@ -519,6 +528,7 @@ The backend automatically refreshes access tokens when needed. The `token_expiry
 3. **Secure Storage**: Store the API key securely; never expose it in client-side code in production
 4. **Redirect URI Validation**: Ensure your redirect URI is registered in Google Cloud Console
 5. **Token Storage**: OAuth tokens are stored server-side; the frontend never handles refresh tokens directly
+6. **API Key Management**: Never commit real API keys to version control. Use environment variables, `.env` files (excluded from git via `.gitignore`), or your deployment platform's secret management system (e.g., Railway secrets, Vercel environment variables, AWS Secrets Manager)
 
 ---
 
