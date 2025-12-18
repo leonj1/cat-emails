@@ -1,6 +1,6 @@
 """Repository for managing OAuth state tokens in the database."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -59,7 +59,7 @@ class OAuthStateRepository:
         """
         connection = get_db_connection()
         try:
-            expires_at = datetime.utcnow() + timedelta(minutes=self.STATE_TTL_MINUTES)
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=self.STATE_TTL_MINUTES)
             metadata_json = json.dumps(metadata) if metadata else None
 
             query = text("""
@@ -72,7 +72,7 @@ class OAuthStateRepository:
                 {
                     'state_token': state_token,
                     'redirect_uri': redirect_uri,
-                    'created_at': datetime.utcnow(),
+                    'created_at': datetime.now(timezone.utc),
                     'expires_at': expires_at,
                     'metadata': metadata_json
                 }
@@ -111,7 +111,7 @@ class OAuthStateRepository:
                 query,
                 {
                     'state_token': state_token,
-                    'now': datetime.utcnow()
+                    'now': datetime.now(timezone.utc)
                 }
             ).fetchone()
 
@@ -183,7 +183,7 @@ class OAuthStateRepository:
                 WHERE expires_at <= :now
             """)
 
-            result = connection.execute(query, {'now': datetime.utcnow()})
+            result = connection.execute(query, {'now': datetime.now(timezone.utc)})
             connection.commit()
 
             count = result.rowcount
