@@ -15,12 +15,14 @@ from sqlalchemy import text
 
 def check_database_available():
     """Check if database is available for integration tests."""
+    from sqlalchemy.exc import SQLAlchemyError
     try:
         connection = get_db_connection()
         connection.close()
-        return True
-    except Exception:
+    except (SQLAlchemyError, OSError):
         return False
+    else:
+        return True
 
 
 # Skip all tests in this module if database is not available
