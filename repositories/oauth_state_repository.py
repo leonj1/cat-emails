@@ -10,19 +10,29 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Module-level engine singleton for connection pooling
+_engine = None
+
+
+def _get_engine():
+    """Get or create the SQLAlchemy engine singleton."""
+    global _engine
+    if _engine is None:
+        db_url = os.getenv(
+            'DATABASE_URL',
+            f"mysql+pymysql://{os.getenv('MYSQL_USER', 'cat_emails')}:"
+            f"{os.getenv('MYSQL_PASSWORD', 'password')}@"
+            f"{os.getenv('MYSQL_HOST', 'localhost')}:"
+            f"{os.getenv('MYSQL_PORT', '3306')}/"
+            f"{os.getenv('MYSQL_DATABASE', 'cat_emails')}"
+        )
+        _engine = create_engine(db_url, pool_pre_ping=True)
+    return _engine
+
 
 def get_db_connection():
     """Get a database connection for OAuth state repository."""
-    db_url = os.getenv(
-        'DATABASE_URL',
-        f"mysql+pymysql://{os.getenv('MYSQL_USER', 'cat_emails')}:"
-        f"{os.getenv('MYSQL_PASSWORD', 'password')}@"
-        f"{os.getenv('MYSQL_HOST', 'localhost')}:"
-        f"{os.getenv('MYSQL_PORT', '3306')}/"
-        f"{os.getenv('MYSQL_DATABASE', 'cat_emails')}"
-    )
-    engine = create_engine(db_url)
-    return engine.connect()
+    return _get_engine().connect()
 
 
 class OAuthStateRepository:
@@ -77,7 +87,7 @@ class OAuthStateRepository:
 
         except Exception as e:
             connection.rollback()
-            logger.error(f"Failed to store OAuth state: {str(e)}")
+            logger.exception("Failed to store OAuth state")
             raise
         finally:
             connection.close()
@@ -123,7 +133,7 @@ class OAuthStateRepository:
             }
 
         except Exception as e:
-            logger.error(f"Failed to retrieve OAuth state: {str(e)}")
+            logger.exception("Failed to retrieve OAuth state")
             return None
         finally:
             connection.close()
@@ -156,7 +166,7 @@ class OAuthStateRepository:
 
         except Exception as e:
             connection.rollback()
-            logger.error(f"Failed to delete OAuth state: {str(e)}")
+            logger.exception("Failed to delete OAuth state")
             return False
         finally:
             connection.close()
@@ -186,7 +196,7 @@ class OAuthStateRepository:
 
         except Exception as e:
             connection.rollback()
-            logger.error(f"Failed to cleanup expired OAuth states: {str(e)}")
+            logger.exception("Failed to cleanup expired OAuth states")
             return 0
         finally:
             connection.close()
