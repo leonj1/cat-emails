@@ -49,6 +49,11 @@ from models.account_models import (
 )
 from models.summary_response import SummaryResponse
 from models.create_account_request import CreateAccountRequest
+from models.oauth_models import (
+    OAuthAuthorizeResponse, OAuthCallbackRequest, OAuthCallbackResponse,
+    OAuthStatusResponse, OAuthRevokeResponse
+)
+from services.oauth_flow_service import OAuthFlowService
 from models.standard_response import StandardResponse
 from models.error_response import ErrorResponse
 from models.processing_current_status_response import (
@@ -1397,6 +1402,313 @@ async def trigger_monthly_summary(x_api_key: Optional[str] = Header(None)):
         )
 
 
+# ==================== OAuth Endpoints ====================
+
+# In-memory storage for OAuth state tokens (in production, use Redis or database)
+_oauth_state_store: Dict[str, dict] = {}
+
+
+def get_oauth_service() -> OAuthFlowService:
+    """Get OAuth flow service instance."""
+    return OAuthFlowService()
+
+
+@app.get("/api/auth/gmail/authorize", response_model=OAuthAuthorizeResponse, tags=["oauth"])
+async def initiate_oauth(
+    redirect_uri: str = Query(..., description="URL to redirect to after Google OAuth consent"),
+    login_hint: Optional[str] = Query(None, description="Optional email address to pre-fill in consent screen"),
+    x_api_key: Optional[str] = Header(None),
+    oauth_service: OAuthFlowService = Depends(get_oauth_service),
+):
+    """
+    Initiate Google OAuth authorization flow.
+
+    Returns an authorization URL that the frontend should redirect the user to.
+    The user will complete consent on Google's site, then be redirected back
+    to the specified redirect_uri with an authorization code.
+
+    Args:
+        redirect_uri: URL to redirect to after consent (must match Google Cloud Console config)
+        login_hint: Optional email to pre-fill in consent screen
+
+    Returns:
+        OAuthAuthorizeResponse with authorization_url and state token
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        # Generate state token for CSRF protection
+        state = oauth_service.generate_state_token()
+
+        # Store state with metadata for validation during callback
+        _oauth_state_store[state] = {
+            'redirect_uri': redirect_uri,
+            'created_at': datetime.utcnow().isoformat(),
+        }
+
+        # Generate authorization URL
+        authorization_url = oauth_service.generate_authorization_url(
+            redirect_uri=redirect_uri,
+            state=state,
+            login_hint=login_hint,
+        )
+
+        logger.info(f"Generated OAuth authorization URL for redirect_uri: {redirect_uri}")
+
+        return OAuthAuthorizeResponse(
+            authorization_url=authorization_url,
+            state=state,
+        )
+
+    except ValueError as e:
+        logger.error(f"OAuth configuration error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"OAuth not configured: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error initiating OAuth: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to initiate OAuth: {str(e)}"
+        )
+
+
+@app.post("/api/auth/gmail/callback", response_model=OAuthCallbackResponse, tags=["oauth"])
+async def oauth_callback(
+    request: OAuthCallbackRequest,
+    redirect_uri: str = Query(..., description="Same redirect_uri used in authorization request"),
+    x_api_key: Optional[str] = Header(None),
+    oauth_service: OAuthFlowService = Depends(get_oauth_service),
+    account_service: AccountCategoryClientInterface = Depends(get_account_service),
+):
+    """
+    Handle OAuth callback after user consent.
+
+    Exchanges the authorization code for access and refresh tokens,
+    then stores them in the database for the account.
+
+    Args:
+        request: Contains authorization code and state token
+        redirect_uri: Same redirect_uri used in authorization request
+
+    Returns:
+        OAuthCallbackResponse with success status and granted scopes
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        # Validate state token
+        state_data = _oauth_state_store.pop(request.state, None)
+        if not state_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired state token. Please restart the OAuth flow."
+            )
+
+        # Exchange authorization code for tokens
+        token_response = oauth_service.exchange_code_for_tokens(
+            code=request.code,
+            redirect_uri=redirect_uri,
+        )
+
+        access_token = token_response.get('access_token')
+        refresh_token = token_response.get('refresh_token')
+        expires_in = token_response.get('expires_in', 3600)
+        scope_string = token_response.get('scope', '')
+
+        if not refresh_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No refresh token received. User may need to revoke access and re-authorize with prompt=consent."
+            )
+
+        # Parse scopes
+        scopes = oauth_service.parse_scopes(scope_string)
+
+        # Calculate token expiry
+        token_expiry = oauth_service.calculate_token_expiry(expires_in)
+
+        # Get user's email from Google's userinfo endpoint
+        import urllib.request
+        import json
+        userinfo_request = urllib.request.Request(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        with urllib.request.urlopen(userinfo_request, timeout=10) as response:
+            userinfo = json.loads(response.read().decode('utf-8'))
+            email_address = userinfo.get('email')
+
+        if not email_address:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not retrieve email address from OAuth response"
+            )
+
+        # Create or update account with OAuth tokens
+        account_service.get_or_create_account(
+            email_address=email_address,
+            auth_method='oauth',
+            oauth_refresh_token=refresh_token,
+        )
+
+        # Update OAuth tokens
+        account_service.update_oauth_tokens(
+            email_address=email_address,
+            refresh_token=refresh_token,
+            access_token=access_token,
+            token_expiry=token_expiry,
+            scopes=scopes,
+        )
+
+        logger.info(f"Successfully completed OAuth flow for: {email_address}")
+
+        return OAuthCallbackResponse(
+            success=True,
+            email_address=email_address,
+            scopes=scopes,
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"OAuth token exchange failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Token exchange failed: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error in OAuth callback: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"OAuth callback failed: {str(e)}"
+        )
+
+
+@app.get("/api/accounts/{email_address}/oauth-status", response_model=OAuthStatusResponse, tags=["oauth"])
+async def get_oauth_status(
+    email_address: str = Path(..., description="Gmail email address"),
+    x_api_key: Optional[str] = Header(None),
+    service: AccountCategoryClientInterface = Depends(get_account_service),
+):
+    """
+    Get OAuth connection status for an account.
+
+    Returns whether OAuth is configured and the granted scopes.
+
+    Args:
+        email_address: Gmail email address
+
+    Returns:
+        OAuthStatusResponse with connection status and scopes
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        # URL decode the email address
+        from urllib.parse import unquote
+        email_address = unquote(email_address)
+
+        status_data = service.get_oauth_status(email_address)
+
+        if status_data is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Account not found: {email_address}"
+            )
+
+        return OAuthStatusResponse(
+            connected=status_data['connected'],
+            auth_method=status_data['auth_method'],
+            scopes=status_data['scopes'],
+            token_expiry=status_data['token_expiry'],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting OAuth status for {email_address}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get OAuth status: {str(e)}"
+        )
+
+
+@app.delete("/api/accounts/{email_address}/oauth", response_model=OAuthRevokeResponse, tags=["oauth"])
+async def revoke_oauth(
+    email_address: str = Path(..., description="Gmail email address"),
+    x_api_key: Optional[str] = Header(None),
+    oauth_service: OAuthFlowService = Depends(get_oauth_service),
+    account_service: AccountCategoryClientInterface = Depends(get_account_service),
+):
+    """
+    Revoke OAuth access for an account.
+
+    Revokes the OAuth tokens with Google and clears them from the database.
+    The account will revert to requiring IMAP authentication.
+
+    Args:
+        email_address: Gmail email address
+
+    Returns:
+        OAuthRevokeResponse with success status
+    """
+    verify_api_key(x_api_key)
+
+    try:
+        # URL decode the email address
+        from urllib.parse import unquote
+        email_address = unquote(email_address)
+
+        # Get current OAuth status to retrieve tokens
+        status_data = account_service.get_oauth_status(email_address)
+
+        if status_data is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Account not found: {email_address}"
+            )
+
+        if not status_data['connected']:
+            return OAuthRevokeResponse(
+                success=True,
+                message="Account is not using OAuth authentication"
+            )
+
+        # Get account to retrieve refresh token
+        account = account_service.get_account_by_email(email_address)
+        if account and account.oauth_refresh_token:
+            # Revoke token with Google
+            oauth_service.revoke_token(account.oauth_refresh_token)
+
+        # Clear OAuth tokens from database
+        cleared = account_service.clear_oauth_tokens(email_address)
+
+        if cleared:
+            logger.info(f"Revoked OAuth access for: {email_address}")
+            return OAuthRevokeResponse(
+                success=True,
+                message=f"OAuth access revoked for {email_address}"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to clear OAuth tokens from database"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking OAuth for {email_address}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to revoke OAuth: {str(e)}"
+        )
+
+
+# ==================== Account Endpoints ====================
+
 @app.get("/api/accounts/{email_address}/categories/top", response_model=TopCategoriesResponse, tags=["accounts"])
 async def get_top_categories(
     email_address: str = Path(..., description="Gmail email address"),
@@ -1594,7 +1906,9 @@ async def create_account(
         account = service.get_or_create_account(
             email_address=request.email_address,
             display_name=request.display_name,
-            app_password=request.app_password
+            app_password=request.app_password,
+            auth_method=request.auth_method,
+            oauth_refresh_token=request.oauth_refresh_token,
         )
 
         response = StandardResponse(
