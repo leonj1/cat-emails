@@ -1635,11 +1635,11 @@ async def get_oauth_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting OAuth status for {email_address}: {str(e)}")
+        logger.exception(f"Error getting OAuth status for {email_address}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get OAuth status: {str(e)}"
-        )
+            detail=f"Failed to get OAuth status: {e!r}"
+        ) from e
 
 
 @app.delete("/api/accounts/{email_address}/oauth", response_model=OAuthRevokeResponse, tags=["oauth"])
@@ -1707,11 +1707,11 @@ async def revoke_oauth(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error revoking OAuth for {email_address}: {str(e)}")
+        logger.exception(f"Error revoking OAuth for {email_address}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to revoke OAuth: {str(e)}"
-        )
+            detail=f"Failed to revoke OAuth: {e!r}"
+        ) from e
 
 
 # ==================== Account Endpoints ====================
