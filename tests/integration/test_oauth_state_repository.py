@@ -13,6 +13,23 @@ from repositories.oauth_state_repository import OAuthStateRepository, get_db_con
 from sqlalchemy import text
 
 
+def check_database_available():
+    """Check if database is available for integration tests."""
+    try:
+        connection = get_db_connection()
+        connection.close()
+        return True
+    except Exception:
+        return False
+
+
+# Skip all tests in this module if database is not available
+pytestmark = pytest.mark.skipif(
+    not check_database_available(),
+    reason="Database not available for integration tests"
+)
+
+
 @pytest.fixture
 def state_repo():
     """Create OAuthStateRepository instance for testing."""
