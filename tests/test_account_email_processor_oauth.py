@@ -64,8 +64,8 @@ class TestAccountEmailProcessorOAuthSupport(unittest.TestCase):
 
         fetcher_calls = []
 
-        def mock_create_fetcher(email, password, api_token):
-            fetcher_calls.append({'email': email, 'password': password})
+        def mock_create_fetcher(email, password, api_token, connection_service=None):
+            fetcher_calls.append({'email': email, 'password': password, 'connection_service': connection_service})
             return mock_fetcher
 
         processor = self._create_processor(create_gmail_fetcher=mock_create_fetcher)
