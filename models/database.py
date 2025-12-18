@@ -40,13 +40,23 @@ class EmailAccount(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True, index=True)
     last_scan_at = Column(DateTime)
-    
+
+    # OAuth fields for multi-user Gmail API access
+    auth_method = Column(String(20), default='imap')  # 'imap' or 'oauth'
+    oauth_client_id = Column(String(255))
+    oauth_client_secret = Column(String(500))
+    oauth_refresh_token = Column(String(500))
+    oauth_access_token = Column(Text)
+    oauth_token_expiry = Column(DateTime)
+    oauth_scopes = Column(Text)  # JSON array stored as text
+
     # Relationships
     email_summaries = relationship("EmailSummary", back_populates="email_account", cascade="all, delete-orphan")
     category_stats = relationship("AccountCategoryStats", back_populates="email_account", cascade="all, delete-orphan")
-    
+
     __table_args__ = (
         Index('idx_email_active', 'email_address', 'is_active'),
+        Index('idx_auth_method', 'auth_method'),
     )
 
 

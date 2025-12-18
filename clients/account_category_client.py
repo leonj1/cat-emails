@@ -101,7 +101,14 @@ class AccountCategoryClient(AccountCategoryClientInterface):
             is_active=account.is_active,
             last_scan_at=account.last_scan_at,
             created_at=account.created_at,
-            updated_at=account.updated_at
+            updated_at=account.updated_at,
+            auth_method=account.auth_method,
+            oauth_client_id=account.oauth_client_id,
+            oauth_client_secret=account.oauth_client_secret,
+            oauth_refresh_token=account.oauth_refresh_token,
+            oauth_access_token=account.oauth_access_token,
+            oauth_token_expiry=account.oauth_token_expiry,
+            oauth_scopes=account.oauth_scopes,
         )
 
     def _validate_email_address(self, email_address: str) -> str:
@@ -127,7 +134,14 @@ class AccountCategoryClient(AccountCategoryClientInterface):
 
         return email_address.strip().lower()
     
-    def get_or_create_account(self, email_address: str, display_name: Optional[str] = None, app_password: Optional[str] = None) -> EmailAccount:
+    def get_or_create_account(
+        self,
+        email_address: str,
+        display_name: Optional[str] = None,
+        app_password: Optional[str] = None,
+        auth_method: str = "imap",
+        oauth_refresh_token: Optional[str] = None,
+    ) -> EmailAccount:
         """
         Get existing account or create a new one.
 
@@ -135,6 +149,8 @@ class AccountCategoryClient(AccountCategoryClientInterface):
             email_address: Gmail email address
             display_name: Optional display name for the account
             app_password: Optional Gmail app-specific password for IMAP access
+            auth_method: Authentication method ('imap' or 'oauth')
+            oauth_refresh_token: OAuth refresh token (required if auth_method is 'oauth')
 
         Returns:
             EmailAccount object (existing or newly created)
@@ -147,14 +163,28 @@ class AccountCategoryClient(AccountCategoryClientInterface):
         try:
             if self.owns_session:
                 with self._get_session() as session:
-                    return self._get_or_create_account_impl(session, email_address, display_name, app_password)
+                    return self._get_or_create_account_impl(
+                        session, email_address, display_name, app_password,
+                        auth_method, oauth_refresh_token
+                    )
             else:
-                return self._get_or_create_account_impl(self.session, email_address, display_name, app_password)
+                return self._get_or_create_account_impl(
+                    self.session, email_address, display_name, app_password,
+                    auth_method, oauth_refresh_token
+                )
         except Exception as e:
             logger.error(f"Error in get_or_create_account for {email_address}: {str(e)}")
             raise
     
-    def _get_or_create_account_impl(self, session: Session, email_address: str, display_name: Optional[str], app_password: Optional[str]) -> EmailAccount:
+    def _get_or_create_account_impl(
+        self,
+        session: Session,
+        email_address: str,
+        display_name: Optional[str],
+        app_password: Optional[str],
+        auth_method: str = "imap",
+        oauth_refresh_token: Optional[str] = None,
+    ) -> EmailAccount:
         """Implementation of get_or_create_account that works with a session."""
         try:
             # Try to get existing account
@@ -168,6 +198,12 @@ class AccountCategoryClient(AccountCategoryClientInterface):
                     updated = True
                 if app_password and app_password != account.app_password:
                     account.app_password = app_password
+                    updated = True
+                if auth_method and auth_method != account.auth_method:
+                    account.auth_method = auth_method
+                    updated = True
+                if oauth_refresh_token and oauth_refresh_token != account.oauth_refresh_token:
+                    account.oauth_refresh_token = oauth_refresh_token
                     updated = True
                 if not account.is_active:
                     account.is_active = True
@@ -188,6 +224,8 @@ class AccountCategoryClient(AccountCategoryClientInterface):
                     email_address=email_address,
                     display_name=display_name,
                     app_password=app_password,
+                    auth_method=auth_method,
+                    oauth_refresh_token=oauth_refresh_token,
                     is_active=True,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()
@@ -609,6 +647,152 @@ class AccountCategoryClient(AccountCategoryClientInterface):
 
         except Exception as e:
             logger.error(f"Database error in delete_account: {str(e)}")
+            raise
+
+    def update_oauth_tokens(
+        self,
+        email_address: str,
+        refresh_token: str,
+        access_token: str,
+        token_expiry: datetime,
+        scopes: List[str],
+    ) -> Optional[EmailAccount]:
+        """
+        Update OAuth tokens for an account.
+
+        Args:
+            email_address: Gmail email address
+            refresh_token: Long-lived refresh token
+            access_token: Short-lived access token
+            token_expiry: When the access token expires
+            scopes: List of granted OAuth scopes
+
+        Returns:
+            Updated EmailAccount or None if not found
+        """
+        import json
+
+        email_address = self._validate_email_address(email_address)
+
+        try:
+            if self.owns_session:
+                with self._get_session() as session:
+                    account = session.query(EmailAccount).filter_by(email_address=email_address).first()
+                    if not account:
+                        logger.warning(f"Account not found for OAuth update: {email_address}")
+                        return None
+
+                    account.auth_method = 'oauth'
+                    account.oauth_refresh_token = refresh_token
+                    account.oauth_access_token = access_token
+                    account.oauth_token_expiry = token_expiry
+                    account.oauth_scopes = json.dumps(scopes)
+                    account.updated_at = datetime.utcnow()
+                    session.commit()
+                    logger.info(f"Updated OAuth tokens for account: {email_address}")
+                    return self._detach_account(account)
+            else:
+                account = self.session.query(EmailAccount).filter_by(email_address=email_address).first()
+                if not account:
+                    logger.warning(f"Account not found for OAuth update: {email_address}")
+                    return None
+
+                account.auth_method = 'oauth'
+                account.oauth_refresh_token = refresh_token
+                account.oauth_access_token = access_token
+                account.oauth_token_expiry = token_expiry
+                account.oauth_scopes = json.dumps(scopes)
+                account.updated_at = datetime.utcnow()
+                self.session.commit()
+                logger.info(f"Updated OAuth tokens for account: {email_address}")
+                return account
+
+        except Exception as e:
+            logger.error(f"Error updating OAuth tokens for {email_address}: {str(e)}")
+            raise
+
+    def get_oauth_status(self, email_address: str) -> Optional[Dict]:
+        """
+        Get OAuth connection status for an account.
+
+        Args:
+            email_address: Gmail email address
+
+        Returns:
+            Dict with OAuth status or None if account not found
+        """
+        import json
+
+        email_address = self._validate_email_address(email_address)
+
+        try:
+            account = self.get_account_by_email(email_address)
+            if not account:
+                return None
+
+            scopes = []
+            if account.oauth_scopes:
+                try:
+                    scopes = json.loads(account.oauth_scopes)
+                except json.JSONDecodeError:
+                    scopes = []
+
+            return {
+                'connected': account.auth_method == 'oauth' and account.oauth_refresh_token is not None,
+                'auth_method': account.auth_method or 'imap',
+                'scopes': scopes if account.auth_method == 'oauth' else None,
+                'token_expiry': account.oauth_token_expiry if account.auth_method == 'oauth' else None,
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting OAuth status for {email_address}: {str(e)}")
+            raise
+
+    def clear_oauth_tokens(self, email_address: str) -> bool:
+        """
+        Clear OAuth tokens for an account (revoke OAuth access).
+
+        Args:
+            email_address: Gmail email address
+
+        Returns:
+            True if tokens were cleared, False if account not found
+        """
+        email_address = self._validate_email_address(email_address)
+
+        try:
+            if self.owns_session:
+                with self._get_session() as session:
+                    account = session.query(EmailAccount).filter_by(email_address=email_address).first()
+                    if not account:
+                        return False
+
+                    account.auth_method = 'imap'
+                    account.oauth_refresh_token = None
+                    account.oauth_access_token = None
+                    account.oauth_token_expiry = None
+                    account.oauth_scopes = None
+                    account.updated_at = datetime.utcnow()
+                    session.commit()
+                    logger.info(f"Cleared OAuth tokens for account: {email_address}")
+                    return True
+            else:
+                account = self.session.query(EmailAccount).filter_by(email_address=email_address).first()
+                if not account:
+                    return False
+
+                account.auth_method = 'imap'
+                account.oauth_refresh_token = None
+                account.oauth_access_token = None
+                account.oauth_token_expiry = None
+                account.oauth_scopes = None
+                account.updated_at = datetime.utcnow()
+                self.session.commit()
+                logger.info(f"Cleared OAuth tokens for account: {email_address}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error clearing OAuth tokens for {email_address}: {str(e)}")
             raise
 
 

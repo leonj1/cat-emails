@@ -119,25 +119,47 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
                     "timestamp": datetime.now().isoformat()
                 }
 
-            # Get credentials
+            # Get credentials based on auth method
+            auth_method = getattr(account, 'auth_method', 'imap') or 'imap'
             app_password = account.app_password
             api_token = self.api_token
 
-            if not app_password:
-                error_msg = f"No app password configured for {email_address}"
-                logger.error(f"❌ {error_msg}")
-                self.processing_status_manager.update_status(
-                    ProcessingState.ERROR,
-                    error_msg,
-                    error_message=error_msg
-                )
-                self.processing_status_manager.complete_processing()
-                return {
-                    "account": email_address,
-                    "error": error_msg,
-                    "success": False,
-                    "timestamp": datetime.now().isoformat()
-                }
+            # Check credentials based on auth method
+            if auth_method == 'oauth':
+                oauth_refresh_token = getattr(account, 'oauth_refresh_token', None)
+                if not oauth_refresh_token:
+                    error_msg = f"No OAuth refresh token configured for {email_address}"
+                    logger.error(f"❌ {error_msg}")
+                    self.processing_status_manager.update_status(
+                        ProcessingState.ERROR,
+                        error_msg,
+                        error_message=error_msg
+                    )
+                    self.processing_status_manager.complete_processing()
+                    return {
+                        "account": email_address,
+                        "error": error_msg,
+                        "success": False,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                logger.info(f"Using OAuth authentication for {email_address}")
+            else:
+                if not app_password:
+                    error_msg = f"No app password configured for {email_address}"
+                    logger.error(f"❌ {error_msg}")
+                    self.processing_status_manager.update_status(
+                        ProcessingState.ERROR,
+                        error_msg,
+                        error_message=error_msg
+                    )
+                    self.processing_status_manager.complete_processing()
+                    return {
+                        "account": email_address,
+                        "error": error_msg,
+                        "success": False,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                logger.info(f"Using IMAP authentication for {email_address}")
 
             start_time = time.time()
 
@@ -149,7 +171,24 @@ class AccountEmailProcessorService(AccountEmailProcessorInterface):
             current_lookback_hours = self.settings_service.get_lookback_hours()
 
             # Initialize the fetcher using the create function
-            fetcher = self.create_gmail_fetcher(email_address, app_password, api_token)
+            # Pass auth_method and OAuth credentials if using OAuth
+            if auth_method == 'oauth':
+                # For OAuth, create connection service with OAuth credentials
+                from services.gmail_connection_factory import GmailConnectionFactory
+                connection_service = GmailConnectionFactory.create_connection(
+                    email_address=email_address,
+                    auth_method='oauth',
+                    refresh_token=account.oauth_refresh_token,
+                )
+                # Create fetcher with OAuth connection service
+                fetcher = self.create_gmail_fetcher(
+                    email_address,
+                    account.oauth_refresh_token,  # Pass refresh token
+                    api_token,
+                    connection_service=connection_service
+                )
+            else:
+                fetcher = self.create_gmail_fetcher(email_address, app_password, api_token)
 
             # Clear any existing tracked data to start fresh
             fetcher.summary_service.clear_tracked_data()
