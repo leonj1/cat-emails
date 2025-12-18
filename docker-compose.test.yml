@@ -49,3 +49,19 @@ services:
       mysql-test:
         condition: service_healthy
     command: ["python", "-m", "pytest", "tests/test_processing_run_columns_integration.py", "-v"]
+
+  oauth-columns-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cat-emails-oauth-columns-test
+    environment:
+      - MYSQL_HOST=mysql-test
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=cat_emails_test
+      - MYSQL_USER=cat_emails
+      - MYSQL_PASSWORD=cat_emails_password
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+    command: ["python", "-m", "pytest", "tests/test_email_account_oauth_columns_integration.py", "-v"]
