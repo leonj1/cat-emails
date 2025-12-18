@@ -54,6 +54,7 @@ from models.oauth_models import (
     OAuthStatusResponse, OAuthRevokeResponse
 )
 from services.oauth_flow_service import OAuthFlowService
+from repositories.oauth_state_repository import OAuthStateRepository
 from models.standard_response import StandardResponse
 from models.error_response import ErrorResponse
 from models.processing_current_status_response import (
@@ -1404,13 +1405,14 @@ async def trigger_monthly_summary(x_api_key: Optional[str] = Header(None)):
 
 # ==================== OAuth Endpoints ====================
 
-# In-memory storage for OAuth state tokens (in production, use Redis or database)
-_oauth_state_store: Dict[str, dict] = {}
-
-
 def get_oauth_service() -> OAuthFlowService:
     """Get OAuth flow service instance."""
     return OAuthFlowService()
+
+
+def get_oauth_state_repository() -> OAuthStateRepository:
+    """Get OAuth state repository instance."""
+    return OAuthStateRepository()
 
 
 @app.get("/api/auth/gmail/authorize", response_model=OAuthAuthorizeResponse, tags=["oauth"])
@@ -1419,6 +1421,7 @@ async def initiate_oauth(
     login_hint: Optional[str] = Query(None, description="Optional email address to pre-fill in consent screen"),
     x_api_key: Optional[str] = Header(None),
     oauth_service: OAuthFlowService = Depends(get_oauth_service),
+    state_repo: OAuthStateRepository = Depends(get_oauth_state_repository),
 ):
     """
     Initiate Google OAuth authorization flow.
@@ -1440,11 +1443,8 @@ async def initiate_oauth(
         # Generate state token for CSRF protection
         state = oauth_service.generate_state_token()
 
-        # Store state with metadata for validation during callback
-        _oauth_state_store[state] = {
-            'redirect_uri': redirect_uri,
-            'created_at': datetime.utcnow().isoformat(),
-        }
+        # Store state in database for validation during callback
+        state_repo.store_state(state_token=state, redirect_uri=redirect_uri)
 
         # Generate authorization URL
         authorization_url = oauth_service.generate_authorization_url(
@@ -1481,6 +1481,7 @@ async def oauth_callback(
     x_api_key: Optional[str] = Header(None),
     oauth_service: OAuthFlowService = Depends(get_oauth_service),
     account_service: AccountCategoryClientInterface = Depends(get_account_service),
+    state_repo: OAuthStateRepository = Depends(get_oauth_state_repository),
 ):
     """
     Handle OAuth callback after user consent.
@@ -1498,8 +1499,8 @@ async def oauth_callback(
     verify_api_key(x_api_key)
 
     try:
-        # Validate state token
-        state_data = _oauth_state_store.pop(request.state, None)
+        # Validate state token from database
+        state_data = state_repo.get_state(request.state)
         if not state_data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1561,6 +1562,9 @@ async def oauth_callback(
             token_expiry=token_expiry,
             scopes=scopes,
         )
+
+        # Delete the used state token
+        state_repo.delete_state(request.state)
 
         logger.info(f"Successfully completed OAuth flow for: {email_address}")
 
