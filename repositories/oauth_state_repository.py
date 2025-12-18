@@ -40,10 +40,6 @@ class OAuthStateRepository:
 
     STATE_TTL_MINUTES = 10  # State tokens expire after 10 minutes
 
-    def __init__(self):
-        """Initialize the OAuth state repository."""
-        pass
-
     def store_state(
         self,
         state_token: str,
@@ -85,7 +81,7 @@ class OAuthStateRepository:
 
             logger.debug(f"Stored OAuth state token (expires in {self.STATE_TTL_MINUTES} minutes)")
 
-        except Exception as e:
+        except Exception:
             connection.rollback()
             logger.exception("Failed to store OAuth state")
             raise
@@ -123,16 +119,18 @@ class OAuthStateRepository:
                 logger.warning("OAuth state not found or expired")
                 return None
 
-            metadata = json.loads(result[3]) if result[3] else {}
+            # Use named access via _mapping for clarity
+            row = result._mapping
+            metadata = json.loads(row['metadata']) if row['metadata'] else {}
 
             return {
-                'redirect_uri': result[0],
-                'created_at': result[1].isoformat() if result[1] else None,
-                'expires_at': result[2].isoformat() if result[2] else None,
+                'redirect_uri': row['redirect_uri'],
+                'created_at': row['created_at'].isoformat() if row['created_at'] else None,
+                'expires_at': row['expires_at'].isoformat() if row['expires_at'] else None,
                 **metadata
             }
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to retrieve OAuth state")
             return None
         finally:
@@ -164,7 +162,7 @@ class OAuthStateRepository:
 
             return deleted
 
-        except Exception as e:
+        except Exception:
             connection.rollback()
             logger.exception("Failed to delete OAuth state")
             return False
@@ -194,7 +192,7 @@ class OAuthStateRepository:
 
             return count
 
-        except Exception as e:
+        except Exception:
             connection.rollback()
             logger.exception("Failed to cleanup expired OAuth states")
             return 0
