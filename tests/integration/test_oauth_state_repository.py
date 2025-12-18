@@ -9,8 +9,7 @@ from datetime import datetime, timedelta
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from repositories.oauth_state_repository import OAuthStateRepository
-from models.database import get_db_connection
+from repositories.oauth_state_repository import OAuthStateRepository, get_db_connection
 from sqlalchemy import text
 
 

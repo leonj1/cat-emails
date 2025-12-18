@@ -1440,6 +1440,9 @@ async def initiate_oauth(
     verify_api_key(x_api_key)
 
     try:
+        # Clean up expired state tokens to prevent database bloat
+        state_repo.cleanup_expired_states()
+
         # Generate state token for CSRF protection
         state = oauth_service.generate_state_token()
 
@@ -1461,17 +1464,17 @@ async def initiate_oauth(
         )
 
     except ValueError as e:
-        logger.error(f"OAuth configuration error: {str(e)}")
+        logger.exception("OAuth configuration error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth not configured: {str(e)}"
-        )
+            detail=f"OAuth not configured: {e!r}"
+        ) from e
     except Exception as e:
-        logger.error(f"Error initiating OAuth: {str(e)}")
+        logger.exception("Error initiating OAuth")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to initiate OAuth: {str(e)}"
-        )
+            detail=f"Failed to initiate OAuth: {e!r}"
+        ) from e
 
 
 @app.post("/api/auth/gmail/callback", response_model=OAuthCallbackResponse, tags=["oauth"])
@@ -1577,17 +1580,17 @@ async def oauth_callback(
     except HTTPException:
         raise
     except ValueError as e:
-        logger.error(f"OAuth token exchange failed: {str(e)}")
+        logger.exception("OAuth token exchange failed")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Token exchange failed: {str(e)}"
-        )
+            detail=f"Token exchange failed: {e!r}"
+        ) from e
     except Exception as e:
-        logger.error(f"Error in OAuth callback: {str(e)}")
+        logger.exception("Error in OAuth callback")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth callback failed: {str(e)}"
-        )
+            detail=f"OAuth callback failed: {e!r}"
+        ) from e
 
 
 @app.get("/api/accounts/{email_address}/oauth-status", response_model=OAuthStatusResponse, tags=["oauth"])

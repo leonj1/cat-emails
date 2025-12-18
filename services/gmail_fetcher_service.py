@@ -28,14 +28,22 @@ logger = get_logger(__name__)
 
 
 class GmailFetcher(GmailFetcherInterface):
-    def __init__(self, email_address: str, app_password: str, api_token: str | None = None):
+    def __init__(
+        self,
+        email_address: str,
+        app_password: str,
+        api_token: str | None = None,
+        connection_service: Optional['GmailConnectionService'] = None
+    ):
         """
         Initialize Gmail connection using IMAP.
 
         Args:
             email_address: Gmail address
-            app_password: Gmail App Password (NOT your regular Gmail password)
+            app_password: Gmail App Password (NOT your regular Gmail password) or OAuth refresh token
             api_token: API token for the control API
+            connection_service: Optional pre-configured connection service (e.g., for OAuth).
+                              If not provided, creates a standard IMAP connection service.
         """
         self.email_address = email_address
         self.password = app_password
@@ -48,7 +56,11 @@ class GmailFetcher(GmailFetcherInterface):
         }
 
         # Initialize connection service (delegates IMAP authentication)
-        self.connection_service = GmailConnectionService(self.email_address, self.password, self.imap_server)
+        # Use provided connection service or create a default one
+        if connection_service is not None:
+            self.connection_service = connection_service
+        else:
+            self.connection_service = GmailConnectionService(self.email_address, self.password, self.imap_server)
         # Initialize domain service and load domain data
         self.domain_service = DomainService(api_token=api_token)
         # Initialize link remover service
