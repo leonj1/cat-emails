@@ -3,10 +3,8 @@ Unit tests for OAuth API endpoints.
 
 Tests the FastAPI OAuth endpoints for Gmail authorization flow.
 """
-import json
 import unittest
-from unittest.mock import MagicMock, patch
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 class TestOAuthModelsExist(unittest.TestCase):

@@ -80,6 +80,7 @@ class TestAccountEmailProcessorOAuthSupport(unittest.TestCase):
 
             # Verify processing succeeded
             self.assertIsNotNone(result)
+            self.assertTrue(result.get('success', False), "Processing should succeed for OAuth account")
 
             # Verify the fetcher was created with refresh_token as password (OAuth flow)
             self.assertEqual(len(fetcher_calls), 1)
