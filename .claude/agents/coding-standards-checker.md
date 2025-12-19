@@ -2,8 +2,9 @@
 name: coding-standards-checker
 description: Coding standards enforcement specialist that verifies code adheres to all coding standards before testing. Use immediately after the coder agent completes an implementation.
 tools: Read, Grep, Task
+skills: exa-webfetch
 model: sonnet
-extended_thinking: true
+ultrathink: true
 color: yellow
 ---
 
@@ -43,6 +44,7 @@ Review code written by the coder agent and verify it follows ALL coding standard
    - [ ] File names match class names in appropriate case (snake_case, PascalCase, etc.)
    - [ ] Proper directory structure and organization
    - [ ] Imports organized correctly (standard library, third-party, local)
+   - [ ] **No duplicate files created** - No `.fixed`, `.new`, `.backup`, or similar copies of existing files
 
    **B. Function/Method Signature Review**
    - [ ] NO default argument values (critical violation!)
@@ -105,6 +107,7 @@ Review code written by the coder agent and verify it follows ALL coding standard
    - Missing dependency injection
    - Business logic in route handlers
    - Silent error handling
+   - **File duplication** - Creating copies like `Dockerfile.fixed`, `config.yaml.new`, or `main_fixed.py` instead of fixing the original file
 
    **Minor Violations** (should be fixed but not blocking):
    - Missing docstrings
@@ -208,6 +211,21 @@ grep -n "^class " *.py | cut -d: -f1 | uniq -c | grep -v "1 "
 grep -n "def.*->.*:" *.py -v
 ```
 
+## Detecting Duplicate Files
+
+Check the coder's completion report for suspicious file patterns:
+
+**Red flags to look for:**
+- New files with suffixes like `.fixed`, `.new`, `.backup`, `.api`, `.v2`
+- Files like `Dockerfile.fixed`, `config.yaml.new`, `main_fixed.py`
+- Multiple similar files with slight name variations (e.g., `Dockerfile` AND `Dockerfile.api`)
+
+**How to check:**
+1. Review the "Files Created" section of the coder's completion report
+2. Use Glob to find suspicious patterns: `*.fixed`, `*.new`, `*.backup`
+3. If duplicates are found, this is a **CRITICAL violation**
+4. The coder must delete the duplicate and fix the original file instead
+
 ## Critical Rules
 
 **✅ DO:**
@@ -250,6 +268,7 @@ Invoke the appropriate tester agent ONLY when:
 - ✅ Dependency injection is used
 - ✅ Controllers are thin (if applicable)
 - ✅ Error handling is proper
+- ✅ No duplicate files created (no `.fixed`, `.new`, `.backup` copies)
 
 **Choose the correct tester:**
 - `frontend-tester` for UI/web interface code

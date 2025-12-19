@@ -399,6 +399,146 @@ async def get_user_controller(user_id: int):
 - **Decorators handle errors**: Convert service exceptions to HTTP responses
 - **Clean separation**: Controllers know nothing about business rules
 
+## FastAPI Layered Architecture
+
+FastAPI applications MUST follow a clean layered architecture. The `fastapi-clean-architecture` skill provides detailed guidance.
+
+### Required Layers
+
+| Layer | Location | Responsibility |
+|-------|----------|----------------|
+| Router | `routers/*.py` | Thin handlers - delegate to services, return responses |
+| Service | `services/*.py` | Business logic, raises domain exceptions |
+| Repository | `repositories/*.py` | Data access abstraction, ORM queries |
+| Exceptions | `exceptions.py` | Domain-specific exception classes |
+| Exception Handlers | `exception_handlers.py` | Convert domain exceptions to HTTP responses |
+
+### Prohibited Patterns in Handlers
+
+```python
+# ❌ BAD - try/except in handler
+@router.post("/users")
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    try:
+        # logic
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ❌ BAD - Direct database access in handler
+@router.get("/users/{user_id}")
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Not found")
+    return user
+
+# ❌ BAD - Business logic in handler
+@router.post("/orders")
+def create_order(order: OrderCreate, db: Session = Depends(get_db)):
+    if order.quantity > 100:
+        raise HTTPException(status_code=400, detail="Max is 100")
+    total = order.quantity * order.unit_price
+    if total > 10000:
+        total = total * 0.9  # Business logic!
+    # ...
+```
+
+### Required Pattern - Thin Handlers
+
+```python
+# ✅ GOOD - Thin handler delegates to service
+@router.post("/users", response_model=UserResponse, status_code=201)
+def create_user(
+    user: UserCreate,
+    service: UserService = Depends(get_user_service)
+):
+    return service.register(user.username, user.email, user.password)
+```
+
+### Domain Exceptions (Not Generic)
+
+```python
+# ❌ BAD - Generic exceptions
+def register(self, username: str):
+    if self._repository.exists_by_username(username):
+        raise ValueError("Username taken")  # Too generic!
+
+# ✅ GOOD - Domain-specific exceptions
+class UsernameAlreadyExistsError(DomainException):
+    def __init__(self, username: str):
+        super().__init__(f"Username '{username}' is already registered")
+
+def register(self, username: str):
+    if self._repository.exists_by_username(username):
+        raise UsernameAlreadyExistsError(username)
+```
+
+### Global Exception Handlers (Not Per-Route)
+
+```python
+# ❌ BAD - HTTPException in service or repository
+class UserService:
+    def get_by_id(self, user_id: int):
+        user = self._repo.find_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404)  # HTTP in service!
+
+# ✅ GOOD - Domain exception + global handler
+# exceptions.py
+class EntityNotFoundError(DomainException):
+    pass
+
+# exception_handlers.py
+async def not_found_handler(request: Request, exc: EntityNotFoundError):
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+# main.py
+app.add_exception_handler(EntityNotFoundError, not_found_handler)
+
+# service.py
+class UserService:
+    def get_by_id(self, user_id: int):
+        user = self._repo.find_by_id(user_id)
+        if not user:
+            raise EntityNotFoundError("User", user_id)  # Domain exception
+        return user
+```
+
+### Dependency Injection via Depends()
+
+```python
+# dependencies.py
+def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
+    return UserRepository(db)
+
+def get_user_service(
+    repository: UserRepository = Depends(get_user_repository)
+) -> UserService:
+    return UserService(repository)
+
+# router.py
+@router.get("/users/{user_id}")
+def get_user(
+    user_id: int,
+    service: UserService = Depends(get_user_service)  # Injected
+):
+    return service.get_by_id(user_id)
+```
+
+### Handler Complexity Limits
+
+- **Max lines per handler**: 5 (excluding decorator and signature)
+- **Max dependencies per handler**: 4
+- **Allowed operations**: Call service method(s), return result
+- **NOT allowed**: try/except, db queries, business logic, validation beyond Pydantic
+
+### Reference
+
+For detailed refactoring steps, before/after examples, and verification checklist, invoke:
+```
+skill: "fastapi-clean-architecture"
+```
+
 ## Imports
 
 ### Organization

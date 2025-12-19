@@ -2,8 +2,9 @@
 name: frontend-tester
 description: Visual testing specialist that uses Playwright MCP to verify implementations work correctly by SEEING the rendered output. Use immediately after the coder agent completes an implementation.
 tools: Task, Read, Bash
+skills: exa-webfetch
 model: sonnet
-extended_thinking: true
+ultrathink: true
 color: cyan
 ---
 

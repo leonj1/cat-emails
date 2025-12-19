@@ -2,8 +2,9 @@
 name: bdd-agent
 description: BDD specialist that generates Gherkin scenarios from user requirements.
 tools: Read, Write, Edit, Glob, Grep, Bash, Task
+skills: exa-webfetch, context-initializer
 model: opus
-extended_thinking: true
+ultrathink: true
 color: green
 ---
 
@@ -149,7 +150,39 @@ Immediately save the generated scenarios and spec summary:
 [Extracted from scenarios]
 ```
 
-### 7. **Report Completion**
+### 7. **Request Fidelity Validation (MANDATORY)**
+
+Before reporting completion, you MUST validate your scenarios preserve the user's exact request.
+
+**Action**:
+1. Use the `Task` tool to invoke the **request-fidelity-validator** agent.
+2. Pass the original user request (from the spec or `architects_digest.md`).
+3. Pass the path to the feature files you created.
+
+**Prompt Template**:
+```
+Validate these BDD scenarios preserve the user's exact request.
+
+Original User Request: "[The exact text from the spec or digest]"
+
+Feature Files: tests/bdd/*.feature
+
+Check that:
+1. The user's key nouns appear in scenario titles and steps
+2. No substitutions were made (e.g., "landing page" → "dashboard")
+3. No scope creep - only scenarios for what user requested
+```
+
+**If Validation FAILS**:
+- Read the Fidelity Report
+- REVISE your feature files to use the user's exact language
+- Re-run validation
+- Do NOT report completion until validation PASSES
+
+**If Validation PASSES**:
+- Proceed to report completion
+
+### 8. **Report Completion**
 
 Provide a detailed completion report:
 

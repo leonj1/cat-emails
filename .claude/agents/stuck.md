@@ -2,6 +2,7 @@
 name: stuck
 description: Emergency escalation agent that ALWAYS gets human input when ANY problem occurs. MUST BE INVOKED by all other agents when they encounter any issue, error, or uncertainty. This agent is HARDWIRED into the system - NO FALLBACKS ALLOWED.
 tools: AskUserQuestion, Read, Bash, Glob, Grep
+skills: exa-webfetch
 model: sonnet
 color: red
 ---

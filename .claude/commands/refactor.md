@@ -1,7 +1,7 @@
 ---
 description: Refactor existing code to adhere to coding standards while preserving functionality
 argument-hint: [file-or-directory-path]
-model: claude-3-5-sonnet-20241022
+model: sonnet
 ---
 
 # Refactor Command
