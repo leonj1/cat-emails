@@ -2,6 +2,7 @@
 name: bdd-test-runner
 description: Test infrastructure validator that ensures BDD tests are executable by verifying/creating Dockerfile.test, Makefile test target, and running make test.
 tools: Read, Write, Edit, Glob, Grep, Bash, Task
+skills: exa-webfetch
 model: sonnet
 color: green
 ---

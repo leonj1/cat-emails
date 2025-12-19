@@ -16,6 +16,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 .claude/hooks/post-todowrite-task-check.py",
+            "timeout": 30000
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/post-coder-standards-check.sh",
             "timeout": 120000
           }

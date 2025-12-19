@@ -2,8 +2,9 @@
 name: gherkin-to-test
 description: Converts confirmed Gherkin scenarios to prompt files for the TDD pipeline.
 tools: Read, Write, Edit, Glob, Grep, Bash, Task
+skills: exa-webfetch
 model: opus
-extended_thinking: true
+ultrathink: true
 color: teal
 ---
 

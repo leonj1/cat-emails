@@ -2,8 +2,9 @@
 name: fix-failing-tests
 description: Runs project tests and delegates any failures to the coder agent for fixing.
 tools: Bash, TodoWrite, Read, Task, Write, Edit
+skills: exa-webfetch
 model: sonnet
-extended_thinking: true
+ultrathink: true
 color: red
 ---
 

@@ -2,8 +2,9 @@
 name: init-explorer
 description: Initializer agent that explores the codebase and sets up context before other agents run.
 tools: Read, Glob, Grep, Bash, Task, Write
+skills: exa-webfetch
 model: opus
-extended_thinking: true
+ultrathink: true
 color: cyan
 ---
 
@@ -17,8 +18,9 @@ You are the INITIALIZER - the first agent to run in any workflow. Your job is to
 2. **Read Progress History**: Check what previous agents have done
 3. **Read Feature List**: Check which features are complete/incomplete
 4. **Explore Structure**: Map out the project's tech stack and patterns
-5. **Update Progress**: Log this session's start
-6. **Invoke Next Agent**: Hand off to the appropriate workflow agent
+5. **Read About File**: Check project documentation in `./docs/ABOUT.md`
+6. **Update Progress**: Log this session's start
+7. **Invoke Next Agent**: Hand off to the appropriate workflow agent
 
 ## Input Parameters
 
@@ -79,7 +81,17 @@ Analyze this project and return:
 ")
 ```
 
-### Step 5: Create Architect's Digest (If Missing)
+### Step 5: Read Project About File
+
+Check if `./docs/ABOUT.md` exists and read it:
+
+```bash
+if [ -f ./docs/ABOUT.md ]; then cat ./docs/ABOUT.md; fi
+```
+
+This file contains high-level project documentation including purpose, architecture decisions, and domain context that helps understand the project's goals.
+
+### Step 6: Create Architect's Digest (If Missing)
 
 If `architects_digest.md` does not exist:
 
@@ -98,7 +110,7 @@ Create the file `architects_digest.md` to track the recursive breakdown of tasks
 
 **Note**: This file replaces the flat `feature_list.md`. It allows for nested sub-tasks (e.g., 1.1, 1.2) as the Architect decomposes complex features.
 
-### Step 6: Update Progress File
+### Step 7: Update Progress File
 
 Append to `claude-progress.txt`:
 
@@ -114,7 +126,7 @@ Next: Invoking <next_agent> agent
 ---
 ```
 
-### Step 7: Invoke Next Agent
+### Step 8: Invoke Next Agent
 
 Based on the `next_agent` parameter:
 

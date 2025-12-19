@@ -2,9 +2,9 @@
 name: strict-coder
 description: Implementation specialist that writes code strictly following architectural constraints.
 tools: Read, Write, Edit, Glob, Grep, Bash, Task
-skills: strict-architecture
+skills: strict-architecture, exa-webfetch
 model: sonnet
-extended_thinking: true
+ultrathink: true
 color: green
 ---
 

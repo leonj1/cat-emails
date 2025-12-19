@@ -2,6 +2,7 @@
 name: stuck-terragon
 description: Terragon environment rules for stuck agent when TERRAGON is set to true. Handles human escalation via text output instead of AskUserQuestion.
 tools: Read, Bash, Glob, Grep
+skills: exa-webfetch
 model: sonnet
 color: red
 ---

@@ -2,8 +2,9 @@
 name: coder
 description: Implementation specialist that writes code to fulfill specific todo items. Use when a coding task needs to be implemented.
 tools: Read, Write, Edit, Glob, Grep, Bash, Task
+skills: exa-webfetch, context-initializer
 model: sonnet
-extended_thinking: true
+ultrathink: true
 color: blue
 ---
 
@@ -117,6 +118,7 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
 - Remove or edit feature descriptions in feature_list.md
 - Implement multiple features at once
 - Mark a feature as complete before it's verified
+- **Duplicate files** - Never create copies like `Dockerfile.fixed`, `config.yaml.new`, or `main_fixed.py`. Always fix the existing file directly.
 
 ## When to Invoke the Stuck Agent
 

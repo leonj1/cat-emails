@@ -17,7 +17,7 @@ Use this command to create implementation prompts following BDD and TDD best pra
 
 **Example**: `/architect Build a user authentication system with JWT`
 
-**Flow**: init-explorer → architect → bdd-agent → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → coder → standards → tester → bdd-test-runner
+**Flow**: init-explorer → architect → **request-fidelity-validator** → bdd-agent → **request-fidelity-validator** → test-consistency-validator → gherkin-to-test → codebase-analyst → refactor-decision → test-creator → test-consistency-validator → coder → standards → tester → bdd-test-runner
 
 ### `/coder` - Orchestrated Development
 Use this command when you want to implement features with full orchestration:
@@ -96,12 +96,14 @@ Use this command to start a forensic Root Cause Analysis debugging session:
 - `.claude/agents/` - Specialized agent configurations
   - `init-explorer.md` - Initializer agent that explores codebase and sets up context
   - `architect.md` - Greenfield spec designer
+  - `request-fidelity-validator.md` - Semantic guardrail preventing agent drift from user request
   - `bdd-agent.md` - BDD specialist that generates Gherkin scenarios
   - `scope-manager.md` - Complexity gatekeeper for BDD features
   - `gherkin-to-test.md` - Converts Gherkin to TDD prompts
   - `codebase-analyst.md` - Finds reuse opportunities
   - `refactor-decision-engine.md` - Decides if refactoring needed
   - `test-creator.md` - TDD specialist that writes tests first
+  - `test-consistency-validator.md` - Validates test names match their contents
   - `coder.md` - Implementation specialist
   - `coding-standards-checker.md` - Code quality verifier
   - `tester.md` - Functionality verification
@@ -117,6 +119,10 @@ Use this command to start a forensic Root Cause Analysis debugging session:
 - `.claude/commands/` - Custom slash commands
 - `.claude/hooks/` - Automated workflow hooks
 - `.claude/config.json` - Project configuration
+- `.claude/skills/` - Reusable skills for Claude Code
+  - `context-initializer/` - Auto-invokes init-explorer when context is empty
+  - `strict-architecture/` - Enforces governance rules for code
+  - `exa-webfetch/` - Uses Exa API for intelligent web searches
 - `tests/bdd/` - Gherkin feature files for BDD scenarios
 
 ## Hooks System
@@ -154,6 +160,80 @@ The `init-explorer` agent is the **initializer** that runs at the start of `/arc
 | `architects_digest.md` | Recursive task breakdown and architecture state |
 | `feature_list.md` | Comprehensive feature requirements with completion status |
 | `.feature_list.md.example` | Example template created if `feature_list.md` is missing |
+
+### Request Fidelity Validator (Anti-Drift Guardrail)
+
+The `request-fidelity-validator` agent prevents a critical failure mode: **Agent Drift**.
+
+**The Problem**: Agents can "interpret" user requests in ways that drift from intent:
+- User says "landing page" → Agent builds "dashboard"
+- User says "org chart" → Agent builds "team metrics"
+- User says "simple button" → Agent builds "component library"
+
+**How It Works**:
+1. Extracts key nouns, verbs, and constraints from the user's exact words
+2. Scans agent-generated artifacts for those exact terms
+3. Flags substitutions (e.g., "dashboard" instead of "landing page")
+4. Rejects artifacts that don't preserve the user's language
+
+**When It Runs**:
+- After `architect` creates a spec → validates `specs/DRAFT-*.md`
+- After `architect` decomposes a task → validates decomposition traces to root
+- After `bdd-agent` creates scenarios → validates `tests/bdd/*.feature`
+
+**Failure Handling**:
+- If validation FAILS, the artifact is returned to its originating agent
+- Agent must revise using the user's exact terms
+- Pipeline cannot proceed until validation PASSES
+
+**The Golden Rule**:
+> If the user could read the artifact and say "That's not what I asked for", the validator will FAIL it.
+
+### Hierarchical Traceability (Decomposition Support)
+
+Complex requests get broken into sub-tasks. The validator supports **three validation modes**:
+
+| Mode | When Used | What It Checks |
+|------|-----------|----------------|
+| **Direct** | Spec or scenario (leaf node) | Root request terms appear in artifact |
+| **Decomposition** | Task broken into sub-tasks | Each sub-task traces to root; all root terms covered |
+| **Aggregation** | All sub-tasks complete | Sum of sub-tasks fulfills original request |
+
+**Example Valid Decomposition**:
+```
+Root Request: "Build an org chart landing page"
+├── 1. Create employee data model     ← Traces to "org chart"
+├── 2. Build tree component           ← Traces to "org chart"
+├── 3. Design landing page layout     ← Traces to "landing page"
+└── 4. Integrate chart into page      ← Traces to both
+```
+
+**Example Invalid Decomposition (DRIFT)**:
+```
+Root Request: "Build an org chart landing page"
+├── 1. Create employee data model     ← OK
+├── 2. Build productivity dashboard   ← DRIFT: "dashboard" ≠ "landing page"
+├── 3. Add team metrics               ← DRIFT: not in root request
+└── 4. Create reporting system        ← DRIFT: not in root request
+```
+
+**Decomposition Justification Requirement**:
+When the architect decomposes a task, they MUST include a justification table in `architects_digest.md`:
+
+```markdown
+## Root Request
+"Build an org chart landing page"
+
+### Decomposition Justification for Task 1
+| Sub-Task | Traces To Root Term | Because |
+|----------|---------------------|---------|
+| 1.1 Employee data model | "org chart" | Chart needs employee data |
+| 1.2 Tree component | "org chart" | Visual hierarchy display |
+| 1.3 Landing layout | "landing page" | Page structure |
+| 1.4 Integration | Both | Combines into final product |
+```
+
+Without this justification, the validator will REJECT the decomposition.
 
 ### Feature List Protocol
 
@@ -196,12 +276,16 @@ If the project already has a `./sql` folder, you cannot modify any of these exis
 **Flow**:
 1. `init-explorer` gathers project context, creates `architects_digest.md`
 2. `architect` creates greenfield spec (or decomposes complex tasks)
-3. `bdd-agent` generates Gherkin scenarios
-4. `scope-manager` validates complexity (loops back to Architect if too complex)
-5. `gherkin-to-test` invokes codebase-analyst and creates prompts
-6. `run-prompt` executes prompts sequentially
-7. For each prompt:
+3. `request-fidelity-validator` validates spec preserves user's exact request (loops back to architect if drift detected)
+4. `bdd-agent` generates Gherkin scenarios
+5. `request-fidelity-validator` validates scenarios preserve user's exact request (loops back to bdd-agent if drift detected)
+6. `scope-manager` validates complexity (loops back to Architect if too complex)
+7. `test-consistency-validator` validates Gherkin scenario names match their steps (loops back to bdd-agent if inconsistent)
+8. `gherkin-to-test` invokes codebase-analyst and creates prompts
+9. `run-prompt` executes prompts sequentially
+10. For each prompt:
    - `test-creator` writes tests from Gherkin
+   - `test-consistency-validator` validates test names match content (loops back to test-creator if inconsistent)
    - `coder` implements to pass tests
    - `coding-standards-checker` verifies quality
    - `tester` validates functionality
@@ -244,6 +328,39 @@ If the project already has a `./sql` folder, you cannot modify any of these exis
 - Batch processing
 - Intelligent routing
 - BDD prompts always run sequentially
+
+## Available Skills
+
+### `context-initializer` - Auto-Context Gathering
+This skill automatically invokes the init-explorer agent when Claude Code lacks project context.
+
+**When it activates**:
+- No project context available (don't know tech stack, purpose, structure)
+- Missing `claude-progress.txt` or `architects_digest.md`
+- User asks context-dependent questions without prior exploration
+- Starting a new task without codebase understanding
+
+**What it does**: Invokes init-explorer to gather project context including tech stack, directory structure, coding patterns, test setup, and build commands.
+
+**Usage**: Invoke the skill with `skill: "context-initializer"` when you detect empty context.
+
+### `exa-webfetch` - Intelligent Web Search via Exa API
+This skill uses the Exa API for intelligent web searches instead of the default WebFetch tool. It provides semantic search capabilities that understand query meaning.
+
+**When it activates**:
+- User asks about current events, news, or recent developments
+- User needs up-to-date information beyond Claude's knowledge cutoff
+- User needs latest documentation, API versions, or technical references
+- User wants comprehensive research on a topic
+- User wants to verify current facts, prices, or statistics
+- User asks about time-sensitive data (stock prices, weather, sports)
+- User wants to find pages similar to a given URL
+
+**Prerequisites**: Requires `EXA_API_TOKEN` environment variable to be set.
+
+**What it does**: Performs web searches using Exa's neural/semantic search, which understands the meaning of queries rather than just matching keywords. Supports filtering by category (news, research paper, github, etc.), date ranges, and specific domains.
+
+**Usage**: Invoke the skill with `skill: "exa-webfetch"` when up-to-date information is needed.
 
 ## General Usage
 
