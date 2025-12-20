@@ -25,9 +25,23 @@ if [ -n "$MYSQL_HOST" ]; then
         exit 1
     fi
 
+    # Run Flyway repair first to clean up any failed migration records
+    # This is safe to run even if there are no failed migrations
+    echo "Running Flyway repair (cleans up failed migration records)..."
+    flyway \
+        -url="$FLYWAY_URL" \
+        -user="$MYSQL_USER" \
+        -password="$MYSQL_PASSWORD" \
+        -locations="filesystem:/app/sql" \
+        -connectRetries=3 \
+        repair || true
+
     # Run Flyway migrations
     # -baselineOnMigrate=true: For existing databases without flyway_schema_history,
-    #   creates a baseline at version 1 and runs only newer migrations
+    #   creates a baseline and runs only newer migrations
+    # -baselineVersion=9: Skip V1-V9 for existing databases (they already have the schema)
+    #   V1: initial schema, V2: clear failed records, V3-4: categorized columns,
+    #   V5-9: OAuth columns - all already exist in production
     echo "Running Flyway migrations..."
     flyway \
         -url="$FLYWAY_URL" \
@@ -36,6 +50,7 @@ if [ -n "$MYSQL_HOST" ]; then
         -locations="filesystem:/app/sql" \
         -connectRetries=3 \
         -baselineOnMigrate=true \
+        -baselineVersion=9 \
         migrate
 
     echo "Flyway migrations completed successfully"
