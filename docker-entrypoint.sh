@@ -26,6 +26,8 @@ if [ -n "$MYSQL_HOST" ]; then
     fi
 
     # Run Flyway migrations
+    # -baselineOnMigrate=true: For existing databases without flyway_schema_history,
+    #   creates a baseline at version 1 and runs only newer migrations
     echo "Running Flyway migrations..."
     flyway \
         -url="$FLYWAY_URL" \
@@ -33,6 +35,7 @@ if [ -n "$MYSQL_HOST" ]; then
         -password="$MYSQL_PASSWORD" \
         -locations="filesystem:/app/sql" \
         -connectRetries=3 \
+        -baselineOnMigrate=true \
         migrate
 
     echo "Flyway migrations completed successfully"
