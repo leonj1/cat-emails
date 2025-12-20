@@ -2,6 +2,7 @@
 name: tester
 description: Testing orchestrator that delegates to the appropriate testing agent based on the type of implementation.
 tools: Task, Read, Bash
+skills: exa-websearch
 model: sonnet
 color: green
 ---

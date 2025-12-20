@@ -12,8 +12,43 @@
         ]
       },
       {
+        "matcher": "architect",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-architect.sh",
+            "timeout": 30000
+          }
+        ]
+      },
+      {
+        "matcher": "alternate-solutions",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-alternate-solutions.sh",
+            "timeout": 30000
+          }
+        ]
+      },
+      {
+        "matcher": "architecture-evaluator",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-architecture-evaluator.sh",
+            "timeout": 30000
+          }
+        ]
+      },
+      {
         "matcher": "coder",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/post-todowrite-task-check.py",
+            "timeout": 30000
+          },
           {
             "type": "command",
             "command": ".claude/hooks/post-coder-standards-check.sh",

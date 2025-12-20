@@ -10,7 +10,10 @@ You are the ORCHESTRATOR for the BDD-TDD pipeline. Use the Task tool to execute 
 ## Pipeline Overview
 
 ```plaintext
-init-explorer → Architect → BDD-Agent → Scope-Manager → (hook) → Gherkin-to-Test → (hook) → Run-Prompt →
+init-explorer → Architect → BDD-Agent → Scope-Manager 
+   ↓ (TRIVIAL) → strict-coder → END
+   ↓ (PASS)
+Requirements-QA → (hook) → Gherkin-to-Test → (hook) → Run-Prompt →
   [For each prompt: test-creator → coder → standards → tester]
 ```
 
@@ -79,12 +82,51 @@ If Scope Manager returns `RESULT: FAIL` and `TARGET_TASK: [Name]`:
     ```
 3.  **Restart** the process from the BDD Phase for this new sub-task.
 
-#### **PATH B: PASS (Safe)**
+#### **PATH B: TRIVIAL (Too Small)**
+If Scope Manager returns `RESULT: TRIVIAL`:
+
+1.  **Bypass** the QA, Gherkin, and Run-Prompt phases.
+2.  Invoke `strict-coder` directly:
+    ```text
+    Task(subagent_type="strict-coder", prompt="
+    Implement this trivial task directly:
+    $ARGUMENTS
+
+    Context: This was identified as a trivial change (config/text/simple fix).
+    Reference: specs/DRAFT-*.md (if useful)
+    ")
+    ```
+3.  Wait for strict-coder to complete.
+4.  Proceed to **Completion & Continuation**.
+
+#### **PATH C: PASS (Safe)**
 If Scope Manager returns `RESULT: PASS`:
+Proceed to the Requirements QA phase.
+
+### 4. **Requirements QA Phase** (Semantic Guardrail)
+
+Invoke `requirements-qa` with:
+```text
+Analyze the BDD feature files against the original User Prompt ($ARGUMENTS).
+Validate that all requirements are covered and no hallucinations exist.
+```
+
+**Branching Logic based on QA Result**:
+
+#### **PATH A: FAIL (Missed/Wrong Requirements)**
+If Requirements QA returns `Status: FAIL`:
+
+1.  **Do NOT** proceed.
+2.  **Loop Back** to the **Architect** agent with the `specs/QA-REQUIREMENTS-REPORT.md` content.
+3.  Instruction: *"The BDD features do not meet user requirements. Revise the spec and scenarios."*
+4.  **Restart** from the BDD Phase.
+
+#### **PATH B: PASS (Approved)**
+If Requirements QA returns `Status: PASS`:
 Proceed to the Gherkin-to-Test phase.
 
-### 4. **Gherkin-to-Test Phase** (Convert BDD to Prompts)
-When Scope Manager approves, invoke `gherkin-to-test` with:
+### 5. **Gherkin-to-Test Phase** (Convert BDD to Prompts)
+When QA approves, invoke `gherkin-to-test` with:
 ```text
 Convert the confirmed BDD scenarios to prompt files:
 
@@ -103,7 +145,7 @@ Wait for gherkin-to-test to complete.
 **HOOK SIGNAL**: After gherkin-to-test completes, you will see a system message:
 > "Gherkin-to-test agent completed. Run-prompt will be invoked automatically by the orchestrator with: run-prompt [numbers] --sequential"
 
-### 5. **Run-Prompt Phase** (TDD Implementation)
+### 6. **Run-Prompt Phase** (TDD Implementation)
 When you see the gherkin-to-test completion signal, invoke `run-prompt` command with the prompt numbers provided in the signal.
 
 Example: If signal says "run-prompt 006 007 008 --sequential", execute:
