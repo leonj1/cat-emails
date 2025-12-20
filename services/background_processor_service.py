@@ -123,7 +123,36 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
                                 # Record categories in aggregator if enabled
                                 if self.category_aggregator:
                                     try:
-                                        category_counts = result.get("category_counts", {})
+                                        category_actions = result.get("category_counts") or {}
+                                        if not isinstance(category_actions, dict):
+                                            logger.warning(
+                                                "Skipping category aggregation for %s due to unexpected "
+                                                "category_counts type: %s",
+                                                account.email_address,
+                                                type(category_actions),
+                                            )
+                                            category_actions = {}
+
+                                        # Extract totals from category_actions (Dict[str, Dict[str, int]])
+                                        # to category_counts (Dict[str, int]) for the aggregator
+                                        category_counts = {}
+                                        filtered_entries = []
+                                        for cat, stats in category_actions.items():
+                                            if not isinstance(stats, dict):
+                                                filtered_entries.append(f"{cat} (non-dict)")
+                                                continue
+                                            total = stats.get("total", 0)
+                                            if not isinstance(total, int):
+                                                filtered_entries.append(f"{cat} (total={type(total).__name__})")
+                                                continue
+                                            category_counts[cat] = total
+
+                                        if filtered_entries:
+                                            logger.warning(
+                                                "Filtered invalid category entries for %s: %s",
+                                                account.email_address,
+                                                ", ".join(filtered_entries),
+                                            )
                                         if category_counts:
                                             self.category_aggregator.record_batch(
                                                 account.email_address,

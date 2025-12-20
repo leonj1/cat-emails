@@ -6,13 +6,13 @@ endif
 
 # Validate required environment variables
 validate-env:
-	@if [ -z "$(GMAIL_EMAIL)" ] || [ -z "$(GMAIL_PASSWORD)" ] || [ -z "$(CONTROL_API_TOKEN)" ]; then \
+	@if [ -z "$(GMAIL_EMAIL)" ] || [ -z "$(GMAIL_PASSWORD)" ] || [ -z "$(CONTROL_TOKEN)" ]; then \
 		echo "Error: Required environment variables are missing. Please set them in .env file:"; \
-		echo "GMAIL_EMAIL, GMAIL_PASSWORD, and CONTROL_API_TOKEN"; \
+		echo "GMAIL_EMAIL, GMAIL_PASSWORD, and CONTROL_TOKEN"; \
 		exit 1; \
 	fi
 
-.PHONY: build run clean test service-build service-run service-stop service-logs api-build api-run api-stop api-logs summary-morning summary-evening summary-weekly summary-monthly api-health test-llm-integration
+.PHONY: build run clean test service-build service-run service-stop service-logs api-build api-run api-stop api-logs summary-morning summary-evening summary-weekly summary-monthly api-health test-llm-integration test-processing-run-columns-integration
 
 # Docker image name
 IMAGE_NAME = gmail-cleaner
@@ -44,7 +44,7 @@ start: validate-env
 		--name $(SERVICE_IMAGE_NAME) \
 		-e GMAIL_EMAIL="$(GMAIL_EMAIL)" \
 		-e GMAIL_PASSWORD="$(GMAIL_PASSWORD)" \
-		-e CONTROL_API_TOKEN="$(CONTROL_API_TOKEN)" \
+		-e CONTROL_TOKEN="$(CONTROL_TOKEN)" \
 		-e HOURS=$(or $(HOURS),120) \
 		-e SCAN_INTERVAL=$(or $(SCAN_INTERVAL),5) \
 		-e ENABLE_SUMMARIES=$(or $(ENABLE_SUMMARIES),true) \
@@ -258,6 +258,17 @@ test-pending-rollback-integration:
 # Clean up integration test containers
 test-integration-clean:
 	docker compose -f docker-compose.test.yml down -v --remove-orphans
+
+# Run ProcessingRun columns integration test with MySQL (verifies V3 migration)
+test-processing-run-columns-integration:
+	@echo "Starting MySQL container for integration tests..."
+	docker compose -f docker-compose.test.yml up -d mysql-test
+	@echo "Waiting for MySQL to be healthy..."
+	@timeout 60 sh -c 'until docker compose -f docker-compose.test.yml exec -T mysql-test mysqladmin ping -h localhost -u root -prootpassword 2>/dev/null; do sleep 2; done'
+	@echo "Running ProcessingRun columns integration tests (verifies V3 migration)..."
+	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit processing-run-columns-test
+	@echo "Cleaning up..."
+	docker compose -f docker-compose.test.yml down -v
 
 # Run LLM service integration test with RequestYAI
 LLM_TEST_IMAGE_NAME = test-llm-integration

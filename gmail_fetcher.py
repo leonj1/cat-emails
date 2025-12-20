@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import re
 from collections import Counter
 from tabulate import tabulate
+from constants import DEFAULT_REQUESTYAI_BASE_URL
 from domain_service import DomainService, AllowedDomain, BlockedDomain, BlockedCategory
 from services.email_summary_service import EmailSummaryService
 from clients.account_category_client import AccountCategoryClient
@@ -24,7 +25,6 @@ from services.email_categorizer_service import EmailCategorizerService
 from services.llm_service_interface import LLMServiceInterface
 from services.llm_service_factory import LLMServiceFactory
 from services.openai_llm_service import OpenAILLMService
-from services.logs_collector_service import LogsCollectorService
 
 parser = argparse.ArgumentParser(description="Email Fetcher")
 parser.add_argument("--primary-host", default=os.environ.get('OLLAMA_HOST_PRIMARY', '10.1.1.247:11434'),
@@ -54,12 +54,12 @@ if args.base_url:
 
 def _make_llm_service(model: str) -> LLMServiceInterface:
     """Construct an LLM service for RequestYAI (OpenAI-compatible) using env for base_url and api key.
-    Provide full OpenAI-compatible root (may include version), e.g. https://api.requesty.ai/openai/v1
+    Provide full OpenAI-compatible root (may include version), e.g. https://router.requesty.ai/v1
     """
     base_url = (
         os.environ.get("REQUESTYAI_BASE_URL")
         or os.environ.get("REQUESTY_API_URL")
-        or "https://api.requesty.ai/openai/v1"
+        or DEFAULT_REQUESTYAI_BASE_URL
     )
     api_key = (
         os.environ.get("REQUESTYAI_API_KEY")
@@ -609,19 +609,6 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     logger.info("Starting email processing")
     logger.info(f"Processing emails from the last {hours} hours")
 
-    # Read SEND_LOGS feature flag from environment
-    send_logs_raw = os.environ.get("SEND_LOGS", "false").lower().strip()
-    send_logs_enabled = send_logs_raw in ("true", "1", "yes")
-
-    # Initialize logs collector service with explicit flag
-    logs_collector = LogsCollectorService(send_logs=send_logs_enabled)
-    logs_collector.send_log(
-        "INFO",
-        f"Email processing started for {email_address}",
-        {"hours": hours},
-        "gmail-fetcher"
-    )
-
     # Test API connection first
     logger.info("Testing API connection")
     api_connected = test_api_connection(api_token)
@@ -629,12 +616,6 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
     # Terminate if API connection failed
     if not api_connected:
         logger.error("Cannot connect to control API. Terminating service.")
-        logs_collector.send_log(
-            "ERROR",
-            "Failed to connect to control API - terminating",
-            {"email": email_address},
-            "gmail-fetcher"
-        )
         raise SystemExit(1)
 
     # Initialize and use the fetcher
@@ -742,28 +723,8 @@ def main(email_address: str, app_password: str, api_token: str,hours: int = 2):
         # Complete processing run in database
         fetcher.summary_service.complete_processing_run(success=True)
 
-        # Send completion log
-        logs_collector.send_log(
-            "INFO",
-            f"Email processing completed successfully for {email_address}",
-            {
-                "processed": fetcher.stats['deleted'] + fetcher.stats['kept'],
-                "deleted": fetcher.stats['deleted'],
-                "kept": fetcher.stats['kept']
-            },
-            "gmail-fetcher"
-        )
-
     except Exception as e:
         logger.error(f"Error during email processing: {str(e)}")
-
-        # Send error log
-        logs_collector.send_log(
-            "ERROR",
-            f"Email processing failed for {email_address}: {str(e)}",
-            {"error": str(e), "email": email_address},
-            "gmail-fetcher"
-        )
 
         # Complete processing run with error
         fetcher.summary_service.complete_processing_run(success=False, error_message=str(e))
@@ -775,12 +736,12 @@ if __name__ == "__main__":
     # Get credentials from environment variables
     email_address = os.getenv("GMAIL_EMAIL")
     app_password = os.getenv("GMAIL_PASSWORD")
-    api_token = os.getenv("CONTROL_API_TOKEN")
+    api_token = os.getenv("CONTROL_TOKEN")
 
     if not email_address or not app_password:
         raise ValueError("Please set GMAIL_EMAIL and GMAIL_PASSWORD environment variables")
 
     if not api_token:
-        raise ValueError("Please set CONTROL_API_TOKEN environment variable")
+        raise ValueError("Please set CONTROL_TOKEN environment variable")
 
     main(email_address, app_password, api_token, args.hours)

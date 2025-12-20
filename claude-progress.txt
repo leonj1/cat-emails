@@ -180,9 +180,9 @@ Implementation Summary:
 Following the CRASH-RCA diagnosis, implemented the fix to ensure DATABASE_PATH is available to all services.
 
 Changes Applied:
-1. ✅ Dockerfile.service - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 37
-2. ✅ Dockerfile - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 27
-3. ✅ docker-compose.yml - Added DATABASE_PATH=/app/email_summaries/summaries.db to api service environment at line 43
+1. Dockerfile.service - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 37
+2. Dockerfile - Added ENV DATABASE_PATH="/app/email_summaries/summaries.db" at line 27
+3. docker-compose.yml - Added DATABASE_PATH=/app/email_summaries/summaries.db to api service environment at line 43
 
 Rationale:
 - Dockerfile.api already had DATABASE_PATH set (line 37)
@@ -211,4 +211,942 @@ Next: Commit changes and update PR
 Features: 0/1 complete
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
+
+=== Session 20251201-050450 ===
+Workflow: architect
+Task: Remove all references in the code that would invoke the remote logs collector. The logs collector at https://logs-collector-production.up.railway.app/logs is returning 404 errors and needs to be removed from the codebase.
+Status: Initialized
+Context: Explored project structure, identified logs collector architecture
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker
+
+Logs Collector Architecture Analysis:
+
+1. Core Service Files (to be removed/modified):
+   - /root/repo/services/logs_collector_service.py - Main LogsCollectorService class with HTTP client, DNS caching, retry logic
+   - /root/repo/services/logs_collector_interface.py - ILogsCollector interface
+   - /root/repo/clients/logs_collector_client.py - RemoteLogsCollectorClient, FakeLogsCollectorClient, LogEntry models
+   - /root/repo/services/logging_service.py - CentralLoggingService (uses LogsCollectorClient)
+   - /root/repo/services/logging_factory.py - Factory creating RemoteLogsCollectorClient
+
+2. Integration Points:
+   - /root/repo/api_service.py:32 - imports LogsCollectorService
+   - /root/repo/api_service.py:292 - creates LogsCollectorService instance
+   - /root/repo/api_service.py:367 - passes logs_collector to other services
+   - /root/repo/gmail_fetcher.py:27 - imports LogsCollectorService
+   - /root/repo/gmail_fetcher.py:617-761 - multiple send_log() calls
+
+3. Feature Flag System:
+   - /root/repo/models/feature_flags.py - FeatureFlags.send_logs
+   - SEND_LOGS env var controls remote logging (default: False)
+   - Already exists as a kill switch for remote logging
+
+4. Test Files (52 files reference logs collector):
+   - /root/repo/tests/test_logs_collector_*.py (4 files)
+   - /root/repo/test_logs_collector_service.py
+   - /root/repo/test_centralized_logging.py
+   - /root/repo/test_logging_compliance*.py
+   - Plus 40+ integration tests
+
+5. Documentation Files:
+   - /root/repo/services/LOGGING_SERVICE_README.md
+   - /root/repo/docs/LOGGING_SERVICE_*.md
+   - /root/repo/examples/logging_service_example.py
+   - /root/repo/specs/DRAFT-*.md (related specs)
+
+6. Environment Configuration:
+   - /root/repo/.env.example - LOGS_COLLECTOR_API, LOGS_COLLECTOR_TOKEN vars
+
+Features: 1/1 complete (FEAT-001 in feature_list.md)
+
+Next: Invoking architect agent to create spec for logs collector removal
+---
+
+=== Session 20251202-054031 ===
+Workflow: debugger
+Task: API token is required but not provided - error occurring during Gmail authentication flow, causing domain data load failure
+Status: Complete
+Context: CRASH-RCA forensic analysis completed - root cause identified and documented
+
+Error Message from Logs:
+```
+2025-12-02 05:24:19,030 - services.gmail_fetcher_service - INFO - Account registered for category tracking: leonj1@gmail.com
+Response: API token is required but not provided
+Error: Failed to load domain data. Details: API token is required but not provided
+```
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker
+
+Key Files Identified:
+
+1. /root/repo/domain_service.py (line 59) - SOURCE of exact error message
+   - DomainService._fetch() raises ValueError("API token is required but not provided")
+   - The check happens at line 58-59: if not self.api_token: raise ValueError(...)
+   - DomainService.__init__ signature: def __init__(self, base_url: str = ..., api_token: str | None = None)
+   - mock_mode is derived from api_token: self.mock_mode = api_token is None (line 25)
+
+2. /root/repo/services/gmail_fetcher_service.py (lines 53, 77-109)
+   - Line 53: Creates DomainService with api_token parameter
+   - Line 66: Logs "Account registered for category tracking" (matches log output)
+   - Lines 77-109: _load_domain_data() calls domain_service.fetch_* methods
+   - Line 94: Prints "Response: " + error_msg
+   - Line 105: Prints "Error: Failed to load domain data. Details: {error_msg}"
+
+3. /root/repo/api_service.py
+   - Line 181: CONTROL_API_TOKEN = os.getenv("CONTROL_API_TOKEN", "")
+   - Line 357: AccountEmailProcessorService created with api_token=CONTROL_API_TOKEN
+   - Lines 387-394: BlockingRecommendationService uses DomainService with mock_mode parameter
+     BUT api_service.py:389-391 passes mock_mode to DomainService which does NOT accept this parameter!
+
+Initial Analysis - TWO POTENTIAL ISSUES:
+
+1. CONTROL_API_TOKEN Environment Variable:
+   - api_service.py:181 defaults to empty string "" if not set
+   - Empty string is truthy in Python but fails the "not self.api_token" check differently
+   - When CONTROL_API_TOKEN="" (empty), it's passed as api_token=""
+   - In DomainService: self.mock_mode = api_token is None -> False (empty string is not None)
+   - So mock_mode is False, but api_token is empty string, so line 58 check fails
+
+2. Parameter Mismatch in api_service.py:389-391:
+   - Code passes mock_mode=use_mock to DomainService
+   - BUT DomainService.__init__ does NOT accept mock_mode parameter
+   - This would raise TypeError on initialization (but may not be the current issue)
+
+Call Chain Leading to Error:
+1. Account processing starts -> AccountEmailProcessorService.process_account()
+2. Creates GmailFetcher with api_token from CONTROL_API_TOKEN
+3. GmailFetcher.__init__ creates DomainService(api_token=api_token) at line 53
+4. GmailFetcher.__init__ calls _load_domain_data() at line 75
+5. _load_domain_data() calls domain_service.fetch_allowed_domains()
+6. DomainService._fetch() checks if api_token is empty/None -> raises ValueError
+
+Root Cause Confirmed (CRASH-RCA Session #20251202-054242):
+DomainService has inconsistent truthiness check at domain_service.py:
+- Line 25: mock_mode = api_token is None (evaluates to False for empty string "")
+- Line 58: if not self.api_token: (evaluates to True for empty string "")
+
+When CONTROL_API_TOKEN="" (default from api_service.py:181):
+1. Empty string flows through AccountEmailProcessorService -> GmailFetcher -> DomainService
+2. mock_mode = False (because "" is not None)
+3. Validation check fails (because not "" evaluates to True)
+4. ValueError raised instead of using mock mode
+
+Fix Options:
+- Option 1 (Preferred): Change domain_service.py:25 to `self.mock_mode = not api_token`
+- Option 2: Change api_service.py:357 to `api_token=CONTROL_API_TOKEN or None`
+
+Evidence: domain_service.py:25,58; api_service.py:181,357,388-390
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Implementation proceeding per PR #83 (fix domain_service.py mock_mode logic)
+---
+
+=== Session 20251204-222218 ===
+Workflow: debugger
+Task: LLM categorization failing with 405 error - background process getting "Error code: 405" when talking to LLM
+Status: Initialized
+Context: Explored project structure and identified LLM service architecture
+
+Error Message:
+```
+Error: leonj1@gmail.com
+State: ERROR
+Step: Processing failed: LLM categorization failed: UnknownError - {'error': 'ProviderError', 'detail': 'Error code: 405'}
+```
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, OpenAI SDK, pytest, Docker
+
+Key Files Identified:
+
+1. /root/repo/services/categorize_emails_llm.py (lines 199-201) - ERROR ORIGIN
+   - Line 199-201: except block catches all exceptions and returns CategoryError
+   - Returns: CategoryError(error="ProviderError", detail=str(e))
+   - This is where "ProviderError" and "Error code: 405" originates
+
+2. /root/repo/services/email_categorizer_service.py (line 47) - ERROR WRAPPER
+   - Line 47: raises RuntimeError(f"LLM categorization failed: {error_type} - {error_detail}")
+   - This creates the "LLM categorization failed: UnknownError - ..." message
+
+3. /root/repo/services/openai_llm_service.py (line 169) - API CALL
+   - Line 169: self.client.beta.chat.completions.parse() - structured output API
+   - Uses OpenAI SDK's beta endpoint for structured outputs
+
+4. /root/repo/services/llm_service_factory.py (lines 21-25) - URL CONFIGURATION
+   - Line 21-24: base_url defaults to "https://requestyai.com/v1"
+   - This URL is WRONG - not a valid RequestYAI endpoint
+
+CRITICAL FINDING - Inconsistent Base URLs:
+- llm_service_factory.py:24 -> "https://requestyai.com/v1" (DEFAULT - WRONG)
+- tests/test_openai_llm_service_integration.py:27 -> "https://router.requesty.ai/v1" (CORRECT)
+- api_service.py:798 -> "https://api.requesty.ai/openai/v1" (ALSO USED)
+- gmail_fetcher.py:61 -> "https://api.requesty.ai/openai/v1" (ALSO USED)
+- .env.example:16 -> "https://api.requesty.ai/openai/v1" (DOCUMENTED)
+
+HTTP 405 "Method Not Allowed" Analysis:
+- The OpenAI SDK is calling the beta.chat.completions.parse endpoint
+- This uses POST method to /chat/completions with structured output
+- A 405 error means the server doesn't support the HTTP method at that URL
+- "https://requestyai.com/v1" likely does not exist or returns 405 for all requests
+
+Call Chain:
+1. EmailCategorizerService.categorize() creates LLMServiceFactory
+2. LLMServiceFactory.create_service() uses default "https://requestyai.com/v1" if env var not set
+3. OpenAILLMService.call_structured() calls client.beta.chat.completions.parse()
+4. Request goes to https://requestyai.com/v1/chat/completions
+5. Server returns HTTP 405 (likely invalid endpoint or domain)
+
+Likely Root Cause:
+- REQUESTYAI_BASE_URL environment variable is NOT set in the background process
+- LLMServiceFactory falls back to hardcoded "https://requestyai.com/v1"
+- This URL is invalid/misconfigured (should be router.requesty.ai or api.requesty.ai)
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
+
+=== Session 20251204-235315 ===
+Workflow: architect
+Task: Add email processing audit entry that includes the number of emails reviewed, how many were tagged, and how many were deleted. Current audit entry only shows: email address, state, start/end time, duration, progress, and step. Need to add: emails_reviewed count, emails_tagged count, emails_deleted count
+Status: Initialized
+Context: Explored project structure, identified audit entry architecture
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker
+
+Current Audit System Analysis:
+
+1. ProcessingRun Model (/root/repo/models/database.py lines 204-225):
+   Current fields:
+   - id (Integer, primary key)
+   - email_address (Text, not null)
+   - start_time (DateTime, not null)
+   - end_time (DateTime, nullable)
+   - state (Text, not null) - current processing state
+   - current_step (Text, nullable) - description of current step
+   - emails_found (Integer, default=0)
+   - emails_processed (Integer, default=0)
+   - error_message (Text, nullable)
+   - created_at, updated_at (DateTime)
+
+   Missing fields (requested):
+   - emails_reviewed (count of emails reviewed)
+   - emails_tagged (count of emails that received labels)
+   - emails_deleted (count of emails deleted)
+
+2. ProcessingStatusManager (/root/repo/services/processing_status_manager.py):
+   - AccountStatus dataclass tracks in-memory processing state
+   - complete_processing() creates archived run record
+   - archived_run dict captures: email_address, start_time, end_time, duration_seconds, final_state, final_step, error_message, final_progress
+   - Does NOT currently track tagged/deleted counts
+
+3. Related Models:
+   - EmailSummary (database.py:53-82) HAS: total_emails_processed, total_emails_deleted, total_emails_archived
+   - CategorySummary (database.py:85-101) HAS: email_count, deleted_count, archived_count
+   - These exist but are NOT connected to ProcessingRun
+
+4. Migration System:
+   - migrations/002_modify_processing_runs.py - previous migration for ProcessingRun table
+   - New migration will be needed: migrations/003_add_audit_counts.py
+
+Key Implementation Points:
+- ProcessingRun table needs 3 new columns
+- ProcessingStatusManager must track these counts in-memory
+- email_scanner_consumer.py or gmail_fetcher.py should report counts on completion
+- API endpoints need to return these new fields
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for email processing audit enhancement
+---
+
+=== Session 20251205-020300 ===
+Workflow: debugger
+Task: MySQL runtime error: Unknown column 'emails_reviewed' in 'field list' when inserting into processing_runs table
+Status: Initialized
+Context: Explored project structure, identified root cause as migration not applied to production database
+
+Error Message:
+```
+(pymysql.err.OperationalError) (1054, "Unknown column 'emails_reviewed' in 'field list'")
+[SQL: INSERT INTO processing_runs (email_address, start_time, end_time, state, current_step, emails_found, emails_processed, error_message, created_at, updated_at, emails_reviewed, emails_tagged, emails_deleted) VALUES ...]
+```
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL, pytest, Docker
+
+Key Files Identified:
+
+1. /root/repo/models/database.py (lines 204-230) - ProcessingRun Model
+   - Model has audit columns defined:
+     - emails_reviewed = Column(Integer, default=0, nullable=False)
+     - emails_tagged = Column(Integer, default=0, nullable=False)
+     - emails_deleted = Column(Integer, default=0, nullable=False)
+   - These columns were added as part of the "Email Processing Audit Counts" feature
+
+2. /root/repo/migrations/005_add_audit_count_columns.py - Migration Script
+   - Migration exists to add these 3 columns to processing_runs table
+   - Uses ALTER TABLE to add emails_reviewed, emails_tagged, emails_deleted
+   - Includes backfill for existing records
+
+3. architects_digest.md shows all 4 phases of audit counts feature are marked "Completed":
+   - 1.1 Add Database Columns and Migration (Completed)
+   - 1.2 Add AccountStatus Tracking and Increment Methods (Completed)
+   - 1.3 Update API Responses to Expose New Fields (Completed)
+   - 1.4 Add Concurrency Safety and Edge Cases (Completed)
+
+Initial Analysis:
+- The SQLAlchemy model was updated with new columns (model layer)
+- The Python migration script was created (migration layer)
+- BUT the migration was NOT run against the production MySQL database
+- The code tries to INSERT with all columns, but MySQL table lacks 3 columns
+
+Related Previous Session (20251204-235315):
+- This was the architect session that designed the audit counts feature
+- The implementation was completed in code, but migration not deployed
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
+
+=== Session 20251205-022949 ===
+Workflow: debugger
+Task: Processing failed: (pymysql.err.OperationalError) (1054, "Unknown column 'emails_reviewed' in 'field list'") - INSERT INTO processing_runs is missing columns emails_reviewed, emails_tagged, emails_deleted
+Status: Initialized
+Context: Explored project structure, identified same issue as previous session (20251205-020300)
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL, pytest, Docker
+
+Key Files Identified:
+
+1. /root/repo/models/database.py (lines 204-230) - ProcessingRun Model
+   - emails_reviewed = Column(Integer, default=0, nullable=False)
+   - emails_tagged = Column(Integer, default=0, nullable=False)
+   - emails_deleted = Column(Integer, default=0, nullable=False)
+   - Model layer has the columns defined
+
+2. /root/repo/migrations/005_add_audit_count_columns.py - Migration Script
+   - Adds 3 new columns via ALTER TABLE
+   - Includes column existence checks and backfill logic
+   - Migration script EXISTS but was NOT executed on production database
+
+3. /root/repo/architects_digest.md - All phases marked "Completed"
+   - Implementation is complete in code
+   - Migration deployment is missing
+
+Branch Context:
+- Current branch: terragon/fix-mysql-runtime-error-i8i54u
+- Previous related PR: #88 (merged) - terragon/fix-mysql-runtime-error-m2r03i
+- This appears to be a continuation of the same issue
+
+Root Cause (from previous session):
+- SQLAlchemy model defines columns that don't exist in MySQL
+- INSERT statement includes all model columns
+- MySQL rejects INSERT because columns are missing from table schema
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
+
+=== Session 20251205-052500 ===
+Workflow: architect
+Task: Generate Mermaid Gantt chart text for email categorization runs
+Status: Initialized
+Context: Explored project structure and identified audit/historical data architecture
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for API service
+- Database: SQLAlchemy with MySQL/SQLite support
+- Testing: pytest with BDD (Gherkin feature files)
+- Visualization: matplotlib/seaborn (existing chart_generator.py), Mermaid (new)
+- Build: Docker, Makefile
+
+Task Description:
+The system has a background process that categorizes emails from Gmail accounts. Create a
+feature that generates Gantt chart text (using Mermaid syntax) for each run per account.
+The Gantt chart text should be included in the historical audit response for the UI to
+render independently.
+
+Key Files Identified for Audit/Historical Data:
+
+1. ProcessingRun Model (/root/repo/models/database.py lines 204-230):
+   - Tracks email processing sessions per account
+   - Fields: id, email_address, start_time, end_time, state, current_step
+   - Fields: emails_found, emails_processed, error_message
+   - Audit fields: emails_reviewed, emails_tagged, emails_deleted
+   - Has indexes: email_address, start_time, (email_address, start_time), state
+
+2. ProcessingStatusManager (/root/repo/services/processing_status_manager.py):
+   - In-memory tracking of processing state
+   - AccountStatus dataclass: email_address, state, current_step, progress, start_time, last_updated
+   - Audit fields: emails_reviewed, emails_tagged, emails_deleted
+   - get_recent_runs(limit): Returns list of archived run dictionaries
+   - archived_run dict includes: start_time, end_time, duration_seconds, final_state, final_step
+
+3. DatabaseService (/root/repo/services/database_service.py):
+   - get_processing_runs(limit): Queries ProcessingRun table
+   - Returns: run_id, started_at, completed_at, duration_seconds, emails_processed, emails_reviewed, emails_tagged, emails_deleted, success, error_message
+
+4. API Endpoints (/root/repo/api_service.py):
+   - GET /api/processing/history - Returns recent_runs from ProcessingStatusManager
+   - GET /api/status - Unified status with optional include_recent parameter
+   - WebSocket /ws/status - Real-time updates including get_recent_runs
+
+5. Frontend Display (/root/repo/frontend/static/js/dashboard.js):
+   - refreshProcessingRuns() - Fetches from /api/stats/processing-runs
+   - createProcessingRunRow(run) - Renders run_id, started_at, duration, emails_processed, emails_deleted, status
+
+6. Existing Chart Generator (/root/repo/services/chart_generator.py):
+   - Uses matplotlib/seaborn for visualizations
+   - Generates base64 PNG images
+   - Pattern to follow: generate_*_chart() methods
+
+Mermaid Gantt Requirements:
+- Reference: https://docs.mermaidchart.com/mermaid-oss/syntax/gantt.html
+- Generate text-based Gantt syntax for UI rendering
+- Chart should show processing steps/phases over time
+- Include: section per account, tasks for each processing phase
+- Time axis should show actual timestamps
+
+Implementation Approach:
+1. Create GanttChartGenerator service to generate Mermaid syntax
+2. Add gantt_chart_text field to audit response
+3. Modify get_processing_runs to include gantt chart text per run
+4. Frontend can render Mermaid using mermaid.js library
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for Mermaid Gantt chart generation
+---
+
+=== Session 20251205-231234 ===
+Workflow: debugger
+Task: Failed to record categories for leonj1@gmail.com: unsupported operand type(s) for +: 'int' and 'dict'
+Status: Initialized
+Context: Explored project structure and identified category aggregation data type mismatch
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker
+
+Error Origin Analysis:
+
+1. Error Location - /root/repo/services/background_processor_service.py (line 139):
+   - Error message: "Failed to record categories for {account.email_address}: {e}"
+   - Error occurs in try/except block at lines 137-140
+   - The record_batch() call at line 128-131 is failing
+
+2. Call Chain:
+   - background_processor_service.py:126 -> category_counts = result.get("category_counts", {})
+   - background_processor_service.py:128-131 -> self.category_aggregator.record_batch(account.email_address, category_counts, datetime.now())
+   - category_aggregator_service.py:117-118 -> for category, count in category_counts.items(): self._buffer[key][category] = self._buffer[key].get(category, 0) + count
+
+3. Type Mismatch Identified:
+   - CategoryAggregator.record_batch() expects: Dict[str, int] (category_name -> count)
+   - But account_email_processor_service.py:350 passes: category_actions (Dict[str, Dict[str, int]])
+
+4. Data Structure Evidence:
+   - /root/repo/services/email_processor_service.py (line 47):
+     self.category_actions: Dict[str, Dict[str, int]] = {}
+
+   - /root/repo/services/email_processor_service.py (lines 236-245):
+     self.category_actions[category] = {"total": 0, "deleted": 0, "kept": 0, "archived": 0}
+     self.category_actions[category]["total"] += 1
+     ... etc.
+
+   - /root/repo/services/account_email_processor_service.py (line 350):
+     "category_counts": category_actions  # <-- This is Dict[str, Dict[str, int]]
+
+5. Root Cause:
+   The error "unsupported operand type(s) for +: 'int' and 'dict'" occurs at:
+   - category_aggregator_service.py:118: self._buffer[key].get(category, 0) + count
+   - Where `count` is a dict {"total": N, "deleted": N, "kept": N, "archived": N}
+   - But should be an int
+
+   account_email_processor_service.py passes `category_actions` as `category_counts`,
+   but category_actions is Dict[str, Dict[str, int]], not Dict[str, int].
+
+6. Key Files:
+   - /root/repo/services/email_processor_service.py:47,236-245 - category_actions structure
+   - /root/repo/services/account_email_processor_service.py:350 - passes wrong structure
+   - /root/repo/services/category_aggregator_service.py:95,117-118 - expects Dict[str, int]
+   - /root/repo/services/background_processor_service.py:126-140 - error handling location
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
+
+=== Session 20251206-024124 ===
+Workflow: architect
+Task: Enhance the audit records to include email, start time, end time, duration, step, error, total emails scanned, total emails categorized, total emails deleted, total emails skipped. The project has a background process that categorizes emails in gmail accounts and tracks status in history or audit table.
+Status: Initialized
+Context: Explored project structure, identified current audit system architecture
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for API service
+- Database: SQLAlchemy with MySQL/SQLite support (Flyway for SQL migrations in sql/ folder)
+- Testing: pytest with BDD (Gherkin feature files)
+- Build: Docker, Makefile
+
+Current Audit System Analysis:
+
+1. ProcessingRun Model (/root/repo/models/database.py lines 204-230):
+   EXISTING fields:
+   - id (Integer, primary key)
+   - email_address (Text, not null)
+   - start_time (DateTime, not null)
+   - end_time (DateTime, nullable)
+   - state (Text, not null) - current processing state
+   - current_step (Text, nullable) - description of current step
+   - emails_found (Integer, default=0)
+   - emails_processed (Integer, default=0)
+   - error_message (Text, nullable)
+   - created_at, updated_at (DateTime)
+   - emails_reviewed (Integer, default=0) - ALREADY EXISTS
+   - emails_tagged (Integer, default=0) - ALREADY EXISTS
+   - emails_deleted (Integer, default=0) - ALREADY EXISTS
+
+2. ProcessingStatusManager (/root/repo/services/processing_status_manager.py):
+   - AccountStatus dataclass tracks in-memory processing state
+   - Fields: email_address, state, current_step, progress, start_time, last_updated, error_message
+   - Audit fields: emails_reviewed, emails_tagged, emails_deleted (ALREADY EXISTS)
+   - Increment methods: increment_reviewed(), increment_tagged(), increment_deleted() (ALREADY EXISTS)
+   - get_recent_runs() returns: email_address, start_time, end_time, duration_seconds,
+     final_state, final_step, error_message, emails_reviewed, emails_tagged, emails_deleted,
+     state_transitions, gantt_chart_text
+
+3. Background Processor (/root/repo/services/background_processor_service.py):
+   - Processes Gmail accounts on schedule
+   - Calls process_account_callback for each account
+   - Records category counts via category_aggregator
+
+4. Database Migrations:
+   - SQL migrations in /root/repo/sql/ (Flyway - V1, V2)
+   - Python migrations in /root/repo/migrations/ (001-005)
+   - V1__initial_schema.sql already has: emails_reviewed, emails_tagged, emails_deleted columns
+
+REQUESTED FIELDS vs CURRENT STATE:
+| Requested Field | Current Status | Notes |
+|-----------------|----------------|-------|
+| email | EXISTS as email_address | Already tracked |
+| start time | EXISTS as start_time | Already tracked |
+| end time | EXISTS as end_time | Already tracked |
+| duration | CALCULATED | duration_seconds in get_recent_runs() |
+| step | EXISTS as current_step | Already tracked |
+| error | EXISTS as error_message | Already tracked |
+| total emails scanned | PARTIAL as emails_found | May need renaming for clarity |
+| total emails categorized | MISSING | Need to add emails_categorized column |
+| total emails deleted | EXISTS as emails_deleted | Already tracked |
+| total emails skipped | MISSING | Need to add emails_skipped column |
+
+MISSING FIELDS TO ADD:
+1. emails_categorized (Integer, default=0) - Count of successfully categorized emails
+2. emails_skipped (Integer, default=0) - Count of emails skipped during processing
+
+These need to be added to:
+- ProcessingRun model (models/database.py)
+- AccountStatus dataclass (services/processing_status_manager.py)
+- Flyway migration (sql/V3__add_skipped_categorized_columns.sql)
+- Python migration (migrations/006_add_skipped_categorized_columns.py)
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for audit enhancement
+---
+
+=== Session 20251206-035949 ===
+Workflow: architect
+Task: Implement sub-task 1.2: Add increment_categorized() and increment_skipped() methods to ProcessingStatusManager
+Status: Initialized
+Context: Continuation of audit records enhancement - Sub-task 1.1 is COMPLETE
+
+Branch: terragon/enhance-audit-records-uep3xb
+Previous Work: Sub-task 1.1 (Core Fields) completed - 37 tests passing
+
+Current State Summary:
+- emails_categorized and emails_skipped columns EXIST in ProcessingRun model (models/database.py:224-225)
+- emails_categorized and emails_skipped fields EXIST in AccountStatus dataclass (processing_status_manager.py:72-73)
+- Flyway migration sql/V3__add_categorized_skipped_columns.sql EXISTS
+- Fields are included in archived_run dict (processing_status_manager.py:243-244)
+
+MISSING (Sub-task 1.2 scope):
+- increment_categorized() method in ProcessingStatusManager
+- increment_skipped() method in ProcessingStatusManager
+
+Pattern to Follow (from existing increment methods at lines 263-315):
+```python
+def increment_reviewed(self, count: int = 1) -> None:
+    """
+    Increment the count of emails reviewed during processing.
+
+    Args:
+        count: Number of emails to add to the reviewed count (default: 1)
+
+    Note:
+        This is a no-op if no processing session is active.
+        Thread-safe operation using internal lock.
+    """
+    with self._lock:
+        if not self._current_status:
+            # Silently ignore if no active session
+            return
+
+        self._current_status.emails_reviewed += count
+```
+
+Test Pattern (from tests/test_processing_status_manager_audit_counts.py):
+- test_processing_status_manager_has_increment_X_method - Method existence
+- test_increment_X_by_one - Default increment
+- test_increment_X_by_multiple - Batch increment with count parameter
+- test_multiple_increments_accumulate_X - Accumulation
+- test_increment_X_without_session_does_not_raise - No-op behavior
+
+Key Files:
+- /root/repo/services/processing_status_manager.py - Add methods here
+- /root/repo/tests/test_processing_status_manager_audit_counts.py - Test patterns
+- /root/repo/models/database.py - ProcessingRun model (fields exist)
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker, threading.RLock
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for increment methods
+---
+
+=== Session 20251206-043149 ===
+Workflow: architect
+Task: Implement sub-task 1.3: Edge Cases - Zero and Empty Handling for emails_categorized and emails_skipped audit fields
+Status: Initialized
+Context: Continuation of audit records enhancement - Sub-tasks 1.1 and 1.2 are COMPLETE
+
+Branch: terragon/enhance-audit-records-uep3xb
+Previous Work:
+- Sub-task 1.1 (Core Fields) completed - 37 tests passing
+- Sub-task 1.2 (Increment Methods) completed - 20 tests passing
+
+Current State Summary:
+- emails_categorized and emails_skipped columns EXIST in ProcessingRun model (models/database.py:224-225)
+- emails_categorized and emails_skipped fields EXIST in AccountStatus dataclass (processing_status_manager.py:72-73)
+- increment_categorized() and increment_skipped() methods EXIST (processing_status_manager.py:317-351)
+- Flyway migration sql/V3__add_categorized_skipped_columns.sql EXISTS
+- Fields are included in archived_run dict (processing_status_manager.py:243-244)
+
+Sub-task 1.3 Scope (Edge Cases):
+- Zero counts in completed runs
+- Empty batch processing
+- Field initialization verification
+- Archived run includes new fields
+
+Key Files:
+- /root/repo/services/processing_status_manager.py - Implementation (317-351 has increment methods)
+- /root/repo/tests/test_increment_categorized_skipped.py - Existing tests for increment behavior
+- /root/repo/tests/test_processing_status_manager_core_audit_counts.py - Core field tests
+- /root/repo/models/database.py - ProcessingRun model (224-225)
+
+Active Task from architects_digest.md:
+1.3 Edge Cases - Zero and Empty Handling (Pending)
+    - Zero counts in completed runs
+    - Empty batch processing
+    - Field initialization verification
+    - Archived run includes new fields
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker, threading.RLock
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for edge case handling
+---
+
+=== Session 20251206-045100 ===
+Workflow: architect
+Task: Implement sub-task 1.5: Data Integrity and Persistence for emails_categorized and emails_skipped audit fields
+Status: Initialized
+Context: Continuation of audit records enhancement - Sub-tasks 1.1, 1.2, 1.3, 1.4 are COMPLETE
+
+Branch: terragon/enhance-audit-records-uep3xb
+
+Previous Work Summary:
+- Sub-task 1.1 (Core Fields) completed - 37 tests passing
+- Sub-task 1.2 (Increment Methods) completed - 20 tests passing
+- Sub-task 1.3 (Edge Cases - Zero and Empty Handling) completed - 10 tests passing
+- Sub-task 1.4 (No Active Session) completed - covered by 1.2 tests
+
+Current State Summary:
+- emails_categorized and emails_skipped columns EXIST in ProcessingRun model (models/database.py:224-225)
+- emails_categorized and emails_skipped fields EXIST in AccountStatus dataclass (processing_status_manager.py:72-73)
+- increment_categorized() and increment_skipped() methods EXIST (processing_status_manager.py:317-351)
+- Flyway migration sql/V3__add_categorized_skipped_columns.sql EXISTS
+- Edge case tests passing (tests/test_edge_cases_zero_empty_handling.py)
+
+Sub-task 1.5 Scope (Data Integrity and Persistence):
+- Verify counts persist to database (ProcessingRun table)
+- Verify accuracy after multiple increments across sessions
+- Migration idempotency verification
+- Python migration for older SQLite databases (migrations/006_add_categorized_skipped_columns.py)
+
+Key Files:
+- /root/repo/models/database.py - ProcessingRun model (columns at 224-225)
+- /root/repo/services/processing_status_manager.py - Status manager with increment methods
+- /root/repo/sql/V3__add_categorized_skipped_columns.sql - Flyway migration (exists)
+- /root/repo/migrations/005_add_audit_count_columns.py - Pattern for Python migrations
+- /root/repo/tests/test_increment_categorized_skipped.py - Existing tests
+- /root/repo/tests/test_edge_cases_zero_empty_handling.py - Edge case tests
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL/SQLite, pytest, Docker, Flyway
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking architect agent to create spec for data integrity and persistence
+---
+
+=== Session 20251206-154734 ===
+Workflow: debugger
+Task: Processing failed: (pymysql.err.OperationalError) (1054, "Unknown column 'emails_categorized' in 'field list'") - The database INSERT is trying to use columns emails_categorized and emails_skipped that don't exist in the processing_runs table
+Status: Initialized
+Context: Explored project structure, identified similar pattern to previous MySQL migration issues
+
+Error Message:
+```
+(pymysql.err.OperationalError) (1054, "Unknown column 'emails_categorized' in 'field list'")
+```
+
+Tech Stack: Python 3.12, FastAPI, SQLAlchemy, MySQL, pytest, Docker, Flyway
+
+Branch: terragon/debugger-slash-command-integration-tests-szh2gs
+
+Key Files Identified:
+
+1. /root/repo/models/database.py (lines 204-232) - ProcessingRun Model
+   - Model has columns defined (lines 224-225):
+     - emails_categorized = Column(Integer, default=0, nullable=False)
+     - emails_skipped = Column(Integer, default=0, nullable=False)
+   - Model layer is COMPLETE
+
+2. /root/repo/sql/V3__add_categorized_skipped_columns.sql - Flyway Migration (EXISTS)
+   - ALTER TABLE processing_runs ADD COLUMN emails_categorized INTEGER NOT NULL DEFAULT 0;
+   - ALTER TABLE processing_runs ADD COLUMN emails_skipped INTEGER NOT NULL DEFAULT 0;
+   - Migration file EXISTS in codebase
+
+3. /root/repo/sql/V1__initial_schema.sql - Initial Schema
+   - processing_runs table definition (lines 129-148)
+   - Does NOT include emails_categorized or emails_skipped
+   - Only includes: emails_reviewed, emails_tagged, emails_deleted (lines 141-143)
+
+4. architects_digest.md - All sub-tasks 1.1-1.7 are marked "Completed"
+   - 1.1 Core Fields - Database Model and Basic Field Existence (Completed)
+   - 1.2 Increment Methods (Completed)
+   - 1.3 Edge Cases (Completed)
+   - 1.4-1.7 all marked Completed
+
+Initial Analysis (Same Pattern as Session 20251205-020300):
+- SQLAlchemy model defines columns that don't exist in production MySQL database
+- Flyway migration V3 file EXISTS but was NOT applied to production database
+- Code tries to INSERT with all model columns
+- MySQL rejects INSERT because columns are missing from table schema
+
+Root Cause Pattern:
+- This is the THIRD occurrence of the same migration deployment issue
+- Session 20251205-020300: emails_reviewed, emails_tagged, emails_deleted
+- Session 20251205-022949: Same columns (continuation)
+- Session 20251206-154734 (current): emails_categorized, emails_skipped
+
+Migration Files Status:
+- V1__initial_schema.sql - Has base processing_runs table
+- V2__clear_failed_flyway_records.sql - Cleanup migration
+- V3__add_categorized_skipped_columns.sql - EXISTS but NOT applied to production
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
+
+=== Session 20251206-162917 ===
+Workflow: exploration
+Task: Verify Dockerfile uses Tini entrypoint with Flyway migrations before running application
+Status: Complete
+Context: Verified Dockerfile configuration - Tini + Flyway + Application flow confirmed
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API (api_service.py - 97k+ lines)
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- AI/ML: OpenAI SDK for LLM-based email categorization
+- Email: IMAP (imapclient) for Gmail integration
+- Testing: pytest with BDD (Gherkin feature files in tests/bdd/)
+- Visualization: matplotlib/seaborn, Mermaid charts for Gantt
+- Build: Docker, Makefile
+
+Key Components:
+- api_service.py: FastAPI REST API (~97k lines)
+- gmail_fetcher.py: Gmail email fetcher and processor (~31k lines)
+- services/: Business logic layer (60+ service files)
+- models/: Pydantic models and SQLAlchemy ORM (database.py)
+- repositories/: Data access layer (MySQL, SQLAlchemy repositories)
+- tests/: Unit tests with BDD scenarios (tests/bdd/)
+- sql/: Flyway migrations (V1-V3)
+- migrations/: Python migrations (001-006)
+
+Project Architecture:
+- Background processor service categorizes emails from Gmail accounts
+- ProcessingRun model tracks audit data (email, start/end time, duration, counts)
+- Category aggregation tracks email classification statistics
+- WebSocket for real-time status updates
+- Mermaid Gantt charts for processing timeline visualization
+
+Recent Activity (from architects_digest.md):
+- "Enhance Audit Records for Email Processing" - ALL 7 sub-tasks COMPLETED
+  - 1.1 Core Fields (37 tests)
+  - 1.2 Increment Methods (20 tests)
+  - 1.3 Edge Cases (10 tests)
+  - 1.4 No Active Session (4 tests)
+  - 1.5 Data Integrity (23 tests)
+  - 1.6 Thread Safety (13 tests)
+  - 1.7 API Response Enhancement (9 tests)
+
+Previous Sessions (summary):
+- Debugger sessions for Flyway migration issues (V3 not applied to production)
+- LLM categorization 405 error (RequestYAI base URL misconfiguration)
+- Domain service API token error (empty string truthiness bug)
+- Database path environment variable issues
+- Category aggregator type mismatch bug
+
+Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from Gmail via API)
+
+Branch: terragon/run-init-explorer-flyway-tini-gn4gvi
+
+Verification Findings:
+1. Dockerfile:48 - ENTRYPOINT correctly uses Tini: ["/usr/bin/tini", "--", "/docker-entrypoint.sh"]
+2. docker-entrypoint.sh:28-38 - Flyway migrations executed before application starts
+3. docker-entrypoint.sh:45 - Uses exec "$@" to replace shell with main command (python api_service.py)
+4. Flyway migration V3 (emails_categorized, emails_skipped columns) exists in /app/sql/
+5. Configuration confirmed: Tini (PID 1) -> Flyway migrate -> API service
+
+Next: Verification complete - awaiting PR review
+---
+
+=== Session 20251206-173700 ===
+Workflow: debugger
+Task: Processing failed: (pymysql.err.OperationalError) (1054, "Unknown column 'emails_categorized' in 'field list'") - The application is trying to INSERT into processing_runs table with columns emails_reviewed, emails_tagged, emails_deleted, emails_categorized, emails_skipped but these columns don't exist in the database. Need to verify Flyway migrations and add missing columns.
+Status: Initialized
+Context: Explored project structure, identified recurring Flyway migration deployment issue
+
+Branch: terragon/fix-runtime-error-flyway-sql-eephj7
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- Build: Docker, Makefile
+
+Error Analysis:
+- This is the FOURTH occurrence of this migration deployment issue
+- Session 20251205-020300: emails_reviewed, emails_tagged, emails_deleted
+- Session 20251205-022949: Same columns (continuation)
+- Session 20251206-154734: emails_categorized, emails_skipped
+- Session 20251206-173700 (current): Same issue persists
+
+Key Files:
+1. /root/repo/models/database.py (lines 204-232) - ProcessingRun Model
+   - All 5 audit columns defined: emails_reviewed, emails_tagged, emails_deleted, emails_categorized, emails_skipped
+
+2. /root/repo/sql/V1__initial_schema.sql (lines 129-148) - Initial Schema
+   - Has: emails_reviewed, emails_tagged, emails_deleted (lines 141-143)
+   - MISSING: emails_categorized, emails_skipped
+
+3. /root/repo/sql/V3__add_categorized_skipped_columns.sql - Migration for missing columns
+   - ALTER TABLE processing_runs ADD COLUMN emails_categorized INTEGER NOT NULL DEFAULT 0;
+   - ALTER TABLE processing_runs ADD COLUMN emails_skipped INTEGER NOT NULL DEFAULT 0;
+   - File EXISTS but NOT applied to production database
+
+Root Cause Pattern:
+- SQLAlchemy model has 5 audit columns
+- V1 initial schema only creates 3 (emails_reviewed, emails_tagged, emails_deleted)
+- V3 migration should add the remaining 2 columns but is NOT being applied
+- Flyway runs on container startup (docker-entrypoint.sh) but may be failing silently
+
+Previous Session (20251206-162917) Verified:
+- Dockerfile correctly uses Tini entrypoint with Flyway
+- docker-entrypoint.sh runs Flyway migrate before app
+- V3 migration file exists in sql/ folder
+
+Hypothesis: Flyway migration V3 is not being applied because:
+1. Flyway may be skipping V3 due to version order issues (V2 is a cleanup script)
+2. Production database may have corrupted flyway_schema_history
+3. Container may not be picking up latest sql/ folder contents
+
+Features: 0/1 complete (feature_list.md)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
+
+=== Session 20251211-120548 ===
+Workflow: debugger
+Task: Test emails_reviewed count bug - /api/processing/history shows emails_reviewed=0 even when emails were processed
+Status: Initialized
+Context: Explored project structure, identified ROOT CAUSE - increment_reviewed() is never called in production code
+
+Branch: terragon/test-emails-reviewed-count-l0zdon
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- Testing: pytest with BDD (Gherkin feature files in tests/bdd/)
+- Build: Docker, Makefile
+
+Error Description:
+When processing emails through the /api/processing/history endpoint, the emails_reviewed count
+shows 0 even when state transitions clearly show emails were processed (e.g., "Processing 1 emails",
+"Processing email 1 of 1", "Categorizing email 1 with AI", "Successfully processed 1 emails").
+
+KEY FINDING - ROOT CAUSE IDENTIFIED:
+
+The increment_reviewed() method EXISTS in ProcessingStatusManager (line 263-279) but is NEVER
+CALLED from any production code:
+
+1. /root/repo/services/processing_status_manager.py:263-279 - increment_reviewed() method EXISTS
+2. /root/repo/gmail_fetcher.py - NO calls to increment_reviewed()
+3. /root/repo/email_scanner_consumer.py - NO calls to increment_reviewed()
+4. /root/repo/api_service.py - NO calls to increment_reviewed()
+5. /root/repo/services/account_email_processor_service.py - NO calls to increment_reviewed()
+6. /root/repo/services/background_processor_service.py - NO calls to increment_reviewed()
+
+The same is true for the other increment methods:
+- increment_tagged() - NEVER called in production
+- increment_deleted() - NEVER called in production
+- increment_categorized() - NEVER called in production
+- increment_skipped() - NEVER called in production
+
+These methods are ONLY called in test files (tests/test_processing_status_manager_audit_counts.py, etc.)
+
+The archived_run dict in complete_processing() (line 240) correctly captures self._current_status.emails_reviewed,
+but since increment_reviewed() is never called during actual email processing, the value remains 0.
+
+Call Chain Analysis:
+1. Email processing starts via BackgroundProcessorService or AccountEmailProcessorService
+2. ProcessingStatusManager.start_processing() is called (emails_reviewed initialized to 0)
+3. ProcessingStatusManager.update_status() is called with state transitions
+4. Emails are processed (but increment_reviewed() is NEVER called)
+5. ProcessingStatusManager.complete_processing() archives the run with emails_reviewed=0
+6. /api/processing/history returns emails_reviewed=0
+
+Task for Debugger:
+Create a TDD test that:
+1. Verifies that when an email is processed, increment_reviewed() should be called
+2. Documents WHERE in the call chain increment_reviewed() should be called
+3. Ensures emails_reviewed count matches actual emails processed
+
+Key Files:
+- /root/repo/services/processing_status_manager.py:263-279 - increment_reviewed() method
+- /root/repo/services/processing_status_manager.py:240 - emails_reviewed in archived_run
+- /root/repo/api_service.py:920-940 - GET /api/processing/history endpoint
+- /root/repo/services/background_processor_service.py - likely location to add increment_reviewed() call
+- /root/repo/services/account_email_processor_service.py - likely location to add increment_reviewed() call
+
+Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from Gmail via API)
+
+Next: Invoking debugger agent to create TDD test for emails_reviewed count
 ---

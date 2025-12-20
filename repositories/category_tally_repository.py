@@ -61,8 +61,8 @@ class CategoryTallyRepository(ICategoryTallyRepository):
             ).first()
 
             if existing:
-                # Merge counts instead of replacing (incremental accumulation)
-                existing.count = existing.count + count
+                # Replace count with new value (upsert semantics)
+                existing.count = count
                 existing.total_emails = total_emails
                 existing.updated_at = now
             else:

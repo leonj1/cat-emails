@@ -99,9 +99,9 @@ class DomainService:
 # Example usage:
 if __name__ == "__main__":
     import os
-    api_token = os.getenv("CONTROL_API_TOKEN")
+    api_token = os.getenv("CONTROL_TOKEN")
     if not api_token:
-        print("Error: CONTROL_API_TOKEN environment variable is not set")
+        print("Error: CONTROL_TOKEN environment variable is not set")
         exit(1)
         
     service = DomainService(api_token=api_token)

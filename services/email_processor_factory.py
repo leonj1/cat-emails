@@ -5,7 +5,6 @@ from services.email_processor_factory_interface import EmailProcessorFactoryInte
 from services.email_processor_service import EmailProcessorService
 from services.email_categorizer_interface import EmailCategorizerInterface
 from services.gmail_fetcher_interface import GmailFetcherInterface
-from services.logs_collector_service import LogsCollectorService
 
 
 class EmailProcessorFactory(EmailProcessorFactoryInterface):
@@ -16,8 +15,7 @@ class EmailProcessorFactory(EmailProcessorFactoryInterface):
         fetcher: GmailFetcherInterface,
         email_address: str,
         model: str,
-        email_categorizer: EmailCategorizerInterface,
-        logs_collector: LogsCollectorService
+        email_categorizer: EmailCategorizerInterface
     ) -> EmailProcessorService:
         """
         Create an EmailProcessorService instance.
@@ -27,7 +25,6 @@ class EmailProcessorFactory(EmailProcessorFactoryInterface):
             email_address: Email address being processed
             model: LLM model identifier
             email_categorizer: Email categorizer implementation
-            logs_collector: LogsCollectorService instance
 
         Returns:
             EmailProcessorService instance
@@ -36,6 +33,5 @@ class EmailProcessorFactory(EmailProcessorFactoryInterface):
             fetcher=fetcher,
             email_address=email_address,
             model=model,
-            email_categorizer=email_categorizer,
-            logs_collector=logs_collector
+            email_categorizer=email_categorizer
         )

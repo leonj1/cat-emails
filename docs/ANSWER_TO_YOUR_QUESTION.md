@@ -13,8 +13,8 @@ Your script **IS working correctly**. The problem is that your `errors.txt` file
 Your file has errors like this:
 
 ```python
-File "/app/services/logging_service.py", line 160, in _send_to_remote_sync
-    return self.logs_collector_client.send(log_entry)
+File "/app/services/some_service.py", line 160, in some_method
+    return self.client.send(data)
 Exception: Timeout
 ```
 

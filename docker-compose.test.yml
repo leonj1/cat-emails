@@ -21,7 +21,7 @@ services:
   integration-test:
     build:
       context: .
-      dockerfile: Dockerfile.integration-test
+      dockerfile: Dockerfile
     container_name: cat-emails-integration-test
     environment:
       - MYSQL_HOST=mysql-test
@@ -32,3 +32,36 @@ services:
     depends_on:
       mysql-test:
         condition: service_healthy
+    command: ["python", "-m", "pytest", "tests/test_pending_rollback_integration.py", "-v"]
+
+  processing-run-columns-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cat-emails-processing-run-columns-test
+    environment:
+      - MYSQL_HOST=mysql-test
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=cat_emails_test
+      - MYSQL_USER=cat_emails
+      - MYSQL_PASSWORD=cat_emails_password
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+    command: ["python", "-m", "pytest", "tests/test_processing_run_columns_integration.py", "-v"]
+
+  oauth-columns-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cat-emails-oauth-columns-test
+    environment:
+      - MYSQL_HOST=mysql-test
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=cat_emails_test
+      - MYSQL_USER=cat_emails
+      - MYSQL_PASSWORD=cat_emails_password
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+    command: ["python", "-m", "pytest", "tests/test_email_account_oauth_columns_integration.py", "-v"]

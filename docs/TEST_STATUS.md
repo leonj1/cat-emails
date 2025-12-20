@@ -140,7 +140,7 @@ Since automated tests can't run in this environment, here's how to manually test
 # Set required environment variables
 export REQUESTYAI_API_KEY="your-llm-api-key"
 export API_KEY="test-api-key"
-export CONTROL_API_TOKEN="your-control-api-token"
+export CONTROL_TOKEN="your-control-api-token"
 
 # Start the service
 python api_service.py

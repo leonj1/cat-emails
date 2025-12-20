@@ -241,23 +241,23 @@ class TestAccountCategoryClient(unittest.TestCase):
 class TestAccountCategoryClientIntegration(unittest.TestCase):
     """Integration tests for AccountCategoryClient with API service."""
 
-    @patch('clients.account_category_client.init_database')
-    @patch('clients.account_category_client.sessionmaker')
-    def test_api_service_usage(self, mock_sessionmaker, mock_init_db):
+    @patch('clients.account_category_client.MySQLRepository')
+    def test_api_service_usage(self, mock_mysql_repository):
         """Test that API service can properly use AccountCategoryClient."""
         # Mock database setup
         mock_session = MagicMock()
         mock_session_factory = MagicMock()
+        mock_repository = MagicMock()
 
         # Configure the session factory to return our mock session when called
         mock_session_factory.return_value = mock_session
 
-        # Configure sessionmaker to return our session factory
-        mock_sessionmaker.return_value = mock_session_factory
+        # Configure the repository
+        mock_repository.SessionFactory = mock_session_factory
+        mock_repository.engine = MagicMock()
 
-        # Mock the database initialization
-        mock_engine = MagicMock()
-        mock_init_db.return_value = mock_engine
+        # Configure MySQLRepository to return our mock when instantiated
+        mock_mysql_repository.return_value = mock_repository
 
         # Create client
         service = AccountCategoryClient()

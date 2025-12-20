@@ -2,11 +2,11 @@ from email.utils import parseaddr
 from typing import Optional
 
 from utils.logger import get_logger
-from services.interfaces.email_address_extractor_interface import EmailAddressExtractorInterface
+from services.interfaces.email_extractor_interface import EmailExtractorInterface
 
 logger = get_logger(__name__)
 
-class ExtractSenderEmailService(EmailAddressExtractorInterface):
+class ExtractSenderEmailService(EmailExtractorInterface):
     """Service for extracting sender email addresses from email headers.
 
     This service provides email address extraction with optional fallback capabilities.
@@ -14,7 +14,7 @@ class ExtractSenderEmailService(EmailAddressExtractorInterface):
     the standard email.utils.parseaddr implementation.
     """
 
-    def __init__(self, fallback_extractor: Optional[EmailAddressExtractorInterface] = None) -> None:
+    def __init__(self, fallback_extractor: Optional[EmailExtractorInterface] = None) -> None:
         """Initialize the service.
 
         Args:

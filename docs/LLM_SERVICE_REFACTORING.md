@@ -96,7 +96,7 @@ from services.categorize_emails_llm import LLMCategorizeEmails
 llm_service = OpenAILLMService(
     model="vertex/google/gemini-2.5-flash",
     api_key=os.environ["REQUESTYAI_API_KEY"],
-    base_url="https://api.requesty.ai/openai/v1",
+    base_url="https://router.requesty.ai/v1",
     provider_name="requestyai"
 )
 

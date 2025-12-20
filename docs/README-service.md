@@ -17,7 +17,7 @@ docker run -d \
   --name gmail-fetcher-service \
   -e GMAIL_EMAIL="your-email@gmail.com" \
   -e GMAIL_PASSWORD="your-app-password" \
-  -e CONTROL_API_TOKEN="your-api-token" \
+  -e CONTROL_TOKEN="your-api-token" \
   -e HOURS=2 \
   -e SCAN_INTERVAL=2 \
   gmail-fetcher-service
@@ -40,7 +40,7 @@ services:
     environment:
       - GMAIL_EMAIL=${GMAIL_EMAIL}
       - GMAIL_PASSWORD=${GMAIL_PASSWORD}
-      - CONTROL_API_TOKEN=${CONTROL_API_TOKEN}
+      - CONTROL_TOKEN=${CONTROL_TOKEN}
       - HOURS=${HOURS:-2}
       - SCAN_INTERVAL=${SCAN_INTERVAL:-2}
     restart: unless-stopped
@@ -60,7 +60,7 @@ docker-compose up -d
 
 - `GMAIL_EMAIL`: Your Gmail email address (required)
 - `GMAIL_PASSWORD`: Your Gmail app-specific password (required)
-- `CONTROL_API_TOKEN`: API token for the control service (required)
+- `CONTROL_TOKEN`: API token for the control service (required)
 - `HOURS`: Number of hours to look back for emails (default: 2)
 - `SCAN_INTERVAL`: Minutes between email scans (default: 2)
 

@@ -53,7 +53,7 @@ Set these environment variables in Railway dashboard:
   - Default: `vertex/google/gemini-2.5-flash`
   - Examples: `gpt-4`, `gpt-3.5-turbo`, `vertex/google/gemini-2.5-flash`
 
-- **`CONTROL_API_TOKEN`** (Optional)
+- **`CONTROL_TOKEN`** (Optional)
   - Token for external Control API integration
   - Only needed if using domain blocking features
 
@@ -316,7 +316,7 @@ Monitor usage in Railway dashboard. Upgrade plan if needed for:
 | `BACKGROUND_PROCESSING` | No | `true` | Enable background processing |
 | `BACKGROUND_SCAN_INTERVAL` | No | `300` | Scan interval (seconds) |
 | `LLM_MODEL` | No | `vertex/google/gemini-2.5-flash` | LLM model name |
-| `CONTROL_API_TOKEN` | No | Empty | External API token |
+| `CONTROL_TOKEN` | No | Empty | External API token |
 | `GMAIL_EMAIL` | No* | None | Gmail account (*required for processing) |
 | `GMAIL_PASSWORD` | No* | None | Gmail app password (*required for processing) |
 

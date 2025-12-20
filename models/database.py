@@ -40,13 +40,23 @@ class EmailAccount(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True, index=True)
     last_scan_at = Column(DateTime)
-    
+
+    # OAuth fields for multi-user Gmail API access
+    auth_method = Column(String(20), default='imap')  # 'imap' or 'oauth'
+    oauth_client_id = Column(String(255))
+    oauth_client_secret = Column(String(500))
+    oauth_refresh_token = Column(String(500))
+    oauth_access_token = Column(Text)
+    oauth_token_expiry = Column(DateTime)
+    oauth_scopes = Column(Text)  # JSON array stored as text
+
     # Relationships
     email_summaries = relationship("EmailSummary", back_populates="email_account", cascade="all, delete-orphan")
     category_stats = relationship("AccountCategoryStats", back_populates="email_account", cascade="all, delete-orphan")
-    
+
     __table_args__ = (
         Index('idx_email_active', 'email_address', 'is_active'),
+        Index('idx_auth_method', 'auth_method'),
     )
 
 
@@ -204,7 +214,7 @@ class AccountCategoryStats(Base):
 class ProcessingRun(Base):
     """Historical tracking of email processing sessions"""
     __tablename__ = 'processing_runs'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     email_address = Column(Text, nullable=False)
     start_time = Column(DateTime, nullable=False)
@@ -216,7 +226,14 @@ class ProcessingRun(Base):
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
+    # Audit count columns
+    emails_reviewed = Column(Integer, default=0, nullable=False)
+    emails_tagged = Column(Integer, default=0, nullable=False)
+    emails_deleted = Column(Integer, default=0, nullable=False)
+    emails_categorized = Column(Integer, default=0, nullable=False)
+    emails_skipped = Column(Integer, default=0, nullable=False)
+
     __table_args__ = (
         Index('idx_processing_runs_email_address', 'email_address'),
         Index('idx_processing_runs_start_time', 'start_time'),

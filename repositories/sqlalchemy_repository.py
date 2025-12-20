@@ -4,6 +4,8 @@ SQLAlchemy implementation of DatabaseRepositoryInterface.
 This concrete implementation uses SQLAlchemy ORM to interact with SQLite databases
 (both local file-based and remote SQLite Cloud).
 """
+import hashlib
+import json
 import os
 from typing import List, Dict, Optional, Any, TypeVar, Type
 from datetime import datetime, date, timedelta
@@ -629,18 +631,165 @@ class SQLAlchemyRepository(DatabaseRepositoryInterface):
             logger.exception("Error cleaning up old records: %s", e)
             raise
     
+    # ==================== OAuth Token Operations ====================
+
+    def update_account_oauth_tokens(
+        self,
+        email_address: str,
+        refresh_token: str,
+        access_token: str,
+        token_expiry: datetime,
+        scopes: List[str],
+    ) -> Optional[EmailAccount]:
+        """
+        Update OAuth tokens for an account.
+
+        Args:
+            email_address: Account email address
+            refresh_token: Long-lived refresh token
+            access_token: Short-lived access token
+            token_expiry: When the access token expires
+            scopes: List of granted OAuth scopes
+
+        Returns:
+            Updated EmailAccount or None if not found
+        """
+        account = self.get_account_by_email(email_address)
+        if not account:
+            email_hash = hashlib.sha256(email_address.encode()).hexdigest()[:8]
+            logger.warning(f"Account not found for OAuth update: {email_hash}")
+            return None
+
+        session = self._get_session()
+        try:
+            account.auth_method = 'oauth'
+            account.oauth_refresh_token = refresh_token
+            account.oauth_access_token = access_token
+            account.oauth_token_expiry = token_expiry
+            account.oauth_scopes = json.dumps(scopes)
+            account.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(account)
+            email_hash = hashlib.sha256(email_address.encode()).hexdigest()[:8]
+            logger.info(f"Updated OAuth tokens for account: {email_hash}")
+            return account
+        except SQLAlchemyError as e:
+            session.rollback()
+            logger.exception("Error updating OAuth tokens: %s", e)
+            raise
+
+    def get_account_oauth_tokens(self, email_address: str) -> Optional[Dict[str, Any]]:
+        """
+        Get OAuth tokens for an account.
+
+        Args:
+            email_address: Account email address
+
+        Returns:
+            Dict with OAuth token data or None if not found/not OAuth.
+            Note: Does not include client_id/client_secret for security reasons.
+        """
+        account = self.get_account_by_email(email_address)
+        if not account:
+            return None
+
+        if account.auth_method != 'oauth':
+            return None
+
+        scopes = []
+        if account.oauth_scopes:
+            try:
+                scopes = json.loads(account.oauth_scopes)
+            except json.JSONDecodeError:
+                scopes = []
+
+        return {
+            'email_address': account.email_address,
+            'auth_method': account.auth_method,
+            'refresh_token': account.oauth_refresh_token,
+            'access_token': account.oauth_access_token,
+            'token_expiry': account.oauth_token_expiry,
+            'scopes': scopes,
+        }
+
+    def clear_account_oauth_tokens(self, email_address: str) -> bool:
+        """
+        Clear OAuth tokens for an account (revoke OAuth access).
+
+        Args:
+            email_address: Account email address
+
+        Returns:
+            True if tokens were cleared, False if account not found
+        """
+        account = self.get_account_by_email(email_address)
+        if not account:
+            return False
+
+        session = self._get_session()
+        try:
+            account.auth_method = 'imap'
+            account.oauth_refresh_token = None
+            account.oauth_access_token = None
+            account.oauth_token_expiry = None
+            account.oauth_scopes = None
+            account.updated_at = datetime.utcnow()
+            session.commit()
+            email_hash = hashlib.sha256(email_address.encode()).hexdigest()[:8]
+            logger.info(f"Cleared OAuth tokens for account: {email_hash}")
+            return True
+        except SQLAlchemyError as e:
+            session.rollback()
+            logger.exception("Error clearing OAuth tokens: %s", e)
+            raise
+
+    def update_account_access_token(
+        self,
+        email_address: str,
+        access_token: str,
+        token_expiry: datetime,
+    ) -> bool:
+        """
+        Update just the access token for an account (after refresh).
+
+        Args:
+            email_address: Account email address
+            access_token: New short-lived access token
+            token_expiry: When the access token expires
+
+        Returns:
+            True if updated, False if account not found
+        """
+        account = self.get_account_by_email(email_address)
+        if not account:
+            return False
+
+        session = self._get_session()
+        try:
+            account.oauth_access_token = access_token
+            account.oauth_token_expiry = token_expiry
+            account.updated_at = datetime.utcnow()
+            session.commit()
+            email_hash = hashlib.sha256(email_address.encode()).hexdigest()[:8]
+            logger.debug(f"Updated access token for account: {email_hash}")
+            return True
+        except SQLAlchemyError as e:
+            session.rollback()
+            logger.exception("Error updating access token: %s", e)
+            raise
+
     # ==================== Transaction Management ====================
-    
+
     def begin_transaction(self) -> None:
         """Start a new transaction"""
         session = self._get_session()
         session.begin()
-    
+
     def commit_transaction(self) -> None:
         """Commit current transaction"""
         session = self._get_session()
         session.commit()
-    
+
     def rollback_transaction(self) -> None:
         """Rollback current transaction"""
         session = self._get_session()

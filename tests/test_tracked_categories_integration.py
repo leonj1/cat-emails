@@ -5,10 +5,22 @@ This test uses repository-based persistence and fake classes for Gmail interacti
 ensuring that category statistics are correctly stored and retrieved.
 """
 import os
+import sys
 import tempfile
 import unittest
 from datetime import datetime, date
 from typing import Dict
+
+# Ensure we have the real services.settings_service module, not a mock
+# (other tests may have injected mocks into sys.modules)
+from unittest.mock import Mock, MagicMock
+
+if 'services.settings_service' in sys.modules:
+    # Check if it's a mock
+    settings_mod = sys.modules['services.settings_service']
+    if isinstance(settings_mod, (Mock, MagicMock)):
+        # It's a mock - remove it and force reimport
+        del sys.modules['services.settings_service']
 
 # Database models and initialization
 from models.database import Base, init_database
@@ -19,7 +31,6 @@ from services.account_email_processor_service import AccountEmailProcessorServic
 from services.processing_status_manager import ProcessingStatusManager
 from services.fake_email_deduplication_factory import FakeEmailDeduplicationFactory
 from services.settings_service import SettingsService
-from services.logs_collector_service import LogsCollectorService
 from repositories.sqlalchemy_repository import SQLAlchemyRepository
 
 # Fake implementations for testing
@@ -62,7 +73,6 @@ class TestTrackedCategoriesIntegration(unittest.TestCase):
         # Inject repository into SettingsService
         self.settings_service = SettingsService(repository=self.repository)
         self.deduplication_factory = FakeEmailDeduplicationFactory()
-        self.logs_collector = LogsCollectorService()
         
         # Create fake email categorizer that returns valid SimpleEmailCategory values
         # Valid categories are: "Advertising", "Marketing", "Wants-Money", and "Other"
@@ -153,7 +163,6 @@ class TestTrackedCategoriesIntegration(unittest.TestCase):
             llm_model="test-model",
             account_category_client=self.account_category_client,
             deduplication_factory=self.deduplication_factory,
-            logs_collector=self.logs_collector,
             create_gmail_fetcher=create_fake_fetcher
         )
 
