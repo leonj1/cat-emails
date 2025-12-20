@@ -14,6 +14,7 @@ These standards ensure consistency, maintainability, and quality across the code
 - `typescript.md` - TypeScript-specific standards
 - `golang.md` - Go-specific standards
 - `dotnetcore.md` - .NET Core/C#-specific standards
+- `markdown.md` - Markdown and documentation standards
 
 ### Testing Standards
 - `testing-standards.md` - Standards for writing and maintaining tests

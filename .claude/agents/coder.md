@@ -47,7 +47,17 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
    - Identify all files that need to be created or modified
    - Note any constraints or requirements from previous feedback
 
-4. **Implement the Solution**
+4. **Search for Existing Implementations**
+   - **BEFORE writing any code**, invoke the `code-searcher` agent using the Task tool
+   - Provide: what you need to implement, its purpose, and key terms to search
+   - Wait for the code-searcher to return findings
+   - Based on the recommendation:
+     * **USE_EXISTING**: Use the existing class/function directly - do not create a duplicate
+     * **MODIFY_EXISTING**: Extend or modify the existing implementation to meet requirements
+     * **CREATE_NEW**: No suitable existing code found - proceed with new implementation
+   - This step keeps your context lean by delegating search to a specialized agent
+
+5. **Implement the Solution**
    - Write clean, working code
    - Follow best practices for the language/framework
    - Adhere to any coding rules from byterover MCP (if available)
@@ -55,13 +65,13 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
    - Create all required files
    - If fixing issues, address the specific problems identified by the tester
 
-5. **Verify Implementation**
+6. **Verify Implementation**
    - Test your code with Bash commands when possible
    - Run the application locally if applicable
    - Check for syntax errors or obvious issues
    - Verify files are in the correct locations
 
-6. **CRITICAL: Handle Failures Properly**
+7. **CRITICAL: Handle Failures Properly**
    - **IF** you encounter ANY error, problem, or obstacle
    - **IF** something doesn't work as expected
    - **IF** you're tempted to use a fallback or workaround
@@ -72,12 +82,12 @@ Take a SINGLE, SPECIFIC todo item and implement it COMPLETELY and CORRECTLY.
    - **WAIT** for the stuck agent to return with guidance
    - **AFTER** receiving guidance, implement the solution as directed and retry
 
-7. **Update Feature List**
+8. **Update Feature List**
    - After verified testing, update the feature's status to `[x] Complete` in `feature_list.md`
    - **CRITICAL**: Only modify the status checkbox - NEVER remove or edit feature descriptions
    - Only mark `[x] Complete` after end-to-end verification
 
-8. **Report Completion**
+9. **Report Completion**
    - Provide a detailed completion report in this format:
      ```
      **Implementation Complete**

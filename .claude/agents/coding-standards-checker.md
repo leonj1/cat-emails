@@ -28,6 +28,7 @@ Review code written by the coder agent and verify it follows ALL coding standard
      * `python.md` - For Python projects
      * `typescript.md` - For TypeScript/JavaScript projects
      * `golang.md` - For Go projects
+     * `markdown.md` - For Markdown files (.md)
    - You MUST check against BOTH sets of rules (MCP + coding standards files)
    - If neither is available, use general best practices
 
@@ -85,7 +86,14 @@ Review code written by the coder agent and verify it follows ALL coding standard
    - [ ] No unused imports or variables
    - [ ] Consistent code style throughout
 
-   **H. Testing Considerations**
+   **H. Markdown Documentation Review** (for .md files)
+   - [ ] All code blocks have language identifiers (e.g., ```python, ```bash)
+   - [ ] List indentation uses 2 spaces for nesting
+   - [ ] Heading hierarchy not skipped (no # followed by ###)
+   - [ ] Links use descriptive text (no "click here")
+   - [ ] Tables properly formatted with header separators
+
+   **I. Testing Considerations**
    - [ ] Code is testable (dependency injection, no globals)
    - [ ] No hard-coded values that should be configurable
    - [ ] Clear separation of concerns
@@ -113,6 +121,9 @@ Review code written by the coder agent and verify it follows ALL coding standard
    - Missing docstrings
    - Inconsistent naming
    - Minor formatting issues
+   - Markdown: code blocks missing language identifiers
+   - Markdown: incorrect list indentation
+   - Markdown: non-descriptive link text
 
 ### 5. **Decision: Pass or Return to Coder**
 
@@ -185,6 +196,7 @@ Review code written by the coder agent and verify it follows ALL coding standard
    - ✅ Controllers are thin (if applicable)
    - ✅ Code style consistent
    - ✅ Type hints present
+   - ✅ Markdown standards (if .md files modified)
    
    **Notes**:
    - All critical standards met
@@ -209,6 +221,15 @@ grep -n "^class " *.py | cut -d: -f1 | uniq -c | grep -v "1 "
 
 # Find missing type hints in Python
 grep -n "def.*->.*:" *.py -v
+
+# Find markdown code blocks without language identifiers
+grep -n "^\`\`\`$" *.md
+
+# Find markdown list indentation issues (3-space indent)
+grep -n "^   -" *.md
+
+# Find non-descriptive link text in markdown
+grep -n "\[click here\]\|\[here\]" *.md
 ```
 
 ## Detecting Duplicate Files

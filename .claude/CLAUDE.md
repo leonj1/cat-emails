@@ -106,7 +106,8 @@ Use this command to start a forensic Root Cause Analysis debugging session:
   - `refactor-decision-engine.md` - Decides if refactoring needed
   - `test-creator.md` - TDD specialist that writes tests first
   - `test-consistency-validator.md` - Validates test names match their contents
-  - `coder.md` - Implementation specialist
+  - `code-searcher.md` - Searches codebase for existing implementations before coding
+  - `coder.md` - Implementation specialist (calls code-searcher before writing code)
   - `coding-standards-checker.md` - Code quality verifier
   - `tester.md` - Functionality verification
   - `bdd-test-runner.md` - Test infrastructure validator (Dockerfile.test, Makefile)
