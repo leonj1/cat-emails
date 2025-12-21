@@ -12,7 +12,7 @@ validate-env:
 		exit 1; \
 	fi
 
-.PHONY: build run clean test service-build service-run service-stop service-logs api-build api-run api-stop api-logs summary-morning summary-evening summary-weekly summary-monthly api-health test-llm-integration test-processing-run-columns-integration
+.PHONY: build run clean test service-build service-run service-stop service-logs api-build api-run api-stop api-logs summary-morning summary-evening summary-weekly summary-monthly api-health test-llm-integration test-processing-run-columns-integration test-flyway-startup
 
 # Docker image name
 IMAGE_NAME = gmail-cleaner
@@ -267,6 +267,17 @@ test-processing-run-columns-integration:
 	@timeout 60 sh -c 'until docker compose -f docker-compose.test.yml exec -T mysql-test mysqladmin ping -h localhost -u root -prootpassword 2>/dev/null; do sleep 2; done'
 	@echo "Running ProcessingRun columns integration tests (verifies V3 migration)..."
 	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit processing-run-columns-test
+	@echo "Cleaning up..."
+	docker compose -f docker-compose.test.yml down -v
+
+# Run Flyway startup integration test (verifies all migrations run without errors)
+test-flyway-startup:
+	@echo "Starting MySQL container for Flyway startup tests..."
+	docker compose -f docker-compose.test.yml up -d mysql-test
+	@echo "Waiting for MySQL to be healthy..."
+	@timeout 60 sh -c 'until docker compose -f docker-compose.test.yml exec -T mysql-test mysqladmin ping -h localhost -u root -prootpassword 2>/dev/null; do sleep 2; done'
+	@echo "Running Flyway startup integration tests..."
+	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit flyway-startup-test
 	@echo "Cleaning up..."
 	docker compose -f docker-compose.test.yml down -v
 

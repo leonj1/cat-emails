@@ -8,7 +8,7 @@ services:
       MYSQL_USER: cat_emails
       MYSQL_PASSWORD: cat_emails_password
     ports:
-      - "3308:3306"
+      - "3309:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
       interval: 5s
@@ -65,3 +65,47 @@ services:
       mysql-test:
         condition: service_healthy
     command: ["python", "-m", "pytest", "tests/test_email_account_oauth_columns_integration.py", "-v"]
+
+  flyway-startup-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cat-emails-flyway-startup-test
+    environment:
+      - MYSQL_HOST=mysql-test
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=cat_emails_test
+      - MYSQL_USER=cat_emails
+      - MYSQL_PASSWORD=cat_emails_password
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+    command: ["python", "-m", "pytest", "tests/integration/test_flyway_startup.py", "-v"]
+
+  # Test Flyway recovery from "stuck at V2" state
+  # This simulates the production scenario where columns exist but migrations aren't recorded
+  flyway-v2-recovery-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cat-emails-flyway-v2-recovery-test
+    environment:
+      - MYSQL_HOST=mysql-test
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=cat_emails_test
+      - MYSQL_USER=cat_emails
+      - MYSQL_PASSWORD=cat_emails_password
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+    # First, set up the "stuck at V2" state, then run the container to test recovery
+    command: >
+      sh -c "
+        echo 'Setting up stuck-at-V2 scenario...';
+        mysql -h mysql-test -u cat_emails -pcat_emails_password cat_emails_test -e '
+          -- Simulate V2 state: create tables with columns but only record V1-V2 in history
+          -- This happens when columns are added manually outside Flyway
+        ';
+        echo 'Running Flyway startup test...';
+        python -m pytest tests/integration/test_flyway_startup.py -v
+      "

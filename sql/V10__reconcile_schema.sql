@@ -1,12 +1,41 @@
--- V9__add_oauth_columns_simple.sql
--- Migration to ensure OAuth authentication columns exist on email_accounts table
--- Uses idempotent pattern to safely handle cases where columns already exist from V5
+-- Flyway migration V10: Reconcile schema to expected state
+-- This migration ensures all columns from V3-V9 exist, handling cases where:
+-- 1. Columns were added manually outside of Flyway
+-- 2. Previous migrations partially failed
+-- 3. Database schema is inconsistent with flyway_schema_history
+--
+-- All operations are idempotent - safe to run multiple times
 
 DELIMITER //
 
-CREATE PROCEDURE ensure_oauth_columns_v9()
+CREATE PROCEDURE reconcile_schema()
 BEGIN
-    -- Add auth_method if missing
+    -- ============================================================
+    -- V3 columns: emails_categorized and emails_skipped on processing_runs
+    -- ============================================================
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'processing_runs'
+        AND COLUMN_NAME = 'emails_categorized'
+    ) THEN
+        ALTER TABLE processing_runs ADD COLUMN emails_categorized INT NOT NULL DEFAULT 0;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'processing_runs'
+        AND COLUMN_NAME = 'emails_skipped'
+    ) THEN
+        ALTER TABLE processing_runs ADD COLUMN emails_skipped INT NOT NULL DEFAULT 0;
+    END IF;
+
+    -- ============================================================
+    -- V5/V9 columns: OAuth columns on email_accounts
+    -- ============================================================
+
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -16,7 +45,6 @@ BEGIN
         ALTER TABLE email_accounts ADD COLUMN auth_method VARCHAR(20) DEFAULT 'imap';
     END IF;
 
-    -- Add oauth_client_id if missing
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -26,7 +54,6 @@ BEGIN
         ALTER TABLE email_accounts ADD COLUMN oauth_client_id VARCHAR(255);
     END IF;
 
-    -- Add oauth_client_secret if missing
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -36,7 +63,6 @@ BEGIN
         ALTER TABLE email_accounts ADD COLUMN oauth_client_secret VARCHAR(500);
     END IF;
 
-    -- Add oauth_refresh_token if missing
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -46,7 +72,6 @@ BEGIN
         ALTER TABLE email_accounts ADD COLUMN oauth_refresh_token VARCHAR(500);
     END IF;
 
-    -- Add oauth_access_token if missing
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -56,7 +81,6 @@ BEGIN
         ALTER TABLE email_accounts ADD COLUMN oauth_access_token TEXT;
     END IF;
 
-    -- Add oauth_token_expiry if missing
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -66,7 +90,6 @@ BEGIN
         ALTER TABLE email_accounts ADD COLUMN oauth_token_expiry DATETIME;
     END IF;
 
-    -- Add oauth_scopes if missing
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -76,7 +99,7 @@ BEGIN
         ALTER TABLE email_accounts ADD COLUMN oauth_scopes TEXT;
     END IF;
 
-    -- Add index on auth_method if missing
+    -- Add index on auth_method if it doesn't exist
     IF NOT EXISTS (
         SELECT * FROM INFORMATION_SCHEMA.STATISTICS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -85,12 +108,13 @@ BEGIN
     ) THEN
         CREATE INDEX idx_auth_method ON email_accounts(auth_method);
     END IF;
+
 END //
 
 DELIMITER ;
 
--- Execute the procedure
-CALL ensure_oauth_columns_v9();
+-- Execute the reconciliation procedure
+CALL reconcile_schema();
 
 -- Clean up the procedure
-DROP PROCEDURE IF EXISTS ensure_oauth_columns_v9;
+DROP PROCEDURE IF EXISTS reconcile_schema;

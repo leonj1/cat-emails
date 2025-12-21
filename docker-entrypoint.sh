@@ -37,11 +37,8 @@ if [ -n "$MYSQL_HOST" ]; then
         repair || true
 
     # Run Flyway migrations
-    # -baselineOnMigrate=true: For existing databases without flyway_schema_history,
-    #   creates a baseline and runs only newer migrations
-    # -baselineVersion=9: Skip V1-V9 for existing databases (they already have the schema)
-    #   V1: initial schema, V2: clear failed records, V3-4: categorized columns,
-    #   V5-9: OAuth columns - all already exist in production
+    # All migrations (V3, V9, etc.) are now idempotent - they check if columns exist
+    # before adding them, so they're safe to run even if schema already has the columns
     echo "Running Flyway migrations..."
     flyway \
         -url="$FLYWAY_URL" \
@@ -49,8 +46,6 @@ if [ -n "$MYSQL_HOST" ]; then
         -password="$MYSQL_PASSWORD" \
         -locations="filesystem:/app/sql" \
         -connectRetries=3 \
-        -baselineOnMigrate=true \
-        -baselineVersion=9 \
         migrate
 
     echo "Flyway migrations completed successfully"
