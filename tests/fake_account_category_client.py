@@ -45,7 +45,7 @@ class FakeAccountCategoryClient(AccountCategoryClientInterface):
         self.category_stats: Dict[str, List[Dict]] = {}  # email -> list of stats
         self._next_id = 1
 
-    def get_or_create_account(self, email_address: str, display_name: Optional[str], app_password: Optional[str], auth_method: Optional[str]) -> FakeEmailAccount:
+    def get_or_create_account(self, email_address: str, display_name: Optional[str], app_password: Optional[str], auth_method: Optional[str], oauth_refresh_token: Optional[str]) -> FakeEmailAccount:
         """
         Get existing account or create a new one.
 
@@ -54,6 +54,7 @@ class FakeAccountCategoryClient(AccountCategoryClientInterface):
             display_name: Optional display name for the account
             app_password: Optional Gmail app-specific password for IMAP access
             auth_method: Optional authentication method ('oauth', 'imap', or None)
+            oauth_refresh_token: OAuth refresh token (required if auth_method is 'oauth')
 
         Returns:
             EmailAccount object (existing or newly created)

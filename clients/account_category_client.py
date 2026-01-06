@@ -803,7 +803,7 @@ if __name__ == "__main__":
     
     try:
         # Create/get an account
-        account = service.get_or_create_account("test@gmail.com", "Test User", None, None, None)
+        account = service.get_or_create_account("test@gmail.com", "Test User", None, None, None, None)
         print(f"Account created/retrieved: {account.email_address}")
         
         # Record some category stats

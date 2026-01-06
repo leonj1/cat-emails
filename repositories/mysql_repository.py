@@ -644,7 +644,7 @@ class MySQLRepository(DatabaseRepositoryInterface):
         """Get email account by email address"""
         return self.find_one(EmailAccount, email_address=email_address)
     
-    def get_all_accounts(self, active_only: bool = False) -> List[EmailAccount]:
+    def get_all_accounts(self, active_only: bool) -> List[EmailAccount]:
         """Get all email accounts"""
         session = self._get_session()
         try:

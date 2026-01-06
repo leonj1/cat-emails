@@ -42,15 +42,15 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_get_or_create_account_invalid_email(self):
         """Test that invalid email raises ValueError."""
         with self.assertRaises(ValueError):
-            self.client.get_or_create_account("", None, None, None)
+            self.client.get_or_create_account("", None, None, None, None)
 
         with self.assertRaises(ValueError):
-            self.client.get_or_create_account("   ", None, None, None)
+            self.client.get_or_create_account("   ", None, None, None, None)
 
     def test_get_account_by_email_found(self):
         """Test retrieving an existing account."""
         # Create account
-        created = self.client.get_or_create_account(self.test_email, None, None, None)
+        created = self.client.get_or_create_account(self.test_email, None, None, None, None)
 
         # Retrieve it
         retrieved = self.client.get_account_by_email(self.test_email)
@@ -72,7 +72,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_update_account_last_scan(self):
         """Test updating last scan timestamp."""
         # Create account
-        account = self.client.get_or_create_account(self.test_email, None, None, None)
+        account = self.client.get_or_create_account(self.test_email, None, None, None, None)
         self.assertIsNone(account.last_scan_at)
 
         # Update last scan
@@ -91,7 +91,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_record_category_stats(self):
         """Test recording category statistics."""
         # Create account first
-        self.client.get_or_create_account(self.test_email, None, None, None)
+        self.client.get_or_create_account(self.test_email, None, None, None, None)
 
         # Record stats
         stats_date = date.today()
@@ -114,7 +114,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_get_top_categories(self):
         """Test retrieving top categories."""
         # Create account
-        self.client.get_or_create_account(self.test_email, None, None, None)
+        self.client.get_or_create_account(self.test_email, None, None, None, None)
 
         # Record some stats
         stats_date = date.today()
@@ -144,7 +144,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_get_top_categories_with_counts(self):
         """Test retrieving top categories with detailed counts."""
         # Create account
-        self.client.get_or_create_account(self.test_email, None, None, None)
+        self.client.get_or_create_account(self.test_email, None, None, None, None)
 
         # Record some stats
         category_stats = {
@@ -171,7 +171,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_get_top_categories_limit(self):
         """Test that limit parameter works correctly."""
         # Create account
-        self.client.get_or_create_account(self.test_email, None, None, None)
+        self.client.get_or_create_account(self.test_email, None, None, None, None)
 
         # Record stats for 5 categories
         category_stats = {
@@ -194,7 +194,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
 
     def test_get_top_categories_invalid_days(self):
         """Test that invalid days parameter raises ValueError."""
-        self.client.get_or_create_account(self.test_email, None, None, None)
+        self.client.get_or_create_account(self.test_email, None, None, None, None)
 
         with self.assertRaises(ValueError):
             self.client.get_top_categories(self.test_email, days=0)
@@ -204,7 +204,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
 
     def test_get_top_categories_invalid_limit(self):
         """Test that invalid limit parameter raises ValueError."""
-        self.client.get_or_create_account(self.test_email, None, None, None)
+        self.client.get_or_create_account(self.test_email, None, None, None, None)
 
         with self.assertRaises(ValueError):
             self.client.get_top_categories(self.test_email, days=30, limit=0)
@@ -220,9 +220,9 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_get_all_accounts_with_data(self):
         """Test getting all accounts."""
         # Create multiple accounts
-        self.client.get_or_create_account("user1@example.com", None, None, None)
-        self.client.get_or_create_account("user2@example.com", None, None, None)
-        self.client.get_or_create_account("user3@example.com", None, None, None)
+        self.client.get_or_create_account("user1@example.com", None, None, None, None)
+        self.client.get_or_create_account("user2@example.com", None, None, None, None)
+        self.client.get_or_create_account("user3@example.com", None, None, None, None)
 
         accounts = self.client.get_all_accounts(active_only=True)
         self.assertEqual(len(accounts), 3)
@@ -230,8 +230,8 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_get_all_accounts_active_only(self):
         """Test filtering accounts by active status."""
         # Create accounts
-        self.client.get_or_create_account("user1@example.com", None, None, None)
-        self.client.get_or_create_account("user2@example.com", None, None, None)
+        self.client.get_or_create_account("user1@example.com", None, None, None, None)
+        self.client.get_or_create_account("user2@example.com", None, None, None, None)
 
         # Deactivate one
         self.client.deactivate_account("user1@example.com")
@@ -248,7 +248,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_deactivate_account(self):
         """Test deactivating an account."""
         # Create account
-        self.client.get_or_create_account(self.test_email, None, None, None)
+        self.client.get_or_create_account(self.test_email, None, None, None, None)
 
         # Deactivate it
         result = self.client.deactivate_account(self.test_email)
@@ -271,7 +271,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_email_case_insensitive(self):
         """Test that email addresses are case-insensitive."""
         # Create account with uppercase
-        account1 = self.client.get_or_create_account("Test@Example.COM", None, None, None)
+        account1 = self.client.get_or_create_account("Test@Example.COM", None, None, None, None)
 
         # Retrieve with lowercase
         account2 = self.client.get_account_by_email("test@example.com")
@@ -282,7 +282,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_record_category_stats_integer_format(self):
         """Test recording category stats with integer counts (simplified format)."""
         # Create account
-        self.client.get_or_create_account(self.test_email, None, None, None)
+        self.client.get_or_create_account(self.test_email, None, None, None, None)
 
         # Record stats with integer format
         category_stats = {

@@ -141,7 +141,7 @@ class TestAccountEmailProcessorService(unittest.TestCase):
     def test_process_account_no_password(self):
         """Test process_account when account has no app password configured."""
         # Setup - create account without app password
-        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = None
 
         # Execute
@@ -163,7 +163,7 @@ class TestAccountEmailProcessorService(unittest.TestCase):
     def test_process_account_success(self):
         """Test successful email processing workflow."""
         # Setup account with app password
-        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = self.test_password
 
         # Setup settings
@@ -207,7 +207,7 @@ class TestAccountEmailProcessorService(unittest.TestCase):
     def test_process_account_fetcher_exception(self):
         """Test process_account when fetcher raises an exception."""
         # Setup account with app password
-        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = self.test_password
 
         # Setup settings
@@ -239,7 +239,7 @@ class TestAccountEmailProcessorService(unittest.TestCase):
     def test_process_account_no_new_emails(self):
         """Test process_account when no new emails are found."""
         # Setup account with app password
-        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = self.test_password
 
         # Setup settings
@@ -272,7 +272,7 @@ class TestAccountEmailProcessorService(unittest.TestCase):
     def test_process_account_category_stats_recording(self):
         """Test that category statistics are recorded after processing."""
         # Setup account with app password
-        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = self.test_password
 
         # Setup settings
@@ -356,7 +356,7 @@ class TestAccountEmailProcessorServiceStatusUpdates(unittest.TestCase):
         # Setup
         fake = Faker()
         test_email = fake.email()
-        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None)
+        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None, None)
         account.app_password = fake.password(length=16)
         self.mock_settings_service.get_lookback_hours.return_value = 2
 

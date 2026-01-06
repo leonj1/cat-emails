@@ -111,7 +111,7 @@ class TestEmailsReviewedCountIntegration(unittest.TestCase):
         """
         # Setup account
         test_email = self.fake.email()
-        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None)
+        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None, None)
         account.app_password = self.fake.password(length=16)
 
         # Setup settings
@@ -148,7 +148,7 @@ class TestEmailsReviewedCountIntegration(unittest.TestCase):
         """
         # Setup account
         test_email = self.fake.email()
-        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None)
+        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None, None)
         account.app_password = self.fake.password(length=16)
 
         # Setup settings
@@ -186,7 +186,7 @@ class TestEmailsReviewedCountIntegration(unittest.TestCase):
         """
         # Setup account
         test_email = self.fake.email()
-        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None)
+        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None, None)
         account.app_password = self.fake.password(length=16)
 
         # Setup settings
@@ -285,7 +285,7 @@ class TestEmailsReviewedCountEndToEnd(unittest.TestCase):
         """
         # Setup account
         test_email = self.fake.email()
-        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None)
+        account = self.fake_account_category_client.get_or_create_account(test_email, None, None, None, None)
         account.app_password = self.fake.password(length=16)
 
         # Setup settings
