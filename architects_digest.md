@@ -2,7 +2,13 @@
 > Status: In Progress
 
 ## Active Stack
-1. Enhance Audit Records for Email Processing (Decomposed)
+2. Add OAuth Status Visual Indicator on Accounts Page (In Progress)
+   - Display auth_method badge in accounts table
+   - Green "OAuth Connected" badge for OAuth accounts
+   - Gray "IMAP" badge for IMAP credential accounts
+   - Efficient: Include auth_method in /api/accounts response (avoid N+1 queries)
+
+1. Enhance Audit Records for Email Processing (All Sub-tasks Completed)
    1.1 Core Fields - Database Model and Basic Field Existence (Completed)
        - Added emails_categorized and emails_skipped columns to ProcessingRun model
        - Added fields to AccountStatus dataclass
@@ -30,31 +36,31 @@
        - 4 comprehensive tests covering all no-session scenarios
    1.5 Data Integrity and Persistence (Decomposed)
        1.5a Python Migration 006 - Core (Completed)
-           - ✅ Created migrations/migration_006_add_categorized_skipped_columns.py
-           - ✅ Migration creates columns when missing
-           - ✅ Migration is idempotent (safe to run multiple times)
-           - ✅ Migration downgrade removes columns
-           - ✅ All 13 tests passing
+           - Created migrations/migration_006_add_categorized_skipped_columns.py
+           - Migration creates columns when missing
+           - Migration is idempotent (safe to run multiple times)
+           - Migration downgrade removes columns
+           - All 13 tests passing
            - Test file: tests/test_migration_006.py
        1.5b Persistence Verification (Completed)
-           - ✅ Single value persistence through session close/reopen
-           - ✅ Cumulative increments persist as total
-           - ✅ Large values (1000+) persist correctly
-           - ✅ Zero values persist as 0 (not NULL)
-           - ✅ All 10 tests passing
+           - Single value persistence through session close/reopen
+           - Cumulative increments persist as total
+           - Large values (1000+) persist correctly
+           - Zero values persist as 0 (not NULL)
+           - All 10 tests passing
            - Test file: tests/test_data_integrity_persistence.py
    1.6 Thread Safety and Large Counts (Completed)
-       - ✅ Concurrent access safety verified (10-100 threads)
-       - ✅ Large count handling (1000+, up to 50000) tested
-       - ✅ Lock mechanism prevents race conditions
-       - ✅ Mixed operations (read/write) thread-safe
-       - ✅ All 13 tests passing
+       - Concurrent access safety verified (10-100 threads)
+       - Large count handling (1000+, up to 50000) tested
+       - Lock mechanism prevents race conditions
+       - Mixed operations (read/write) thread-safe
+       - All 13 tests passing
        - Test file: tests/test_thread_safety_concurrent_increments.py
    1.7 API Response Enhancement (Completed)
-       - ✅ Status endpoint includes emails_categorized and emails_skipped via AccountStatus.to_dict()
-       - ✅ History endpoint includes new fields via database_service.get_processing_runs()
-       - ✅ Both fields default to 0 for NULL/missing values
-       - ✅ All 9 API integration tests passing
+       - Status endpoint includes emails_categorized and emails_skipped via AccountStatus.to_dict()
+       - History endpoint includes new fields via database_service.get_processing_runs()
+       - Both fields default to 0 for NULL/missing values
+       - All 9 API integration tests passing
        - Test file: tests/test_api_response_categorized_skipped.py
 
 ## Recently Completed
@@ -94,49 +100,35 @@
 - [x] 1.5b Persistence Verification (10 tests passing)
 - [x] 1.6 Thread Safety and Large Counts (13 tests passing)
 - [x] 1.7 API Response Enhancement (9 tests passing)
+- [x] Enhance Audit Records for Email Processing (ALL SUB-TASKS 1.1-1.7 COMPLETE)
 
 ## Context
 
 ### Current Task Description
-Enhance the audit records to include email, start time, end time, duration, step, error,
-total emails scanned, total emails categorized, total emails deleted, total emails skipped.
+Add a visual indicator on the Accounts page showing Gmail OAuth connection status:
+- Display "OAuth Connected" (green badge) for accounts using OAuth authentication
+- Display "IMAP" (gray badge) for accounts using IMAP credentials
+- Efficient implementation: Include auth_method in /api/accounts response to avoid N+1 queries
 
-### Current State Analysis
-All requested audit fields now exist in ProcessingRun:
-- email_address, start_time, end_time, current_step, error_message
-- emails_found (scanned), emails_deleted, emails_reviewed, emails_tagged
-- **emails_categorized** - Count of emails successfully assigned a category (ADDED in sub-task 1.1)
-- **emails_skipped** - Count of emails skipped (e.g., already processed, filtered out) (ADDED in sub-task 1.1)
+### Implementation Strategy (Recommended)
+**Option A - Include auth_method in accounts list response (Efficient)**
+1. Add auth_method field to EmailAccountInfo response model
+2. Update GET /api/accounts to include account.auth_method in response
+3. Update frontend accounts.html to display badge based on auth_method value
+4. Single API call serves all data - no N+1 queries
 
-Completed work:
-- **1.1**: Database columns and dataclass fields (37 tests passing)
-- **1.2**: Increment methods (20 tests passing)
-- **1.3**: Edge case handling - zero counts, empty batch (10 tests passing)
-- **1.4**: Edge case handling - no active session (4 tests in 1.2)
+**Option B - Per-account OAuth status calls (Not Recommended)**
+- Would require N+1 API calls using existing /api/accounts/{email}/oauth-status endpoint
+- Less efficient, more network overhead
 
-Completed work (continued):
-- **1.5a**: Python migration 006 for older SQLite databases (13 tests passing)
-- **1.5b**: Data integrity and persistence verification (10 tests passing)
-- **1.6**: Thread safety and large count handling tests (13 tests passing)
-- **1.7**: API response integration (9 tests passing)
+### Key Files to Modify
+1. models/account_models.py - Add auth_method to EmailAccountInfo
+2. api_service.py - Include auth_method in GET /api/accounts response (lines 1846-1857)
+3. frontend/templates/accounts.html - Add Auth Method column with badge styling
+4. frontend/templates/accounts.html - Update renderAccountsTable() JavaScript function
 
-ALL SUB-TASKS COMPLETED (1.1 through 1.7)
-
-Note: Full implementation complete. All audit fields (emails_categorized and emails_skipped) are now tracked, persisted, and exposed via API endpoints.
-
-### Key Files Modified/Created
-1. models/database.py - ProcessingRun model (columns added)
-2. services/processing_status_manager.py - AccountStatus dataclass (fields added, increment methods)
-3. services/database_service.py - get_processing_runs() updated to include new fields
-4. sql/V3__add_categorized_skipped_columns.sql - Flyway migration (created)
-5. migrations/migration_006_add_categorized_skipped_columns.py - Python migration (created for sub-task 1.5a)
-6. tests/test_api_response_categorized_skipped.py - API integration tests (created for sub-task 1.7)
-
-### Processing States Timeline
-The Gantt chart should represent these processing phases:
-1. CONNECTING - Initial connection to Gmail IMAP
-2. FETCHING - Retrieving emails from mailbox
-3. PROCESSING - General email processing
-4. CATEGORIZING - AI categorization of emails
-5. LABELING - Applying Gmail labels
-6. COMPLETED/ERROR - Final state
+### Existing OAuth Infrastructure
+- EmailAccount model has auth_method column (models/database.py:45)
+- OAuthStatusResponse model exists (models/oauth_models.py:42-57)
+- GET /api/accounts/{email}/oauth-status endpoint exists (api_service.py:1596-1642)
+- OAuth columns in database: auth_method, oauth_client_id, oauth_client_secret, oauth_refresh_token, oauth_access_token, oauth_token_expiry, oauth_scopes
