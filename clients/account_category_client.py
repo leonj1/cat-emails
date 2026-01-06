@@ -137,10 +137,10 @@ class AccountCategoryClient(AccountCategoryClientInterface):
     def get_or_create_account(
         self,
         email_address: str,
-        display_name: Optional[str] = None,
-        app_password: Optional[str] = None,
-        auth_method: str = "imap",
-        oauth_refresh_token: Optional[str] = None,
+        display_name: Optional[str],
+        app_password: Optional[str],
+        auth_method: Optional[str],
+        oauth_refresh_token: Optional[str],
     ) -> EmailAccount:
         """
         Get existing account or create a new one.
@@ -182,8 +182,8 @@ class AccountCategoryClient(AccountCategoryClientInterface):
         email_address: str,
         display_name: Optional[str],
         app_password: Optional[str],
-        auth_method: str = "imap",
-        oauth_refresh_token: Optional[str] = None,
+        auth_method: Optional[str],
+        oauth_refresh_token: Optional[str],
     ) -> EmailAccount:
         """Implementation of get_or_create_account that works with a session."""
         try:
@@ -292,7 +292,7 @@ class AccountCategoryClient(AccountCategoryClientInterface):
         
         try:
             # Get or create account first
-            account = self.get_or_create_account(email_address)
+            account = self.get_or_create_account(email_address, None, None, None, None)
             
             if self.owns_session:
                 with self._get_session() as session:
@@ -334,7 +334,7 @@ class AccountCategoryClient(AccountCategoryClientInterface):
         
         try:
             # Get or create account
-            account = self.get_or_create_account(email_address)
+            account = self.get_or_create_account(email_address, None, None, None, None)
             
             if self.owns_session:
                 with self._get_session() as session:
@@ -530,7 +530,7 @@ class AccountCategoryClient(AccountCategoryClientInterface):
             logger.error(f"Unexpected error in _get_top_categories_impl: {str(e)}")
             raise
     
-    def get_all_accounts(self, active_only: bool = True) -> List[EmailAccount]:
+    def get_all_accounts(self, active_only: bool) -> List[EmailAccount]:
         """
         Get list of all tracked accounts.
         
@@ -803,7 +803,7 @@ if __name__ == "__main__":
     
     try:
         # Create/get an account
-        account = service.get_or_create_account("test@gmail.com", "Test User")
+        account = service.get_or_create_account("test@gmail.com", "Test User", None, None, None)
         print(f"Account created/retrieved: {account.email_address}")
         
         # Record some category stats

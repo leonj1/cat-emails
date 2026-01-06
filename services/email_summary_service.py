@@ -127,7 +127,7 @@ class EmailSummaryService:
         if self.account_service and self.gmail_email:
             try:
                 # Create account and get its ID, but don't keep reference to avoid session issues
-                account = self.account_service.get_or_create_account(self.gmail_email)
+                account = self.account_service.get_or_create_account(self.gmail_email, None, None, None, None)
                 self.current_account_id = account.id
                 account_id = account.id  # Store ID before account object goes out of scope
                 logger.info(f"Processing run linked to account: {self.gmail_email} (ID: {account_id})")

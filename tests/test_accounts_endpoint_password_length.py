@@ -50,13 +50,13 @@ class TestAccountsEndpointPasswordLength(unittest.TestCase):
         fake_client = FakeAccountCategoryClient()
         
         # Create test accounts with different password scenarios
-        account1 = fake_client.get_or_create_account("test1@gmail.com")
+        account1 = fake_client.get_or_create_account("test1@gmail.com", None, None, None)
         account1.app_password = "abcdefghijklmnop"  # 16 characters
         
-        account2 = fake_client.get_or_create_account("test2@gmail.com")
+        account2 = fake_client.get_or_create_account("test2@gmail.com", None, None, None)
         account2.app_password = None  # No password
         
-        account3 = fake_client.get_or_create_account("test3@gmail.com") 
+        account3 = fake_client.get_or_create_account("test3@gmail.com", None, None, None) 
         account3.app_password = "verylongpassword123456"  # 22 characters
         
         # Override the dependency to use our fake client
@@ -118,9 +118,9 @@ class TestAccountsEndpointPasswordLength(unittest.TestCase):
         """Test that password_length is 0 when account has no password."""
         # Create a client with only accounts without passwords
         fake_client = FakeAccountCategoryClient()
-        account1 = fake_client.get_or_create_account("nopass1@gmail.com")
+        account1 = fake_client.get_or_create_account("nopass1@gmail.com", None, None, None)
         account1.app_password = None
-        account2 = fake_client.get_or_create_account("nopass2@gmail.com")
+        account2 = fake_client.get_or_create_account("nopass2@gmail.com", None, None, None)
         account2.app_password = ""  # Empty string should also be 0
         
         # Override the dependency
@@ -156,7 +156,7 @@ class TestAccountsEndpointPasswordLength(unittest.TestCase):
         ]
         
         for email, password, expected_length in test_cases:
-            account = fake_client.get_or_create_account(email)
+            account = fake_client.get_or_create_account(email, None, None, None)
             account.app_password = password
             
         # Override the dependency

@@ -15,8 +15,8 @@ def example_usage():
     client = FakeAccountCategoryClient()
 
     # Create some accounts
-    account1 = client.get_or_create_account("user1@example.com", "User One")
-    account2 = client.get_or_create_account("user2@example.com", "User Two")
+    account1 = client.get_or_create_account("user1@example.com", "User One", None, None)
+    account2 = client.get_or_create_account("user2@example.com", "User Two", None, None)
 
     print(f"Created account: {account1.email_address} (ID: {account1.id})")
     print(f"Created account: {account2.email_address} (ID: {account2.id})")

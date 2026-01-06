@@ -90,7 +90,7 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         test_password = self.fake.password()
 
         # Create account using real client
-        account = self.real_client.get_or_create_account(test_email)
+        account = self.real_client.get_or_create_account(test_email, None, None, None)
 
         # This should NOT raise AttributeError
         # Set the app_password
@@ -114,7 +114,7 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         api_token = self.fake.uuid4()
 
         # Create account with app_password
-        account = self.real_client.get_or_create_account(test_email)
+        account = self.real_client.get_or_create_account(test_email, None, None, None)
         account.app_password = test_password
         self.session.add(account)
         self.session.commit()
@@ -146,7 +146,7 @@ class TestEmailAccountAppPasswordIntegration(unittest.TestCase):
         api_token = self.fake.uuid4()
 
         # Create account WITHOUT app_password
-        account = self.real_client.get_or_create_account(test_email)
+        account = self.real_client.get_or_create_account(test_email, None, None, None)
         # Don't set app_password - it should be None
         self.session.add(account)
         self.session.commit()

@@ -86,6 +86,35 @@
         box-shadow: 0 2px 4px rgba(107, 114, 128, 0.3);
     }
 
+    /* Auth method badges */
+    .auth-badge {
+        padding: 0.375rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        display: inline-block;
+        min-width: 7rem;
+        text-align: center;
+    }
+
+    .auth-badge.oauth {
+        background-color: #198754;
+        color: white;
+        box-shadow: 0 2px 4px rgba(25, 135, 84, 0.3);
+    }
+
+    .auth-badge.imap {
+        background-color: #6c757d;
+        color: white;
+        box-shadow: 0 2px 4px rgba(108, 117, 125, 0.3);
+    }
+
+    .auth-badge.not-configured {
+        background-color: #f8f9fa;
+        color: #212529;
+        border: 1px solid #dee2e6;
+    }
+
     /* Action buttons */
     .action-buttons {
         display: flex;
@@ -333,6 +362,7 @@
             <thead>
                 <tr>
                     <th>Email Address</th>
+                    <th>Auth Method</th>
                     <th>Display Name</th>
                     <th>Status</th>
                     <th>Last Scan</th>
@@ -514,6 +544,30 @@
             emailSpan.textContent = account.email_address;
             emailCell.appendChild(emailSpan);
 
+            // Create Auth Method cell
+            const authMethodCell = document.createElement('td');
+            authMethodCell.setAttribute('data-label', 'Auth Method');
+            const authBadge = document.createElement('span');
+            authBadge.className = 'auth-badge';
+
+            // Determine badge text and style based on auth_method (case-insensitive)
+            const authMethod = account.auth_method ? account.auth_method.toLowerCase() : null;
+            if (authMethod === 'oauth') {
+                authBadge.classList.add('oauth');
+                authBadge.textContent = 'OAuth Connected';
+                authBadge.setAttribute('aria-label', 'Authentication method: OAuth Connected');
+            } else if (authMethod === 'imap') {
+                authBadge.classList.add('imap');
+                authBadge.textContent = 'IMAP';
+                authBadge.setAttribute('aria-label', 'Authentication method: IMAP');
+            } else {
+                authBadge.classList.add('not-configured');
+                authBadge.textContent = 'Not Configured';
+                authBadge.setAttribute('aria-label', 'Authentication method: Not Configured');
+            }
+
+            authMethodCell.appendChild(authBadge);
+
             // Create Display Name cell
             const displayNameCell = document.createElement('td');
             displayNameCell.setAttribute('data-label', 'Display Name');
@@ -587,6 +641,7 @@
 
             // Append all cells to row
             row.appendChild(emailCell);
+            row.appendChild(authMethodCell);
             row.appendChild(displayNameCell);
             row.appendChild(statusCell);
             row.appendChild(lastScanCell);

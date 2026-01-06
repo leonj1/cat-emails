@@ -52,7 +52,7 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         """Test deletion of account without associated data."""
         # Create an account
         email = "test@example.com"
-        account = self.client.get_or_create_account(email, "Test User")
+        account = self.client.get_or_create_account(email, "Test User", None, None)
         self.assertIsNotNone(account)
 
         # Verify account exists
@@ -71,7 +71,7 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         """Test deletion of account with associated category statistics."""
         # Create an account
         email = "test@example.com"
-        account = self.client.get_or_create_account(email, "Test User")
+        account = self.client.get_or_create_account(email, "Test User", None, None)
 
         # Add some category stats
         stats_date = date.today()
@@ -104,7 +104,7 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         """Test that deleting account cascades to delete all associated stats."""
         # Create an account
         email = "cascade@example.com"
-        account = self.client.get_or_create_account(email, "Cascade Test")
+        account = self.client.get_or_create_account(email, "Cascade Test", None, None)
         account_id = account.id
 
         # Add category stats for multiple days
@@ -134,9 +134,9 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         email2 = "user2@example.com"
         email3 = "user3@example.com"
 
-        account1 = self.client.get_or_create_account(email1, "User 1")
-        account2 = self.client.get_or_create_account(email2, "User 2")
-        account3 = self.client.get_or_create_account(email3, "User 3")
+        account1 = self.client.get_or_create_account(email1, "User 1", None, None)
+        account2 = self.client.get_or_create_account(email2, "User 2", None, None)
+        account3 = self.client.get_or_create_account(email3, "User 3", None, None)
 
         # Add stats to all accounts
         stats_date = date.today()
@@ -179,7 +179,7 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         """Test deletion of deactivated account works correctly."""
         # Create and deactivate an account
         email = "inactive@example.com"
-        account = self.client.get_or_create_account(email, "Inactive User")
+        account = self.client.get_or_create_account(email, "Inactive User", None, None)
 
         # Deactivate it
         result = self.client.deactivate_account(email)
@@ -201,7 +201,7 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         email = "recreate@example.com"
 
         # Create account first time
-        account1 = self.client.get_or_create_account(email, "Original User")
+        account1 = self.client.get_or_create_account(email, "Original User", None, None)
         original_id = account1.id
 
         # Delete it
@@ -209,7 +209,7 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         self.assertTrue(result)
 
         # Create account again with same email
-        account2 = self.client.get_or_create_account(email, "New User")
+        account2 = self.client.get_or_create_account(email, "New User", None, None)
         new_id = account2.id
 
         # Verify it's a new account (may reuse ID in SQLite, but should have new data)
@@ -224,7 +224,7 @@ class TestAccountDeletionIntegration(unittest.TestCase):
         # We'll create an account and then test error handling
 
         email = "rollback@example.com"
-        account = self.client.get_or_create_account(email, "Rollback Test")
+        account = self.client.get_or_create_account(email, "Rollback Test", None, None)
 
         # Create a new session for the second client
         Session = sessionmaker(bind=self.engine)

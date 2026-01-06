@@ -174,6 +174,8 @@ class TestEmailAccountOAuthColumnsIntegration(unittest.TestCase):
         test_email = 'test_oauth_get_all@example.com'
         account = self.client.get_or_create_account(
             email_address=test_email,
+            app_password=None,
+            oauth_refresh_token=None,
             display_name='Test OAuth User',
             auth_method='imap'
         )
@@ -202,6 +204,7 @@ class TestEmailAccountOAuthColumnsIntegration(unittest.TestCase):
 
         account = self.client.get_or_create_account(
             email_address=test_email,
+            app_password=None,
             display_name='OAuth Test User',
             auth_method='oauth',
             oauth_refresh_token='test_refresh_token_value'
@@ -223,6 +226,8 @@ class TestEmailAccountOAuthColumnsIntegration(unittest.TestCase):
         # Create account first
         self.client.get_or_create_account(
             email_address=test_email,
+            app_password=None,
+            oauth_refresh_token=None,
             display_name='OAuth Update Test',
             auth_method='imap'
         )
@@ -254,6 +259,8 @@ class TestEmailAccountOAuthColumnsIntegration(unittest.TestCase):
         # Create account with OAuth
         self.client.get_or_create_account(
             email_address=test_email,
+            display_name=None,
+            app_password=None,
             auth_method='oauth',
             oauth_refresh_token='test_refresh'
         )

@@ -120,6 +120,10 @@ class EmailAccountInfo(BaseModel):
         description="Timestamp of the last successful email scan"
     )
     created_at: datetime = Field(description="When the account was first added to tracking")
+    auth_method: Optional[str] = Field(
+        None,
+        description="Authentication method: 'oauth', 'imap', or null for legacy accounts"
+    )
 
 
 class AccountListResponse(BaseModel):
