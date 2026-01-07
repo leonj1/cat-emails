@@ -10,9 +10,10 @@ import time
 import asyncio
 from typing import Optional, Dict, List
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
 # Add the current directory to the Python path
@@ -1480,7 +1481,7 @@ async def initiate_oauth(
 @app.post("/api/auth/gmail/callback", response_model=OAuthCallbackResponse, tags=["oauth"])
 async def oauth_callback(
     request: OAuthCallbackRequest,
-    redirect_uri: str = Query(..., description="Same redirect_uri used in authorization request"),
+    redirect_uri: Optional[str] = Query(None, description="Same redirect_uri used in authorization request (optional, retrieved from state if not provided)"),
     x_api_key: Optional[str] = Header(None),
     oauth_service: OAuthFlowService = Depends(get_oauth_service),
     account_service: AccountCategoryClientInterface = Depends(get_account_service),
@@ -1494,26 +1495,45 @@ async def oauth_callback(
 
     Args:
         request: Contains authorization code and state token
-        redirect_uri: Same redirect_uri used in authorization request
+        redirect_uri: Same redirect_uri used in authorization request (optional, retrieved from state if not provided)
 
     Returns:
         OAuthCallbackResponse with success status and granted scopes
     """
+    # Log OAuth callback parameters (sanitized - no sensitive data)
+    logger.info(
+        f"OAuth callback received - "
+        f"redirect_uri: {'provided' if redirect_uri else 'omitted'}, "
+        f"code: {'present' if request.code else 'missing'}, "
+        f"state: {'present' if request.state else 'missing'}"
+    )
+
     verify_api_key(x_api_key)
 
     try:
         # Validate state token from database
         state_data = state_repo.get_state(request.state)
         if not state_data:
+            logger.warning("OAuth callback failed - state token not found or expired")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired state token. Please restart the OAuth flow."
             )
 
+        # Use redirect_uri from state data if not provided in query
+        effective_redirect_uri = redirect_uri or state_data.get('redirect_uri')
+        if not effective_redirect_uri:
+            logger.error("OAuth callback failed - no redirect_uri in query or state")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No redirect_uri found. Please restart the OAuth flow."
+            )
+
         # Exchange authorization code for tokens
+        logger.info(f"Exchanging authorization code - redirect_uri source: {'query' if redirect_uri else 'state'}")
         token_response = oauth_service.exchange_code_for_tokens(
             code=request.code,
-            redirect_uri=redirect_uri,
+            redirect_uri=effective_redirect_uri,
         )
 
         access_token = token_response.get('access_token')
@@ -2833,6 +2853,28 @@ async def not_found(request, exc):
                 "websocket_status": "WS /ws/status"
             }
         }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Custom validation error handler with verbose logging for debugging."""
+    # Log detailed information about the validation error
+    logger.error(f"Request validation error on {request.method} {request.url.path}")
+    logger.error(f"Validation errors: {exc.errors()}")
+
+    # Log request details for OAuth callback specifically (sanitized - no sensitive data)
+    if "/api/auth/gmail/callback" in str(request.url.path):
+        logger.error(f"OAuth callback validation failed - path: {request.url.path}")
+        # Log presence of query params without exposing values
+        logger.error(f"OAuth callback query params present: {list(request.query_params.keys())}")
+        # Do not log request body for OAuth callback as it contains sensitive tokens
+        logger.error("OAuth callback request body not logged (contains sensitive tokens)")
+
+    # Return the standard validation error response
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
     )
 
 
