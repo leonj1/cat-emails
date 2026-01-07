@@ -22,6 +22,7 @@ from clients.account_category_client import AccountCategoryClient
 from services.gmail_fetcher_interface import GmailFetcherInterface
 from services.gmail_connection_service import GmailConnectionService
 from services.http_link_remover_service import HttpLinkRemoverService
+from utils.auth_method_resolver import AuthMethodResolver
 
 
 logger = get_logger(__name__)
@@ -73,9 +74,21 @@ class GmailFetcher(GmailFetcherInterface):
         self.account_service = None
         try:
             self.account_service = AccountCategoryClient()
-            # Register/activate the account (don't store the returned object to avoid session issues)
-            # Mark as IMAP authentication with the app password
-            self.account_service.get_or_create_account(self.email_address, None, app_password, 'imap', None)
+
+            # Resolve auth method based on connection_service presence
+            auth_context = AuthMethodResolver.resolve(
+                connection_service=connection_service,
+                app_password=app_password
+            )
+
+            # Register/activate the account with appropriate auth settings
+            self.account_service.get_or_create_account(
+                self.email_address,
+                None,  # display_name
+                auth_context.app_password,  # None for OAuth, actual password for IMAP
+                auth_context.auth_method,   # None for OAuth, 'imap' for IMAP
+                None   # oauth_refresh_token
+            )
             logger.info(f"Account registered for category tracking: {self.email_address}")
         except Exception as e:
             logger.error(f"Failed to initialize AccountCategoryClient for {self.email_address}: {str(e)}")

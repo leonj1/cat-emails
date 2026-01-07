@@ -2,6 +2,19 @@
 > Status: In Progress
 
 ## Active Stack
+3. Fix Gmail OAuth Auth Method Corruption Bug (BDD Scenarios Complete)
+   - Root Cause: /root/repo/services/gmail_fetcher_service.py line 78 always sets auth_method='imap'
+   - Fix Part 1: Conditionally set auth_method based on connection_service presence
+   - Fix Part 2: Create migration to restore corrupted OAuth accounts (auth_method='imap' but have oauth_refresh_token)
+   - Key Files: gmail_fetcher_service.py:78, account_category_client.py:137-250
+   - **BDD Phase Complete**: 24 Gherkin scenarios generated and approved
+   - Feature Files:
+     - tests/bdd/gmail-oauth-auth-preservation.feature (8 scenarios)
+     - tests/bdd/corrupted-oauth-account-restoration.feature (10 scenarios)
+     - tests/bdd/auth-method-resolution-logic.feature (6 scenarios)
+   - BDD Spec: specs/BDD-SPEC-gmail-oauth-auth-fix.md
+   - **Next**: gherkin-to-test agent to create TDD prompts
+
 2. Add OAuth Status Visual Indicator on Accounts Page (In Progress)
    - Display auth_method badge in accounts table
    - Green "OAuth Connected" badge for OAuth accounts
@@ -104,7 +117,37 @@
 
 ## Context
 
-### Current Task Description
+### Current Task Description (Task 3 - NEW from CRASH-RCA)
+Fix the Gmail OAuth authentication corruption bug identified in the CRASH-RCA investigation.
+
+**Root Cause:**
+At `/root/repo/services/gmail_fetcher_service.py` line 78:
+```python
+self.account_service.get_or_create_account(self.email_address, None, app_password, 'imap', None)
+```
+
+This line ALWAYS sets `auth_method='imap'` regardless of whether the account uses OAuth authentication. When an OAuth account is processed:
+1. GmailFetcher is created with a `connection_service` (OAuth connection)
+2. Line 78 calls get_or_create_account with `auth_method='imap'`
+3. The database updates `auth_method` from 'oauth' to 'imap'
+4. Next time the account is processed, it tries IMAP authentication instead of OAuth
+5. IMAP authentication fails because there's no valid app_password for OAuth accounts
+
+**Fix Requirements:**
+1. **Part 1 - Code Fix:** Modify `/root/repo/services/gmail_fetcher_service.py` line 78:
+   - If `connection_service` is provided (OAuth), don't overwrite auth_method
+   - If no `connection_service` (IMAP), set `auth_method='imap'` and pass app_password
+
+2. **Part 2 - Database Migration:** Restore corrupted OAuth accounts:
+   - Find accounts with `oauth_refresh_token IS NOT NULL` but `auth_method='imap'`
+   - Update their `auth_method` to 'oauth'
+
+**Key Files:**
+- `/root/repo/services/gmail_fetcher_service.py:78` - Bug location
+- `/root/repo/clients/account_category_client.py:137-250` - get_or_create_account implementation
+- `/root/repo/models/database.py:31-60` - EmailAccount model with auth_method column
+
+### Previous Task Context (Task 2)
 Add a visual indicator on the Accounts page showing Gmail OAuth connection status:
 - Display "OAuth Connected" (green badge) for accounts using OAuth authentication
 - Display "IMAP" (gray badge) for accounts using IMAP credentials
