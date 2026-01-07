@@ -26,7 +26,12 @@ from utils.logger import get_logger
 
 
 class RestorationError(Exception):
-    """Error during OAuth account restoration."""
+    """Error during OAuth account restoration.
+
+    Attributes:
+        email_address: Email of the account that failed to restore
+        cause: The underlying exception that caused the failure
+    """
 
     def __init__(self, email_address: str, cause: Exception):
         """
