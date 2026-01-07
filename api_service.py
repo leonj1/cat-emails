@@ -1480,7 +1480,7 @@ async def initiate_oauth(
 @app.post("/api/auth/gmail/callback", response_model=OAuthCallbackResponse, tags=["oauth"])
 async def oauth_callback(
     request: OAuthCallbackRequest,
-    redirect_uri: str = Query(..., description="Same redirect_uri used in authorization request"),
+    redirect_uri: Optional[str] = Query(None, description="Same redirect_uri used in authorization request (optional, retrieved from state if not provided)"),
     x_api_key: Optional[str] = Header(None),
     oauth_service: OAuthFlowService = Depends(get_oauth_service),
     account_service: AccountCategoryClientInterface = Depends(get_account_service),
@@ -1494,7 +1494,7 @@ async def oauth_callback(
 
     Args:
         request: Contains authorization code and state token
-        redirect_uri: Same redirect_uri used in authorization request
+        redirect_uri: Same redirect_uri used in authorization request (optional, retrieved from state if not provided)
 
     Returns:
         OAuthCallbackResponse with success status and granted scopes
@@ -1510,10 +1510,18 @@ async def oauth_callback(
                 detail="Invalid or expired state token. Please restart the OAuth flow."
             )
 
+        # Use redirect_uri from state data if not provided in query
+        effective_redirect_uri = redirect_uri or state_data.get('redirect_uri')
+        if not effective_redirect_uri:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No redirect_uri found. Please restart the OAuth flow."
+            )
+
         # Exchange authorization code for tokens
         token_response = oauth_service.exchange_code_for_tokens(
             code=request.code,
-            redirect_uri=redirect_uri,
+            redirect_uri=effective_redirect_uri,
         )
 
         access_token = token_response.get('access_token')

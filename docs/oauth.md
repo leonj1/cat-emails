@@ -128,7 +128,19 @@ After the user completes consent on Google's site, they are redirected back to y
 
 ### Request
 
+The `redirect_uri` query parameter is optional. If omitted, the API retrieves it from the stored state:
+
 ```bash
+# Without redirect_uri (recommended - uses stored value)
+curl -X POST "https://your-api-host/api/auth/gmail/callback" \
+  -H "X-API-Key: ${GMAIL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "4/0AfJohXnN...",
+    "state": "abc123xyz789..."
+  }'
+
+# With explicit redirect_uri (for backwards compatibility)
 curl -X POST "https://your-api-host/api/auth/gmail/callback?redirect_uri=https://your-app.com/oauth/callback" \
   -H "X-API-Key: ${GMAIL_API_KEY}" \
   -H "Content-Type: application/json" \
@@ -142,9 +154,11 @@ curl -X POST "https://your-api-host/api/auth/gmail/callback?redirect_uri=https:/
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `redirect_uri` | query | Yes | Same redirect_uri used in authorization request |
+| `redirect_uri` | query | No | Same redirect_uri used in authorization request (optional, retrieved from state if not provided) |
 | `code` | body | Yes | Authorization code from Google callback |
 | `state` | body | Yes | State token for CSRF validation |
+
+> **Note**: The `redirect_uri` query parameter is optional. If not provided, the API will automatically retrieve the redirect_uri that was stored during the authorization step (via the state token). This simplifies client implementations.
 
 ### Response (Success)
 
@@ -182,9 +196,9 @@ if (state !== storedState) {
   throw new Error('CSRF validation failed');
 }
 
-// Exchange code for tokens
+// Exchange code for tokens (redirect_uri is optional - retrieved from state automatically)
 const response = await fetch(
-  `${API_BASE}/api/auth/gmail/callback?redirect_uri=${encodeURIComponent(REDIRECT_URI)}`,
+  `${API_BASE}/api/auth/gmail/callback`,
   {
     method: 'POST',
     headers: {
@@ -468,8 +482,9 @@ function OAuthCallbackPage() {
     }
 
     try {
+      // redirect_uri is optional - the API retrieves it from the stored state
       const response = await fetch(
-        `${API_BASE}/api/auth/gmail/callback?redirect_uri=${encodeURIComponent(REDIRECT_URI)}`,
+        `${API_BASE}/api/auth/gmail/callback`,
         {
           method: 'POST',
           headers: {
