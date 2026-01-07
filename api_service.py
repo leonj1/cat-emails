@@ -2872,7 +2872,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             body = await request.body()
             logger.error(f"OAuth callback request body: {body.decode('utf-8', errors='replace')[:500]}")
         except Exception as e:
-            logger.error(f"Could not read request body: {e}")
+            logger.exception(f"Could not read request body: {e}")
 
     # Return the standard validation error response
     return JSONResponse(
