@@ -1375,12 +1375,12 @@ Tech Stack:
 
 Key Files Identified for Gmail Authentication:
 
-1. /root/repo/services/gmail_connection_service.py (lines 17-93) - IMAP Connection
+1. /root/repo/services/gmail_connection_service.py (lines 17-92) - IMAP Connection
    - GmailConnectionService.connect() method performs IMAP authentication
    - Tries SASL AUTHENTICATE PLAIN first
    - Falls back to sanitized password retry (whitespace removal)
    - Falls back to IMAP LOGIN mechanism
-   - Line 83-87: Error message matches the task error exactly
+   - Line 83-89: Error message matches the task error exactly
    - Error path: PLAIN fails -> sanitized retry fails -> LOGIN fails -> raises Exception
 
 2. /root/repo/services/gmail_oauth_connection_service.py (lines 238-284) - OAuth Connection
@@ -1394,10 +1394,11 @@ Key Files Identified for Gmail Authentication:
    - Lines 115-123: OAuth path
    - Lines 124-129: IMAP path (default)
 
-4. /root/repo/services/account_email_processor_service.py (lines 122-191) - Call site
+4. /root/repo/services/account_email_processor_service.py (lines 65-191) - Call site
+   - process_account() method starts at line 65
    - Line 123: auth_method = getattr(account, 'auth_method', 'imap') or 'imap'
    - Lines 128-144: OAuth credential validation
-   - Lines 146-161: IMAP credential validation
+   - Lines 146-162: IMAP credential validation
    - Lines 175-191: Creates Gmail connection based on auth_method
 
 5. /root/repo/clients/account_category_client.py - Account management
