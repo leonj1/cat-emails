@@ -1352,3 +1352,80 @@ Active Task from architects_digest.md:
 
 Next: Invoking architect agent to create spec for OAuth status visual indicator
 ---
+
+=== Session 20260107-115735 ===
+Workflow: debugger
+Task: Gmail authentication failure - AUTHENTICATIONFAILED Invalid credentials during IMAP login
+Status: Initialized
+Context: Explored project structure, identified Gmail connection architecture
+
+Error Message:
+```
+Processing failed: Failed to connect to Gmail: Failed to connect to Gmail: [AUTHENTICATIONFAILED] Invalid credentials (Failure); sanitized retry error: [AUTHENTICATIONFAILED] Invalid credentials (Failure); LOGIN error: b'[AUTHENTICATIONFAILED] Invalid credentials (Failure)'. Gmail authentication failed. Ensure GMAIL_PASSWORD is a Gmail App Password (not your regular password), 16 characters, no spaces, and that 2-Step Verification is enabled. If you pasted the password from Google, remove all spaces.
+```
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API (api_service.py - ~109k lines)
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- AI/ML: OpenAI SDK for LLM-based email categorization
+- Email: IMAP (imapclient) for Gmail integration, OAuth 2.0 support
+- Testing: pytest with BDD (Gherkin feature files in tests/bdd/)
+- Build: Docker with Tini entrypoint, Makefile
+
+Key Files Identified for Gmail Authentication:
+
+1. /root/repo/services/gmail_connection_service.py (lines 17-93) - IMAP Connection
+   - GmailConnectionService.connect() method performs IMAP authentication
+   - Tries SASL AUTHENTICATE PLAIN first
+   - Falls back to sanitized password retry (whitespace removal)
+   - Falls back to IMAP LOGIN mechanism
+   - Line 83-87: Error message matches the task error exactly
+   - Error path: PLAIN fails -> sanitized retry fails -> LOGIN fails -> raises Exception
+
+2. /root/repo/services/gmail_oauth_connection_service.py (lines 238-284) - OAuth Connection
+   - GmailOAuthConnectionService.connect() uses XOAUTH2 authentication
+   - Uses OAuth 2.0 access token from refresh token
+   - Lines 262-280: Handles "Invalid credentials" differently for OAuth
+
+3. /root/repo/services/gmail_connection_factory.py (lines 80-129) - Factory
+   - GmailConnectionFactory.create_connection() selects auth method
+   - Line 112: Uses auth_method parameter or environment variable
+   - Lines 115-123: OAuth path
+   - Lines 124-129: IMAP path (default)
+
+4. /root/repo/services/account_email_processor_service.py (lines 122-191) - Call site
+   - Line 123: auth_method = getattr(account, 'auth_method', 'imap') or 'imap'
+   - Lines 128-144: OAuth credential validation
+   - Lines 146-161: IMAP credential validation
+   - Lines 175-191: Creates Gmail connection based on auth_method
+
+5. /root/repo/clients/account_category_client.py - Account management
+   - Lines 770-784: IMAP account creation with auth_method='imap'
+   - Lines 685-700: OAuth account creation with auth_method='oauth'
+
+Call Chain for IMAP Authentication:
+1. AccountEmailProcessorService.process_account() retrieves account from database
+2. Gets auth_method (defaults to 'imap' if not set or None)
+3. For IMAP: Gets app_password from account
+4. Creates GmailFetcher with email_address, app_password, api_token
+5. GmailFetcher uses GmailConnectionService.connect()
+6. connect() tries PLAIN -> sanitized -> LOGIN -> all fail -> raises Exception
+
+Potential Root Causes to Investigate:
+1. Account has auth_method='oauth' but system is using IMAP credentials
+2. OAuth account was registered but refresh_token expired/revoked
+3. IMAP account was registered but app_password is incorrect/expired
+4. Account was created with wrong auth_method value
+5. Database has stale/invalid credentials
+6. Password contains special characters or whitespace not being handled
+
+Branch: terragon/debug-gmail-auth-failure-nrv2dz
+
+Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from Gmail via API)
+
+Active Task from architects_digest.md:
+2. Add OAuth Status Visual Indicator on Accounts Page (In Progress)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
