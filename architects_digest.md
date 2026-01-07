@@ -2,11 +2,18 @@
 > Status: In Progress
 
 ## Active Stack
-3. Fix Gmail OAuth Auth Method Corruption Bug (In Progress)
+3. Fix Gmail OAuth Auth Method Corruption Bug (BDD Scenarios Complete)
    - Root Cause: /root/repo/services/gmail_fetcher_service.py line 78 always sets auth_method='imap'
    - Fix Part 1: Conditionally set auth_method based on connection_service presence
    - Fix Part 2: Create migration to restore corrupted OAuth accounts (auth_method='imap' but have oauth_refresh_token)
    - Key Files: gmail_fetcher_service.py:78, account_category_client.py:137-250
+   - **BDD Phase Complete**: 24 Gherkin scenarios generated and approved
+   - Feature Files:
+     - tests/bdd/gmail-oauth-auth-preservation.feature (8 scenarios)
+     - tests/bdd/corrupted-oauth-account-restoration.feature (10 scenarios)
+     - tests/bdd/auth-method-resolution-logic.feature (6 scenarios)
+   - BDD Spec: specs/BDD-SPEC-gmail-oauth-auth-fix.md
+   - **Next**: gherkin-to-test agent to create TDD prompts
 
 2. Add OAuth Status Visual Indicator on Accounts Page (In Progress)
    - Display auth_method badge in accounts table
