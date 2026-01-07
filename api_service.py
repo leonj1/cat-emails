@@ -10,9 +10,10 @@ import time
 import asyncio
 from typing import Optional, Dict, List
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
 # Add the current directory to the Python path
@@ -1499,26 +1500,38 @@ async def oauth_callback(
     Returns:
         OAuthCallbackResponse with success status and granted scopes
     """
+    # Verbose logging for debugging OAuth callback issues
+    logger.info(f"OAuth callback received - redirect_uri from query: {redirect_uri!r}")
+    logger.info(f"OAuth callback request body - code length: {len(request.code) if request.code else 0}, state length: {len(request.state) if request.state else 0}")
+
     verify_api_key(x_api_key)
 
     try:
         # Validate state token from database
+        logger.info(f"Looking up state token in database: {request.state[:20]}..." if len(request.state) > 20 else f"Looking up state token: {request.state}")
         state_data = state_repo.get_state(request.state)
         if not state_data:
+            logger.warning(f"State token not found or expired: {request.state[:20]}...")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired state token. Please restart the OAuth flow."
             )
 
+        logger.info(f"State data retrieved - redirect_uri from state: {state_data.get('redirect_uri')!r}")
+
         # Use redirect_uri from state data if not provided in query
         effective_redirect_uri = redirect_uri or state_data.get('redirect_uri')
+        logger.info(f"Effective redirect_uri to use: {effective_redirect_uri!r}")
+
         if not effective_redirect_uri:
+            logger.error("No redirect_uri available from query or state data")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No redirect_uri found. Please restart the OAuth flow."
             )
 
         # Exchange authorization code for tokens
+        logger.info(f"Exchanging authorization code for tokens with redirect_uri: {effective_redirect_uri}")
         token_response = oauth_service.exchange_code_for_tokens(
             code=request.code,
             redirect_uri=effective_redirect_uri,
@@ -2841,6 +2854,30 @@ async def not_found(request, exc):
                 "websocket_status": "WS /ws/status"
             }
         }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Custom validation error handler with verbose logging for debugging."""
+    # Log detailed information about the validation error
+    logger.error(f"Request validation error on {request.method} {request.url.path}")
+    logger.error(f"Validation errors: {exc.errors()}")
+
+    # Log request details for OAuth callback specifically
+    if "/api/auth/gmail/callback" in str(request.url.path):
+        logger.error(f"OAuth callback validation failed - URL: {request.url}")
+        logger.error(f"OAuth callback query params: {dict(request.query_params)}")
+        try:
+            body = await request.body()
+            logger.error(f"OAuth callback request body: {body.decode('utf-8', errors='replace')[:500]}")
+        except Exception as e:
+            logger.error(f"Could not read request body: {e}")
+
+    # Return the standard validation error response
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
     )
 
 
