@@ -1500,28 +1500,28 @@ async def oauth_callback(
     Returns:
         OAuthCallbackResponse with success status and granted scopes
     """
-    # Verbose logging for debugging OAuth callback issues
-    logger.info(f"OAuth callback received - redirect_uri from query: {redirect_uri!r}")
-    logger.info(f"OAuth callback request body - code length: {len(request.code) if request.code else 0}, state length: {len(request.state) if request.state else 0}")
+    # Verbose logging for debugging OAuth callback issues (sanitized - no sensitive data)
+    logger.info(f"OAuth callback received - redirect_uri from query: {'provided' if redirect_uri else 'not provided'}")
+    logger.info(f"OAuth callback request body - code: {'present' if request.code else 'missing'}, state: {'present' if request.state else 'missing'}")
 
     verify_api_key(x_api_key)
 
     try:
         # Validate state token from database
-        logger.info(f"Looking up state token in database: {request.state[:20]}..." if len(request.state) > 20 else f"Looking up state token: {request.state}")
+        logger.info("Looking up state token in database")
         state_data = state_repo.get_state(request.state)
         if not state_data:
-            logger.warning(f"State token not found or expired: {request.state[:20]}...")
+            logger.warning("State token not found or expired")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired state token. Please restart the OAuth flow."
             )
 
-        logger.info(f"State data retrieved - redirect_uri from state: {state_data.get('redirect_uri')!r}")
+        logger.info(f"State data retrieved - redirect_uri from state: {'present' if state_data.get('redirect_uri') else 'missing'}")
 
         # Use redirect_uri from state data if not provided in query
         effective_redirect_uri = redirect_uri or state_data.get('redirect_uri')
-        logger.info(f"Effective redirect_uri to use: {effective_redirect_uri!r}")
+        logger.info(f"Effective redirect_uri determined: {'yes' if effective_redirect_uri else 'no'}")
 
         if not effective_redirect_uri:
             logger.error("No redirect_uri available from query or state data")
@@ -1531,7 +1531,7 @@ async def oauth_callback(
             )
 
         # Exchange authorization code for tokens
-        logger.info(f"Exchanging authorization code for tokens with redirect_uri: {effective_redirect_uri}")
+        logger.info("Exchanging authorization code for tokens")
         token_response = oauth_service.exchange_code_for_tokens(
             code=request.code,
             redirect_uri=effective_redirect_uri,
@@ -2864,15 +2864,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     logger.error(f"Request validation error on {request.method} {request.url.path}")
     logger.error(f"Validation errors: {exc.errors()}")
 
-    # Log request details for OAuth callback specifically
+    # Log request details for OAuth callback specifically (sanitized - no sensitive data)
     if "/api/auth/gmail/callback" in str(request.url.path):
-        logger.error(f"OAuth callback validation failed - URL: {request.url}")
-        logger.error(f"OAuth callback query params: {dict(request.query_params)}")
-        try:
-            body = await request.body()
-            logger.error(f"OAuth callback request body: {body.decode('utf-8', errors='replace')[:500]}")
-        except Exception as e:
-            logger.exception(f"Could not read request body: {e}")
+        logger.error(f"OAuth callback validation failed - path: {request.url.path}")
+        # Log presence of query params without exposing values
+        query_params = dict(request.query_params)
+        sanitized_params = {k: 'present' for k in query_params.keys()}
+        logger.error(f"OAuth callback query params present: {list(sanitized_params.keys())}")
+        # Do not log request body for OAuth callback as it contains sensitive tokens
+        logger.error("OAuth callback request body not logged (contains sensitive tokens)")
 
     # Return the standard validation error response
     return JSONResponse(
