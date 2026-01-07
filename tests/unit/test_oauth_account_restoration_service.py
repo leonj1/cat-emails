@@ -19,7 +19,7 @@ Implementation should create:
 """
 import unittest
 from typing import Protocol, List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from unittest.mock import MagicMock, Mock, patch, call
 
@@ -52,7 +52,7 @@ class MockEmailAccount:
             auth_method="imap",
             oauth_refresh_token=token,
             app_password=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
 
     @classmethod
@@ -69,7 +69,7 @@ class MockEmailAccount:
             auth_method="oauth",
             oauth_refresh_token=token,
             app_password=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
 
     @classmethod
@@ -86,7 +86,7 @@ class MockEmailAccount:
             auth_method="imap",
             oauth_refresh_token=None,
             app_password=password,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
 
 
@@ -647,7 +647,7 @@ class TestEmptyOAuthRefreshTokenNotModified(unittest.TestCase):
             auth_method="imap",
             oauth_refresh_token="",  # Empty string
             app_password=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
 
         # Act
@@ -673,7 +673,7 @@ class TestEmptyOAuthRefreshTokenNotModified(unittest.TestCase):
             auth_method="imap",
             oauth_refresh_token="",
             app_password=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
         mock_repository.get_all_accounts.return_value = [empty_token_account]
 
@@ -699,7 +699,7 @@ class TestEmptyOAuthRefreshTokenNotModified(unittest.TestCase):
             auth_method="imap",
             oauth_refresh_token="",
             app_password=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
         mock_repository.get_all_accounts.return_value = [empty_token_account]
 
@@ -830,7 +830,7 @@ class TestLegacyAccountNotModified(unittest.TestCase):
             auth_method=None,  # Null auth_method
             oauth_refresh_token=None,  # Null oauth_refresh_token
             app_password=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
 
         # Act
@@ -856,7 +856,7 @@ class TestLegacyAccountNotModified(unittest.TestCase):
             auth_method=None,
             oauth_refresh_token=None,
             app_password=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
         mock_repository.get_all_accounts.return_value = [legacy_account]
 
@@ -882,7 +882,7 @@ class TestLegacyAccountNotModified(unittest.TestCase):
             auth_method=None,
             oauth_refresh_token=None,
             app_password=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
         mock_repository.get_all_accounts.return_value = [legacy_account]
 
@@ -1180,7 +1180,7 @@ class TestMixedAccountTypes(unittest.TestCase):
                 auth_method="imap",
                 oauth_refresh_token="",  # Empty
                 app_password=None,
-                updated_at=datetime.utcnow()
+                updated_at=datetime.now(timezone.utc)
             ),
             MockEmailAccount(
                 id=6,
@@ -1188,7 +1188,7 @@ class TestMixedAccountTypes(unittest.TestCase):
                 auth_method=None,  # Null
                 oauth_refresh_token=None,
                 app_password=None,
-                updated_at=datetime.utcnow()
+                updated_at=datetime.now(timezone.utc)
             ),
         ]
         mock_repository.get_all_accounts.return_value = mixed_accounts
@@ -1310,7 +1310,7 @@ class TestCorruptedAccountDetectionEdgeCases(unittest.TestCase):
             auth_method="imap",
             oauth_refresh_token="   ",  # Whitespace only
             app_password=None,
-            updated_at=datetime.utcnow()
+            updated_at=datetime.now(timezone.utc)
         )
 
         # Act
@@ -1347,7 +1347,7 @@ class TestCorruptedAccountDetectionEdgeCases(unittest.TestCase):
                 auth_method=auth_method,
                 oauth_refresh_token="valid-token",
                 app_password=None,
-                updated_at=datetime.utcnow()
+                updated_at=datetime.now(timezone.utc)
             )
 
             # Act
