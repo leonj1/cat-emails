@@ -97,7 +97,7 @@ class BackgroundProcessorService(BackgroundProcessorInterface):
                 try:
                     # Use the shared repository instance
                     service = AccountCategoryClient(repository=self.repository)
-                    accounts = service.get_all_accounts()
+                    accounts = service.get_all_accounts(active_only=True)
 
                     if not accounts:
                         logger.info("📭 No Gmail accounts found in database to process")

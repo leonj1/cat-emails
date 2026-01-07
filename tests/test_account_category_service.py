@@ -94,12 +94,12 @@ class TestAccountCategoryClient(unittest.TestCase):
     def test_create_or_update_account(self):
         """Test get_or_create_account method."""
         # First creation
-        account1 = self.service.get_or_create_account(self.test_email)
+        account1 = self.service.get_or_create_account(self.test_email, None, None, None, None)
         self.assertIsNotNone(account1)
         self.assertEqual(account1.email_address, self.test_email)
 
         # Update existing
-        account2 = self.service.get_or_create_account(self.test_email)
+        account2 = self.service.get_or_create_account(self.test_email, None, None, None, None)
         self.assertIsNotNone(account2)
         self.assertEqual(account2.id, account1.id)  # Should be same account
 

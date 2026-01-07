@@ -1553,6 +1553,8 @@ async def oauth_callback(
         # Create or update account with OAuth tokens
         account_service.get_or_create_account(
             email_address=email_address,
+            display_name=None,
+            app_password=None,
             auth_method='oauth',
             oauth_refresh_token=refresh_token,
         )
@@ -1852,7 +1854,8 @@ async def get_all_accounts(
                 password_length=len(account.app_password) if account.app_password else 0,
                 is_active=account.is_active,
                 last_scan_at=account.last_scan_at,
-                created_at=account.created_at
+                created_at=account.created_at,
+                auth_method=account.auth_method
             )
             for account in accounts
         ]

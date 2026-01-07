@@ -216,7 +216,7 @@ class TestCollectorClearedAtStartOfProcessing(unittest.TestCase):
         )
 
         # Setup account
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -268,7 +268,7 @@ class TestCollectorClearedAtStartOfProcessing(unittest.TestCase):
         )
 
         # Setup account with no emails
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -384,7 +384,7 @@ class TestDomainCollectionDuringProcessing(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -435,7 +435,7 @@ class TestDomainCollectionDuringProcessing(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -589,7 +589,7 @@ class TestMultipleDomainsWithDifferentCategories(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -669,7 +669,7 @@ class TestMultipleDomainsWithDifferentCategories(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -739,7 +739,7 @@ class TestMultipleDomainsWithDifferentCategories(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -840,7 +840,7 @@ class TestResponseIncludesRecommendationSummary(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -901,7 +901,7 @@ class TestResponseIncludesRecommendationSummary(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -962,7 +962,7 @@ class TestResponseIncludesRecommendationSummary(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1023,7 +1023,7 @@ class TestResponseIncludesRecommendationSummary(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1083,7 +1083,7 @@ class TestResponseIncludesRecommendationSummary(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1184,7 +1184,7 @@ class TestEmailNotificationFailureHandling(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1238,7 +1238,7 @@ class TestEmailNotificationFailureHandling(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1292,7 +1292,7 @@ class TestEmailNotificationFailureHandling(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1347,7 +1347,7 @@ class TestEmailNotificationFailureHandling(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1442,7 +1442,7 @@ class TestResponseMaintainsExistingFields(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         result = service.process_account(self.test_email)
@@ -1483,7 +1483,7 @@ class TestResponseMaintainsExistingFields(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         result = service.process_account(self.test_email)
@@ -1523,7 +1523,7 @@ class TestResponseMaintainsExistingFields(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         result = service.process_account(self.test_email)
@@ -1563,7 +1563,7 @@ class TestResponseMaintainsExistingFields(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         result = service.process_account(self.test_email)
@@ -1603,7 +1603,7 @@ class TestResponseMaintainsExistingFields(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         result = service.process_account(self.test_email)
@@ -1643,7 +1643,7 @@ class TestResponseMaintainsExistingFields(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         result = service.process_account(self.test_email)
@@ -1727,7 +1727,7 @@ class TestNoRecommendationsWhenInboxEmpty(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1781,7 +1781,7 @@ class TestNoRecommendationsWhenInboxEmpty(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1833,7 +1833,7 @@ class TestNoRecommendationsWhenInboxEmpty(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -1923,7 +1923,7 @@ class TestNotificationEmailSubject(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act
@@ -2017,7 +2017,7 @@ class TestCompleteResponseStructure(unittest.TestCase):
             create_gmail_fetcher=lambda email, pwd, token: fetcher
         )
 
-        account = self.account_category_client.get_or_create_account(self.test_email)
+        account = self.account_category_client.get_or_create_account(self.test_email, None, None, None, None)
         account.app_password = "testpassword1234"
 
         # Act

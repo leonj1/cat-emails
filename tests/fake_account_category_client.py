@@ -29,6 +29,7 @@ class FakeEmailAccount:
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_scan_at: Optional[datetime] = None
     app_password: Optional[str] = None
+    auth_method: Optional[str] = None
 
 
 class FakeAccountCategoryClient(AccountCategoryClientInterface):
@@ -44,7 +45,7 @@ class FakeAccountCategoryClient(AccountCategoryClientInterface):
         self.category_stats: Dict[str, List[Dict]] = {}  # email -> list of stats
         self._next_id = 1
 
-    def get_or_create_account(self, email_address: str, display_name: Optional[str] = None, app_password: Optional[str] = None) -> FakeEmailAccount:
+    def get_or_create_account(self, email_address: str, display_name: Optional[str], app_password: Optional[str], auth_method: Optional[str], oauth_refresh_token: Optional[str]) -> FakeEmailAccount:
         """
         Get existing account or create a new one.
 
@@ -52,6 +53,8 @@ class FakeAccountCategoryClient(AccountCategoryClientInterface):
             email_address: Gmail email address
             display_name: Optional display name for the account
             app_password: Optional Gmail app-specific password for IMAP access
+            auth_method: Optional authentication method ('oauth', 'imap', or None)
+            oauth_refresh_token: OAuth refresh token (required if auth_method is 'oauth')
 
         Returns:
             EmailAccount object (existing or newly created)
@@ -74,6 +77,7 @@ class FakeAccountCategoryClient(AccountCategoryClientInterface):
             email_address=email_address,
             display_name=display_name or email_address,
             app_password=app_password,
+            auth_method=auth_method,
             is_active=True,
             created_at=datetime.utcnow(),
             last_scan_at=None
@@ -247,7 +251,7 @@ class FakeAccountCategoryClient(AccountCategoryClientInterface):
             top_categories=top_categories
         )
 
-    def get_all_accounts(self, active_only: bool = True) -> List[FakeEmailAccount]:
+    def get_all_accounts(self, active_only: bool) -> List[FakeEmailAccount]:
         """
         Get all accounts, optionally filtered by active status.
 

@@ -14,13 +14,16 @@ class AccountCategoryClientInterface(ABC):
     """Interface for managing email accounts and category statistics."""
 
     @abstractmethod
-    def get_or_create_account(self, email_address: str, display_name: Optional[str] = None) -> EmailAccount:
+    def get_or_create_account(self, email_address: str, display_name: Optional[str], app_password: Optional[str], auth_method: Optional[str], oauth_refresh_token: Optional[str]) -> EmailAccount:
         """
         Get existing account or create a new one.
 
         Args:
             email_address: Gmail email address
             display_name: Optional display name for the account
+            app_password: Optional Gmail app-specific password for IMAP access
+            auth_method: Optional authentication method ('oauth', 'imap', or None)
+            oauth_refresh_token: OAuth refresh token (required if auth_method is 'oauth')
 
         Returns:
             EmailAccount object (existing or newly created)
@@ -97,12 +100,12 @@ class AccountCategoryClientInterface(ABC):
         pass
 
     @abstractmethod
-    def get_all_accounts(self, active_only: bool = True) -> List[EmailAccount]:
+    def get_all_accounts(self, active_only: bool) -> List[EmailAccount]:
         """
         Get all accounts, optionally filtered by active status.
 
         Args:
-            active_only: If True, only return active accounts (default: True)
+            active_only: If True, only return active accounts
 
         Returns:
             List of EmailAccount objects

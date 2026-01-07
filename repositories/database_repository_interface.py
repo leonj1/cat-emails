@@ -290,13 +290,13 @@ class DatabaseRepositoryInterface(ABC):
         pass
     
     @abstractmethod
-    def get_all_accounts(self, active_only: bool = False) -> List[Any]:
+    def get_all_accounts(self, active_only: bool) -> List[Any]:
         """
         Get all email accounts.
-        
+
         Args:
             active_only: If True, only return active accounts
-            
+
         Returns:
             List of EmailAccount entities
         """

@@ -41,6 +41,8 @@ class TestAccountCategoryClientOAuth(unittest.TestCase):
         """Test creating account with OAuth authentication."""
         account = self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            app_password=None,
             auth_method="oauth",
             oauth_refresh_token="test_refresh_token",
         )
@@ -54,6 +56,9 @@ class TestAccountCategoryClientOAuth(unittest.TestCase):
         """Test that account defaults to IMAP auth method."""
         account = self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            auth_method=None,
+            oauth_refresh_token=None,
             app_password="test_password",
         )
 
@@ -65,6 +70,9 @@ class TestAccountCategoryClientOAuth(unittest.TestCase):
         # First create an account
         self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            auth_method=None,
+            oauth_refresh_token=None,
             app_password="initial_password",
         )
 
@@ -103,6 +111,8 @@ class TestAccountCategoryClientOAuth(unittest.TestCase):
         # Create account with OAuth
         self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            app_password=None,
             auth_method="oauth",
             oauth_refresh_token="refresh_token",
         )
@@ -129,6 +139,9 @@ class TestAccountCategoryClientOAuth(unittest.TestCase):
         """Test getting OAuth status for IMAP-authenticated account."""
         self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            auth_method=None,
+            oauth_refresh_token=None,
             app_password="password",
         )
 
@@ -150,6 +163,8 @@ class TestAccountCategoryClientOAuth(unittest.TestCase):
         # Create OAuth account
         self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            app_password=None,
             auth_method="oauth",
             oauth_refresh_token="refresh_token",
         )
@@ -184,6 +199,8 @@ class TestAccountCategoryClientOAuth(unittest.TestCase):
         # Create OAuth account
         self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            app_password=None,
             auth_method="oauth",
             oauth_refresh_token="refresh_token",
         )
@@ -203,12 +220,17 @@ class TestAccountCategoryClientOAuth(unittest.TestCase):
         # Create IMAP account
         self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            auth_method=None,
+            oauth_refresh_token=None,
             app_password="password",
         )
 
         # Update to OAuth
         account = self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            app_password=None,
             auth_method="oauth",
             oauth_refresh_token="new_refresh_token",
         )
@@ -220,6 +242,8 @@ class TestAccountCategoryClientOAuth(unittest.TestCase):
         """Test that OAuth scopes are stored as JSON and retrieved as list."""
         self.service.get_or_create_account(
             email_address=self.test_email,
+            display_name=None,
+            app_password=None,
             auth_method="oauth",
             oauth_refresh_token="token",
         )

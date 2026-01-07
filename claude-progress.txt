@@ -1284,3 +1284,71 @@ Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
 ---
+
+=== Session 20260106-222849 ===
+Workflow: architect
+Task: Add visual indicator on Accounts page showing Gmail OAuth connection status
+Status: Initialized
+Context: Explored project structure, identified OAuth and accounts components
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API (api_service.py - ~109k lines)
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- Frontend: Jinja2 templates, Bootstrap, vanilla JavaScript
+- AI/ML: OpenAI SDK for LLM-based email categorization
+- Email: IMAP (imapclient) for Gmail integration, OAuth 2.0 support
+- Testing: pytest with BDD (Gherkin feature files in tests/bdd/)
+- Build: Docker with Tini entrypoint, Makefile
+
+Task Analysis:
+The user wants a visual indicator on the Accounts page showing whether each account uses OAuth or IMAP authentication:
+- Green "OAuth Connected" badge for OAuth accounts
+- Gray "IMAP" badge for IMAP credential accounts
+
+Key Files Identified:
+
+1. /root/repo/api_service.py (lines 1814-1864) - GET /api/accounts endpoint
+   - Currently returns: id, email_address, display_name, masked_password, password_length, is_active, last_scan_at, created_at
+   - MISSING: auth_method field
+   - Can access account.auth_method from EmailAccount model but doesn't include it in response
+
+2. /root/repo/api_service.py (lines 1596-1642) - GET /api/accounts/{email}/oauth-status endpoint
+   - Returns OAuthStatusResponse with: connected, auth_method, scopes, token_expiry
+   - This endpoint EXISTS but requires per-account API calls
+
+3. /root/repo/models/account_models.py (lines 97-133) - EmailAccountInfo response model
+   - Currently MISSING auth_method field
+   - Need to add: auth_method: str = Field(default='imap', description="Authentication method: 'imap' or 'oauth'")
+
+4. /root/repo/models/database.py (lines 31-60) - EmailAccount SQLAlchemy model
+   - Has auth_method column: auth_method = Column(String(20), default='imap')
+   - Database model is COMPLETE
+
+5. /root/repo/frontend/templates/accounts.html - Accounts page template
+   - Table columns: Email Address, Display Name, Status, Last Scan, Created, Actions
+   - Need to add new "Auth Method" column with badge styling
+   - renderAccountsTable() function builds table rows
+
+6. /root/repo/models/oauth_models.py (lines 42-57) - OAuthStatusResponse
+   - Already has auth_method field definition
+
+Implementation Plan:
+Option A (Recommended - Efficient): Add auth_method to /api/accounts response
+- Modify EmailAccountInfo to include auth_method field
+- Update GET /api/accounts to include account.auth_method in response
+- Update frontend to display badge based on auth_method value
+- Single API call, no N+1 queries
+
+Option B (Less efficient): Call /api/accounts/{email}/oauth-status per account
+- Frontend makes separate call for each account
+- N+1 API calls pattern - not recommended
+
+Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from Gmail via API)
+
+Active Task from architects_digest.md:
+1. Enhance Audit Records for Email Processing - ALL sub-tasks (1.1-1.7) COMPLETED
+   New task will be added for OAuth status indicator feature
+
+Next: Invoking architect agent to create spec for OAuth status visual indicator
+---

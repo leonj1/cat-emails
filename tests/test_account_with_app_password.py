@@ -70,6 +70,8 @@ class TestAccountWithAppPassword(unittest.TestCase):
         # Create account with app_password
         account = self.client.get_or_create_account(
             email_address=test_email,
+            auth_method=None,
+            oauth_refresh_token=None,
             display_name=test_display_name,
             app_password=test_password
         )
@@ -91,6 +93,8 @@ class TestAccountWithAppPassword(unittest.TestCase):
         # Create account with initial password
         account1 = self.client.get_or_create_account(
             email_address=test_email,
+            auth_method=None,
+            oauth_refresh_token=None,
             display_name=initial_display_name,
             app_password=initial_password
         )
@@ -102,6 +106,9 @@ class TestAccountWithAppPassword(unittest.TestCase):
         new_password = self._generate_password()
         account2 = self.client.get_or_create_account(
             email_address=test_email,
+            display_name=None,
+            auth_method=None,
+            oauth_refresh_token=None,
             app_password=new_password
         )
 
@@ -119,6 +126,9 @@ class TestAccountWithAppPassword(unittest.TestCase):
         # Create account without app_password
         account = self.client.get_or_create_account(
             email_address=test_email,
+            app_password=None,
+            auth_method=None,
+            oauth_refresh_token=None,
             display_name=test_display_name
             # No app_password parameter
         )
@@ -140,6 +150,8 @@ class TestAccountWithAppPassword(unittest.TestCase):
         # Create account with password
         account1 = self.client.get_or_create_account(
             email_address=test_email,
+            auth_method=None,
+            oauth_refresh_token=None,
             display_name=initial_display_name,
             app_password=test_password
         )
@@ -147,6 +159,9 @@ class TestAccountWithAppPassword(unittest.TestCase):
         # Update account with new display name but no password
         account2 = self.client.get_or_create_account(
             email_address=test_email,
+            app_password=None,
+            auth_method=None,
+            oauth_refresh_token=None,
             display_name=new_display_name
             # No app_password - should preserve existing
         )
@@ -165,6 +180,8 @@ class TestAccountWithAppPassword(unittest.TestCase):
         # Create account with app_password
         created_account = self.client.get_or_create_account(
             email_address=test_email,
+            auth_method=None,
+            oauth_refresh_token=None,
             display_name=test_display_name,
             app_password=test_password
         )
@@ -190,6 +207,8 @@ class TestAccountWithAppPassword(unittest.TestCase):
 
             account = self.client.get_or_create_account(
                 email_address=email,
+                auth_method=None,
+                oauth_refresh_token=None,
                 display_name=display_name,
                 app_password=password
             )
