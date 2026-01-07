@@ -17,7 +17,7 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
 
     def test_get_or_create_account_creates_new(self):
         """Test creating a new account."""
-        account = self.client.get_or_create_account(self.test_email, self.test_display_name, None, None)
+        account = self.client.get_or_create_account(self.test_email, self.test_display_name, None, None, None)
 
         self.assertIsInstance(account, FakeEmailAccount)
         self.assertEqual(account.email_address, self.test_email)
@@ -28,10 +28,10 @@ class TestFakeAccountCategoryClient(unittest.TestCase):
     def test_get_or_create_account_returns_existing(self):
         """Test that get_or_create returns existing account."""
         # Create account
-        account1 = self.client.get_or_create_account(self.test_email, self.test_display_name, None, None)
+        account1 = self.client.get_or_create_account(self.test_email, self.test_display_name, None, None, None)
 
         # Get the same account
-        account2 = self.client.get_or_create_account(self.test_email, "Different Name", None, None)
+        account2 = self.client.get_or_create_account(self.test_email, "Different Name", None, None, None)
 
         # Should be the same account
         self.assertEqual(account1.id, account2.id)
