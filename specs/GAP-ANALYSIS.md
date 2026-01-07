@@ -178,7 +178,7 @@ Based on Gherkin scenarios, these test files need to be created:
 | Existing Code Reuse | HIGH | AccountCategoryClient, EmailAccount model |
 | New Files | 3 | Resolution util, restoration service, SQL migration |
 | Refactoring Required | 0 | No refactoring needed |
-| Core Fix Scope | ~10 lines | Conditional logic in GmailFetcher.__init__ |
+| Core Fix Scope | ~10 lines | Conditional logic in GmailFetcher.\_\_init\_\_ |
 | Total Scenarios | 24 | 8 + 10 + 6 across 3 features |
 
 ## GO Signal Assessment

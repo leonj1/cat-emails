@@ -122,8 +122,8 @@ class OAuthAccountRestorationService:
             self.logger.info(f"Scan complete. Found {len(corrupted_accounts)} corrupted accounts")
             return corrupted_accounts
 
-        except Exception as e:
-            self.logger.error(f"Error scanning for corrupted accounts: {str(e)}")
+        except Exception:
+            self.logger.exception("Error scanning for corrupted accounts")
             raise
 
     def restore_corrupted_accounts(self) -> int:
@@ -170,16 +170,16 @@ class OAuthAccountRestorationService:
                             )
 
                     except Exception as e:
-                        self.logger.error(
-                            f"Database error restoring account {account.email_address}: {str(e)}"
+                        self.logger.exception(
+                            f"Database error restoring account {account.email_address}"
                         )
                         raise Exception(
-                            f"Database error during restoration for {account.email_address}: {str(e)}"
-                        )
+                            f"Database error during restoration for {account.email_address}"
+                        ) from e
 
             self.logger.info(f"Restoration complete. Total accounts restored: {restored_count}")
             return restored_count
 
-        except Exception as e:
-            self.logger.error(f"Error during OAuth account restoration: {str(e)}")
+        except Exception:
+            self.logger.exception("Error during OAuth account restoration")
             raise

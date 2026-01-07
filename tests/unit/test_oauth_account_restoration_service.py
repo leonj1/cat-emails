@@ -208,8 +208,8 @@ class TestCorruptedOAuthAccountIsIdentified(unittest.TestCase):
         # Assert
         self.assertTrue(
             is_corrupted,
-            f"Account with auth_method='imap' and oauth_refresh_token='valid-refresh-token' "
-            f"should be identified as corrupted"
+            "Account with auth_method='imap' and oauth_refresh_token='valid-refresh-token' "
+            "should be identified as corrupted"
         )
 
     def test_scan_corrupted_accounts_finds_corrupted_account(self):
@@ -943,8 +943,8 @@ class TestDatabaseErrorHandling(unittest.TestCase):
 
         # Assert: Error was logged
         error_logged = False
-        for call in mock_logger.error.call_args_list:
-            if "database" in str(call).lower() or "error" in str(call).lower():
+        for log_call in mock_logger.error.call_args_list:
+            if "database" in str(log_call).lower() or "error" in str(log_call).lower():
                 error_logged = True
                 break
 

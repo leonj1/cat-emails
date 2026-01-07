@@ -15,8 +15,7 @@ The implementation should create:
 2. AuthMethodResolver class with resolve() method
 """
 import unittest
-from typing import Optional, Protocol
-from dataclasses import dataclass
+from typing import Optional
 from unittest.mock import MagicMock
 
 

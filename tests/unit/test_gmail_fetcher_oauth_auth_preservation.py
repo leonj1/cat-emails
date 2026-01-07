@@ -19,7 +19,6 @@ The fix should:
 import unittest
 from typing import Optional, Protocol
 from unittest.mock import MagicMock, Mock, patch, PropertyMock
-from dataclasses import dataclass
 
 
 class AccountServiceProtocol(Protocol):
