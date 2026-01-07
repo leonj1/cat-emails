@@ -182,7 +182,7 @@ else:
 ```
 
 **Pseudocode:**
-```
+```pseudocode
 function register_account(email_address, app_password, connection_service):
     if connection_service is provided:
         # OAuth path - don't modify auth credentials
@@ -248,7 +248,7 @@ def downgrade(session):
 
 ### Step 1: Create AuthMethodResolver Service
 
-```
+```text
 File: services/auth_method_resolver.py
 
 class AuthMethodResolver(IAuthMethodResolver):
@@ -259,9 +259,9 @@ class AuthMethodResolver(IAuthMethodResolver):
             return ('imap', app_password)  # Set IMAP credentials
 ```
 
-### Step 2: Update GmailFetcher.__init__
+### Step 2: Update GmailFetcher.\_\_init\_\_
 
-```
+```text
 File: services/gmail_fetcher_service.py
 Location: Lines 74-82
 
@@ -274,7 +274,7 @@ Changes:
 
 ### Step 3: Create Migration Script
 
-```
+```text
 File: migrations/migration_007_restore_corrupted_oauth_accounts.py
 
 Purpose: One-time fix for accounts corrupted before the code fix
@@ -284,7 +284,7 @@ Action: Set auth_method='oauth'
 
 ### Step 4: Add Unit Tests
 
-```
+```text
 File: tests/test_gmail_oauth_auth_fix.py
 
 Tests:
