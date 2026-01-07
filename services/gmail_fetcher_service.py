@@ -74,7 +74,8 @@ class GmailFetcher(GmailFetcherInterface):
         try:
             self.account_service = AccountCategoryClient()
             # Register/activate the account (don't store the returned object to avoid session issues)
-            self.account_service.get_or_create_account(self.email_address, None, None, None, None)
+            # Mark as IMAP authentication with the app password
+            self.account_service.get_or_create_account(self.email_address, None, app_password, 'imap', None)
             logger.info(f"Account registered for category tracking: {self.email_address}")
         except Exception as e:
             logger.error(f"Failed to initialize AccountCategoryClient for {self.email_address}: {str(e)}")
