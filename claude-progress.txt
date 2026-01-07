@@ -1430,3 +1430,58 @@ Active Task from architects_digest.md:
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
 ---
+
+=== Session 20260107-121247 ===
+Workflow: architect
+Task: Apply the fix identified in the CRASH-RCA investigation: Modify /root/repo/services/gmail_fetcher_service.py line 78 to conditionally set auth_method based on whether the account uses OAuth or IMAP. For IMAP accounts (when no OAuth connection_service is provided), set auth_method='imap' and pass app_password. For OAuth accounts (when connection_service is provided), don't overwrite the auth_method or password. Also restore any corrupted OAuth accounts in the database by setting their auth_method back to 'oauth' if they have an oauth_refresh_token.
+Status: Initialized
+Context: Explored project structure, identified root cause and fix location
+
+Branch: terragon/debug-gmail-auth-failure-nrv2dz
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API (api_service.py - ~109k lines)
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- AI/ML: OpenAI SDK for LLM-based email categorization
+- Email: IMAP (imapclient) for Gmail integration, OAuth 2.0 support
+- Testing: pytest with BDD (Gherkin feature files in tests/bdd/)
+- Build: Docker with Tini entrypoint, Makefile
+
+Root Cause Analysis (from CRASH-RCA investigation):
+
+The issue is at /root/repo/services/gmail_fetcher_service.py line 78:
+```python
+self.account_service.get_or_create_account(self.email_address, None, app_password, 'imap', None)
+```
+
+This line ALWAYS sets auth_method='imap' regardless of whether the account uses OAuth authentication.
+When an OAuth account is processed:
+1. GmailFetcher is created with a connection_service (OAuth connection)
+2. Line 78 calls get_or_create_account with auth_method='imap'
+3. The database updates auth_method from 'oauth' to 'imap'
+4. Next time the account is processed, it tries IMAP authentication instead of OAuth
+5. IMAP authentication fails because there's no valid app_password for OAuth accounts
+
+The Fix Requirements:
+1. Modify /root/repo/services/gmail_fetcher_service.py line 78:
+   - If connection_service is provided (OAuth), don't call get_or_create_account or skip auth_method update
+   - If no connection_service (IMAP), set auth_method='imap' and pass app_password
+
+2. Create a database fix/migration to restore corrupted OAuth accounts:
+   - Find accounts with oauth_refresh_token but auth_method='imap'
+   - Set their auth_method back to 'oauth'
+
+Key Files:
+- /root/repo/services/gmail_fetcher_service.py:78 - Bug location
+- /root/repo/clients/account_category_client.py:137-250 - get_or_create_account implementation
+- /root/repo/models/database.py:31-60 - EmailAccount model with auth_method column
+
+Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from Gmail via API)
+
+Active Task from architects_digest.md:
+2. Add OAuth Status Visual Indicator on Accounts Page (In Progress)
+3. Fix Gmail OAuth Auth Method Bug (NEW - from CRASH-RCA)
+
+Next: Invoking architect agent to create spec for the fix
+---
