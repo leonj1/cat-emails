@@ -98,6 +98,16 @@ class OAuthStateRepository:
         Returns:
             Dict with state data if valid and not expired, None otherwise
         """
+        # Debug logging for state token lookup
+        token_len = len(state_token) if state_token else 0
+        token_preview = state_token[:20] + '...' if state_token and len(state_token) > 20 else state_token
+        logger.info(
+            f"Looking up OAuth state - "
+            f"token length: {token_len}, "
+            f"token empty: {not bool(state_token)}, "
+            f"token repr: {token_preview!r}"
+        )
+
         connection = get_db_connection()
         try:
             query = text("""
@@ -107,16 +117,39 @@ class OAuthStateRepository:
                 AND expires_at > :now
             """)
 
+            now_utc = datetime.now(timezone.utc)
             result = connection.execute(
                 query,
                 {
                     'state_token': state_token,
-                    'now': datetime.now(timezone.utc)
+                    'now': now_utc
                 }
             ).fetchone()
 
             if not result:
-                logger.warning("OAuth state not found or expired")
+                # Enhanced logging to differentiate between not found vs expired
+                if state_token:
+                    # Check if token exists but is expired
+                    check_query = text("""
+                        SELECT expires_at FROM oauth_state WHERE state_token = :state_token
+                    """)
+                    expired_check = connection.execute(
+                        check_query,
+                        {'state_token': state_token}
+                    ).fetchone()
+                    if expired_check:
+                        expires_at = expired_check._mapping['expires_at']
+                        logger.warning(
+                            f"OAuth state token exists but expired - "
+                            f"expired_at: {expires_at}, current_utc: {now_utc}"
+                        )
+                    else:
+                        logger.warning(
+                            f"OAuth state token not found in database - "
+                            f"token_prefix: {state_token[:10] if state_token else 'empty'}..."
+                        )
+                else:
+                    logger.warning("OAuth state lookup with empty/None token")
                 return None
 
             # Use named access via _mapping for clarity
