@@ -8,6 +8,9 @@ import logging
 import threading
 import time
 import asyncio
+import json
+import urllib.parse
+import urllib.request
 from typing import Optional, Dict, List
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect, Request
@@ -191,8 +194,8 @@ app.add_middleware(
 async def oauth_callback_debug_middleware(request: Request, call_next):
     """Debug middleware to log raw OAuth callback request details before parsing."""
     if request.url.path == "/api/auth/gmail/callback" and request.method == "POST":
-        # Log URL and query parameters (keys only, not values for security)
-        logger.info(f"[OAuth Debug] Raw request URL: {request.url}")
+        # Log URL path only (not full URL which may contain sensitive query params)
+        logger.info(f"[OAuth Debug] Request path: {request.url.path}")
         logger.info(f"[OAuth Debug] Query params keys: {list(request.query_params.keys())}")
         logger.info(f"[OAuth Debug] Headers present: {list(request.headers.keys())}")
 
@@ -202,13 +205,14 @@ async def oauth_callback_debug_middleware(request: Request, call_next):
 
         # Parse body to check structure without exposing sensitive values
         try:
-            import json
             body_json = json.loads(body_str) if body_str else {}
             # Log structure: which keys are present and their lengths
             body_structure = {}
             for key, value in body_json.items():
                 if isinstance(value, str):
-                    body_structure[key] = f"string(len={len(value)}, empty={not bool(value)}, preview='{value[:10]}...' if len > 10 else '{value}')"
+                    value_len = len(value)
+                    preview = value[:10] + '...' if value_len > 10 else value
+                    body_structure[key] = f"string(len={value_len}, empty={not bool(value)}, preview='{preview}')"
                 else:
                     body_structure[key] = f"{type(value).__name__}"
             logger.info(f"[OAuth Debug] Request body structure: {body_structure}")
@@ -226,11 +230,11 @@ async def oauth_callback_debug_middleware(request: Request, call_next):
             else:
                 logger.warning("[OAuth Debug] 'code' field MISSING from request body!")
 
-        except json.JSONDecodeError as e:
-            logger.error(f"[OAuth Debug] Failed to parse body as JSON: {e}")
-            logger.error(f"[OAuth Debug] Raw body (first 200 chars): {body_str[:200]}")
-        except Exception as e:
-            logger.error(f"[OAuth Debug] Error inspecting request body: {e}")
+        except json.JSONDecodeError:
+            logger.exception("[OAuth Debug] Failed to parse body as JSON")
+            logger.info(f"[OAuth Debug] Raw body (first 200 chars): {body_str[:200]}")
+        except Exception:
+            logger.exception("[OAuth Debug] Error inspecting request body")
 
         # IMPORTANT: We need to make the body available again for the endpoint
         # Create a new request with the body we read
@@ -1200,7 +1204,6 @@ async def create_sample_data(x_api_key: Optional[str] = Header(None), report_typ
     try:
         from services.email_summary_service import EmailSummaryService
         from models.email_summary import ProcessedEmail, EmailAction
-        import json
         from pathlib import Path
         import random
         
@@ -1519,7 +1522,6 @@ async def initiate_oauth(
         # Log the state parameter in the URL to verify it's included
         if 'state=' in authorization_url:
             # Extract state from URL for verification
-            import urllib.parse
             parsed_url = urllib.parse.urlparse(authorization_url)
             query_params = urllib.parse.parse_qs(parsed_url.query)
             url_state = query_params.get('state', [''])[0]
@@ -1633,8 +1635,6 @@ async def oauth_callback(
         token_expiry = oauth_service.calculate_token_expiry(expires_in)
 
         # Get user's email from Google's userinfo endpoint
-        import urllib.request
-        import json
         userinfo_request = urllib.request.Request(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {access_token}"}
