@@ -11,10 +11,11 @@ import asyncio
 import json
 import urllib.parse
 import urllib.request
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Callable
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
@@ -191,12 +192,17 @@ app.add_middleware(
 
 # OAuth callback debugging middleware
 # Logs raw request details BEFORE Pydantic parsing
-# OAuth debug preview length constant
-OAUTH_DEBUG_PREVIEW_LENGTH = 10
+# OAuth debug preview length (configurable via environment variable)
+OAUTH_DEBUG_PREVIEW_LENGTH = int(
+    os.getenv("OAUTH_DEBUG_PREVIEW_LENGTH", "10")
+)
 
 
 @app.middleware("http")
-async def oauth_callback_debug_middleware(request: Request, call_next):
+async def oauth_callback_debug_middleware(
+    request: Request,
+    call_next: Callable
+) -> Response:
     """Debug middleware to log raw OAuth callback request details."""
     is_oauth_callback = (
         request.url.path == "/api/auth/gmail/callback"
@@ -290,8 +296,14 @@ async def oauth_callback_debug_middleware(request: Request, call_next):
                 f"[OAuth Debug] Raw body (200 chars): "
                 f"{body_preview}"
             )
-        except Exception:
+        except (KeyError, AttributeError, TypeError, ValueError) as e:
             logger.exception("[OAuth Debug] Inspection error")
+        except Exception as e:
+            logger.exception(
+                "[OAuth Debug] Unexpected error during body inspection"
+            )
+            # Re-raise to avoid masking critical errors
+            raise
 
         # IMPORTANT: We need to make the body available again
         # Create a new request with the body we read
@@ -1589,11 +1601,10 @@ async def initiate_oauth(
         )
 
         # Verify state parameter in URL
-        if 'state=' in authorization_url:
-            # Extract state from URL for verification
-            parsed = urllib.parse.urlparse(authorization_url)
-            params = urllib.parse.parse_qs(parsed.query)
-            url_state = params.get('state', [''])[0]
+        parsed = urllib.parse.urlparse(authorization_url)
+        params = urllib.parse.parse_qs(parsed.query)
+        url_state = params.get('state', [''])[0]
+        if url_state:
             url_state_len = len(url_state)
             matches = url_state == state
             logger.info(
