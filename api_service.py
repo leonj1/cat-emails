@@ -11,7 +11,8 @@ import asyncio
 import json
 import urllib.parse
 import urllib.request
-from typing import Optional, Dict, List, Callable
+from urllib.error import URLError, HTTPError
+from typing import Optional, Dict, List, Callable, Awaitable
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
@@ -193,15 +194,21 @@ app.add_middleware(
 # OAuth callback debugging middleware
 # Logs raw request details BEFORE Pydantic parsing
 # OAuth debug preview length (configurable via environment variable)
-OAUTH_DEBUG_PREVIEW_LENGTH = int(
-    os.getenv("OAUTH_DEBUG_PREVIEW_LENGTH", "10")
-)
+try:
+    OAUTH_DEBUG_PREVIEW_LENGTH = int(
+        os.getenv("OAUTH_DEBUG_PREVIEW_LENGTH", "10")
+    )
+except ValueError:
+    logger.warning(
+        "Invalid OAUTH_DEBUG_PREVIEW_LENGTH value, using default of 10"
+    )
+    OAUTH_DEBUG_PREVIEW_LENGTH = 10
 
 
 @app.middleware("http")
 async def oauth_callback_debug_middleware(
     request: Request,
-    call_next: Callable
+    call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     """Debug middleware to log raw OAuth callback request details."""
     is_oauth_callback = (
@@ -296,9 +303,9 @@ async def oauth_callback_debug_middleware(
                 f"[OAuth Debug] Raw body (200 chars): "
                 f"{body_preview}"
             )
-        except (KeyError, AttributeError, TypeError, ValueError) as e:
+        except (KeyError, AttributeError, TypeError, ValueError):
             logger.exception("[OAuth Debug] Inspection error")
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "[OAuth Debug] Unexpected error during body inspection"
             )
@@ -1726,18 +1733,34 @@ async def oauth_callback(
         token_expiry = oauth_service.calculate_token_expiry(expires_in)
 
         # Get user's email from Google's userinfo endpoint
-        userinfo_request = urllib.request.Request(
-            "https://www.googleapis.com/oauth2/v2/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"}
-        )
-        with urllib.request.urlopen(userinfo_request, timeout=10) as response:
-            userinfo = json.loads(response.read().decode('utf-8'))
-            email_address = userinfo.get('email')
+        try:
+            userinfo_request = urllib.request.Request(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            with urllib.request.urlopen(
+                userinfo_request, timeout=10
+            ) as response:
+                userinfo = json.loads(
+                    response.read().decode('utf-8')
+                )
+                email_address = userinfo.get('email')
+        except (URLError, HTTPError) as e:
+            logger.error(
+                f"Failed to retrieve user info from Google: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to retrieve user information from Google"
+            ) from e
 
         if not email_address:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not retrieve email address from OAuth response"
+                detail=(
+                    "Could not retrieve email address from "
+                    "OAuth response"
+                )
             )
 
         # Create or update account with OAuth tokens
