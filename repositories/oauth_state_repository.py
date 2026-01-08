@@ -146,7 +146,7 @@ class OAuthStateRepository:
                     else:
                         logger.warning(
                             f"OAuth state token not found in database - "
-                            f"token_prefix: {state_token[:10]}..."
+                            f"token_prefix: {state_token[:10] + '...' if len(state_token) > 10 else state_token}"
                         )
                 else:
                     logger.warning("OAuth state lookup with empty/None token")
