@@ -185,6 +185,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# OAuth callback debugging middleware - logs raw request details BEFORE Pydantic parsing
+@app.middleware("http")
+async def oauth_callback_debug_middleware(request: Request, call_next):
+    """Debug middleware to log raw OAuth callback request details before parsing."""
+    if request.url.path == "/api/auth/gmail/callback" and request.method == "POST":
+        # Log URL and query parameters (keys only, not values for security)
+        logger.info(f"[OAuth Debug] Raw request URL: {request.url}")
+        logger.info(f"[OAuth Debug] Query params keys: {list(request.query_params.keys())}")
+        logger.info(f"[OAuth Debug] Headers present: {list(request.headers.keys())}")
+
+        # Read and log the raw body (safely, without exposing full tokens)
+        body_bytes = await request.body()
+        body_str = body_bytes.decode('utf-8') if body_bytes else ''
+
+        # Parse body to check structure without exposing sensitive values
+        try:
+            import json
+            body_json = json.loads(body_str) if body_str else {}
+            # Log structure: which keys are present and their lengths
+            body_structure = {}
+            for key, value in body_json.items():
+                if isinstance(value, str):
+                    body_structure[key] = f"string(len={len(value)}, empty={not bool(value)}, preview='{value[:10]}...' if len > 10 else '{value}')"
+                else:
+                    body_structure[key] = f"{type(value).__name__}"
+            logger.info(f"[OAuth Debug] Request body structure: {body_structure}")
+
+            # Specifically check for 'state' field issues
+            if 'state' in body_json:
+                state_val = body_json['state']
+                logger.info(f"[OAuth Debug] state field - type: {type(state_val).__name__}, len: {len(state_val) if isinstance(state_val, str) else 'N/A'}, empty: {not bool(state_val)}, repr: {repr(state_val)[:50]}")
+            else:
+                logger.warning("[OAuth Debug] 'state' field MISSING from request body!")
+
+            if 'code' in body_json:
+                code_val = body_json['code']
+                logger.info(f"[OAuth Debug] code field - type: {type(code_val).__name__}, len: {len(code_val) if isinstance(code_val, str) else 'N/A'}, empty: {not bool(code_val)}")
+            else:
+                logger.warning("[OAuth Debug] 'code' field MISSING from request body!")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"[OAuth Debug] Failed to parse body as JSON: {e}")
+            logger.error(f"[OAuth Debug] Raw body (first 200 chars): {body_str[:200]}")
+        except Exception as e:
+            logger.error(f"[OAuth Debug] Error inspecting request body: {e}")
+
+        # IMPORTANT: We need to make the body available again for the endpoint
+        # Create a new request with the body we read
+        async def receive():
+            return {"type": "http.request", "body": body_bytes}
+        request = Request(scope=request.scope, receive=receive)
+
+    response = await call_next(request)
+    return response
+
+
 # Optional API key authentication
 API_KEY = os.getenv("API_KEY")
 CONTROL_TOKEN = os.getenv("CONTROL_TOKEN", "")
@@ -1446,9 +1503,11 @@ async def initiate_oauth(
 
         # Generate state token for CSRF protection
         state = oauth_service.generate_state_token()
+        logger.info(f"[OAuth Debug] Generated state token - length: {len(state)}, preview: {state[:20]}...")
 
         # Store state in database for validation during callback
         state_repo.store_state(state_token=state, redirect_uri=redirect_uri)
+        logger.info(f"[OAuth Debug] Stored state token in database with redirect_uri: {redirect_uri}")
 
         # Generate authorization URL
         authorization_url = oauth_service.generate_authorization_url(
@@ -1456,6 +1515,17 @@ async def initiate_oauth(
             state=state,
             login_hint=login_hint,
         )
+
+        # Log the state parameter in the URL to verify it's included
+        if 'state=' in authorization_url:
+            # Extract state from URL for verification
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(authorization_url)
+            query_params = urllib.parse.parse_qs(parsed_url.query)
+            url_state = query_params.get('state', [''])[0]
+            logger.info(f"[OAuth Debug] State in authorization URL - length: {len(url_state)}, matches generated: {url_state == state}")
+        else:
+            logger.warning("[OAuth Debug] State parameter NOT found in authorization URL!")
 
         logger.info(f"Generated OAuth authorization URL for redirect_uri: {redirect_uri}")
 
