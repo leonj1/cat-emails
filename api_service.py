@@ -1746,7 +1746,7 @@ async def oauth_callback(
                 )
                 email_address = userinfo.get('email')
         except (URLError, HTTPError) as e:
-            logger.error(
+            logger.exception(
                 f"Failed to retrieve user info from Google: {e}"
             )
             raise HTTPException(
