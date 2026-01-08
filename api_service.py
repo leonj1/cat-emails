@@ -1501,12 +1501,23 @@ async def oauth_callback(
         OAuthCallbackResponse with success status and granted scopes
     """
     # Log OAuth callback parameters (sanitized - no sensitive data)
+    # Log state details to help debug empty state issues
+    state_len = len(request.state) if request.state else 0
+    state_repr = f"present ({state_len} chars)" if request.state else "missing/empty"
     logger.info(
         f"OAuth callback received - "
         f"redirect_uri: {'provided' if redirect_uri else 'omitted'}, "
         f"code: {'present' if request.code else 'missing'}, "
-        f"state: {'present' if request.state else 'missing'}"
+        f"state: {state_repr}"
     )
+
+    # Additional debug logging for state issues
+    if not request.state:
+        logger.warning(
+            f"OAuth callback state is empty/missing - "
+            f"state value type: {type(request.state).__name__}, "
+            f"state repr: {repr(request.state)}"
+        )
 
     verify_api_key(x_api_key)
 
