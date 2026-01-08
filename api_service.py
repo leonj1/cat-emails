@@ -8,10 +8,15 @@ import logging
 import threading
 import time
 import asyncio
-from typing import Optional, Dict, List
+import json
+import urllib.parse
+import urllib.request
+from urllib.error import URLError, HTTPError
+from typing import Optional, Dict, List, Callable, Awaitable
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Header, status, Query, Path, Depends, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
@@ -184,6 +189,138 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# OAuth callback debugging middleware
+# Logs raw request details BEFORE Pydantic parsing
+# OAuth debug preview length (configurable via environment variable)
+try:
+    OAUTH_DEBUG_PREVIEW_LENGTH = int(
+        os.getenv("OAUTH_DEBUG_PREVIEW_LENGTH", "10")
+    )
+except ValueError:
+    logger.warning(
+        "Invalid OAUTH_DEBUG_PREVIEW_LENGTH value, using default of 10"
+    )
+    OAUTH_DEBUG_PREVIEW_LENGTH = 10
+
+
+@app.middleware("http")
+async def oauth_callback_debug_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Debug middleware to log raw OAuth callback request details."""
+    is_oauth_callback = (
+        request.url.path == "/api/auth/gmail/callback"
+        and request.method == "POST"
+    )
+    if is_oauth_callback:
+        # Log URL path only (no sensitive query params)
+        logger.info(f"[OAuth Debug] Path: {request.url.path}")
+
+        param_keys = list(request.query_params.keys())
+        logger.info(f"[OAuth Debug] Query keys: {param_keys}")
+
+        header_keys = list(request.headers.keys())
+        logger.info(f"[OAuth Debug] Headers: {header_keys}")
+
+        # Read and log raw body (safely, without exposing full tokens)
+        body_bytes = await request.body()
+        body_str = body_bytes.decode('utf-8') if body_bytes else ''
+
+        # Parse body to check structure without exposing sensitive values
+        try:
+            body_json = json.loads(body_str) if body_str else {}
+            # Log structure: keys present and their lengths
+            body_structure = {}
+            for key, value in body_json.items():
+                if isinstance(value, str):
+                    value_len = len(value)
+                    max_len = OAUTH_DEBUG_PREVIEW_LENGTH
+                    if value_len > max_len:
+                        preview = value[:max_len] + '...'
+                    else:
+                        preview = value
+                    is_empty = not bool(value)
+                    body_structure[key] = (
+                        f"string(len={value_len}, "
+                        f"empty={is_empty}, "
+                        f"preview='{preview}')"
+                    )
+                else:
+                    body_structure[key] = f"{type(value).__name__}"
+            logger.info(
+                f"[OAuth Debug] Body structure: {body_structure}"
+            )
+
+            # Specifically check for 'state' field issues
+            if 'state' in body_json:
+                state_val = body_json['state']
+                if isinstance(state_val, str):
+                    state_len = len(state_val)
+                else:
+                    state_len = 'N/A'
+                max_preview = OAUTH_DEBUG_PREVIEW_LENGTH
+                state_preview = repr(state_val)[:max_preview]
+                state_empty = not bool(state_val)
+                state_type = type(state_val).__name__
+                logger.info(
+                    f"[OAuth Debug] state - "
+                    f"type: {state_type}, "
+                    f"len: {state_len}, "
+                    f"empty: {state_empty}, "
+                    f"preview: {state_preview}"
+                )
+            else:
+                logger.warning(
+                    "[OAuth Debug] 'state' MISSING from body!"
+                )
+
+            if 'code' in body_json:
+                code_val = body_json['code']
+                if isinstance(code_val, str):
+                    code_len = len(code_val)
+                else:
+                    code_len = 'N/A'
+                code_empty = not bool(code_val)
+                code_type = type(code_val).__name__
+                logger.info(
+                    f"[OAuth Debug] code - "
+                    f"type: {code_type}, "
+                    f"len: {code_len}, "
+                    f"empty: {code_empty}"
+                )
+            else:
+                logger.warning(
+                    "[OAuth Debug] 'code' MISSING from body!"
+                )
+
+        except json.JSONDecodeError:
+            logger.exception("[OAuth Debug] Parse failed")
+            body_preview = body_str[:200]
+            logger.info(
+                f"[OAuth Debug] Raw body (200 chars): "
+                f"{body_preview}"
+            )
+        except (KeyError, AttributeError, TypeError, ValueError):
+            logger.exception("[OAuth Debug] Inspection error")
+        except Exception:
+            logger.exception(
+                "[OAuth Debug] Unexpected error during body inspection"
+            )
+            # Re-raise to avoid masking critical errors
+            raise
+
+        # IMPORTANT: We need to make the body available again
+        # Create a new request with the body we read
+        async def receive():
+            return {"type": "http.request", "body": body_bytes}
+        request = Request(scope=request.scope, receive=receive)
+
+    response = await call_next(request)
+    return response
+
 
 # Optional API key authentication
 API_KEY = os.getenv("API_KEY")
@@ -1143,7 +1280,6 @@ async def create_sample_data(x_api_key: Optional[str] = Header(None), report_typ
     try:
         from services.email_summary_service import EmailSummaryService
         from models.email_summary import ProcessedEmail, EmailAction
-        import json
         from pathlib import Path
         import random
         
@@ -1446,9 +1582,23 @@ async def initiate_oauth(
 
         # Generate state token for CSRF protection
         state = oauth_service.generate_state_token()
+        state_len = len(state)
+        preview_len = OAUTH_DEBUG_PREVIEW_LENGTH
+        state_preview = state[:preview_len]
+        logger.info(
+            f"[OAuth Debug] Generated state - "
+            f"len: {state_len}, "
+            f"preview: {state_preview}..."
+        )
 
-        # Store state in database for validation during callback
-        state_repo.store_state(state_token=state, redirect_uri=redirect_uri)
+        # Store state in database for callback validation
+        state_repo.store_state(
+            state_token=state, redirect_uri=redirect_uri
+        )
+        logger.info(
+            f"[OAuth Debug] Stored state with "
+            f"redirect_uri: {redirect_uri}"
+        )
 
         # Generate authorization URL
         authorization_url = oauth_service.generate_authorization_url(
@@ -1457,7 +1607,27 @@ async def initiate_oauth(
             login_hint=login_hint,
         )
 
-        logger.info(f"Generated OAuth authorization URL for redirect_uri: {redirect_uri}")
+        # Verify state parameter in URL
+        parsed = urllib.parse.urlparse(authorization_url)
+        params = urllib.parse.parse_qs(parsed.query)
+        url_state = params.get('state', [''])[0]
+        if url_state:
+            url_state_len = len(url_state)
+            matches = url_state == state
+            logger.info(
+                f"[OAuth Debug] URL state - "
+                f"len: {url_state_len}, "
+                f"matches: {matches}"
+            )
+        else:
+            logger.warning(
+                "[OAuth Debug] State NOT in auth URL!"
+            )
+
+        logger.info(
+            f"Generated OAuth URL for "
+            f"redirect: {redirect_uri}"
+        )
 
         return OAuthAuthorizeResponse(
             authorization_url=authorization_url,
@@ -1563,20 +1733,34 @@ async def oauth_callback(
         token_expiry = oauth_service.calculate_token_expiry(expires_in)
 
         # Get user's email from Google's userinfo endpoint
-        import urllib.request
-        import json
-        userinfo_request = urllib.request.Request(
-            "https://www.googleapis.com/oauth2/v2/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"}
-        )
-        with urllib.request.urlopen(userinfo_request, timeout=10) as response:
-            userinfo = json.loads(response.read().decode('utf-8'))
-            email_address = userinfo.get('email')
+        try:
+            userinfo_request = urllib.request.Request(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            with urllib.request.urlopen(
+                userinfo_request, timeout=10
+            ) as response:
+                userinfo = json.loads(
+                    response.read().decode('utf-8')
+                )
+                email_address = userinfo.get('email')
+        except (URLError, HTTPError) as e:
+            logger.exception(
+                f"Failed to retrieve user info from Google: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to retrieve user information from Google"
+            ) from e
 
         if not email_address:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not retrieve email address from OAuth response"
+                detail=(
+                    "Could not retrieve email address from "
+                    "OAuth response"
+                )
             )
 
         # Create or update account with OAuth tokens
