@@ -198,18 +198,19 @@ OAUTH_DEBUG_PREVIEW_LENGTH = 10
 @app.middleware("http")
 async def oauth_callback_debug_middleware(request: Request, call_next):
     """Debug middleware to log raw OAuth callback request details."""
-    if (request.url.path == "/api/auth/gmail/callback" and
-            request.method == "POST"):
-        # Log URL path only (not full URL with sensitive query params)
-        logger.info(f"[OAuth Debug] Request path: {request.url.path}")
-        logger.info(
-            f"[OAuth Debug] Query params keys: "
-            f"{list(request.query_params.keys())}"
-        )
-        logger.info(
-            f"[OAuth Debug] Headers present: "
-            f"{list(request.headers.keys())}"
-        )
+    is_oauth_callback = (
+        request.url.path == "/api/auth/gmail/callback"
+        and request.method == "POST"
+    )
+    if is_oauth_callback:
+        # Log URL path only (no sensitive query params)
+        logger.info(f"[OAuth Debug] Path: {request.url.path}")
+
+        param_keys = list(request.query_params.keys())
+        logger.info(f"[OAuth Debug] Query keys: {param_keys}")
+
+        header_keys = list(request.headers.keys())
+        logger.info(f"[OAuth Debug] Headers: {header_keys}")
 
         # Read and log raw body (safely, without exposing full tokens)
         body_bytes = await request.body()
@@ -218,77 +219,79 @@ async def oauth_callback_debug_middleware(request: Request, call_next):
         # Parse body to check structure without exposing sensitive values
         try:
             body_json = json.loads(body_str) if body_str else {}
-            # Log structure: which keys are present and their lengths
+            # Log structure: keys present and their lengths
             body_structure = {}
             for key, value in body_json.items():
                 if isinstance(value, str):
                     value_len = len(value)
-                    preview = (
-                        value[:OAUTH_DEBUG_PREVIEW_LENGTH] + '...'
-                        if value_len > OAUTH_DEBUG_PREVIEW_LENGTH
-                        else value
-                    )
+                    max_len = OAUTH_DEBUG_PREVIEW_LENGTH
+                    if value_len > max_len:
+                        preview = value[:max_len] + '...'
+                    else:
+                        preview = value
+                    is_empty = not bool(value)
                     body_structure[key] = (
                         f"string(len={value_len}, "
-                        f"empty={not bool(value)}, "
+                        f"empty={is_empty}, "
                         f"preview='{preview}')"
                     )
                 else:
                     body_structure[key] = f"{type(value).__name__}"
             logger.info(
-                f"[OAuth Debug] Request body structure: "
-                f"{body_structure}"
+                f"[OAuth Debug] Body structure: {body_structure}"
             )
 
             # Specifically check for 'state' field issues
             if 'state' in body_json:
                 state_val = body_json['state']
-                state_len = (
-                    len(state_val)
-                    if isinstance(state_val, str)
-                    else 'N/A'
-                )
-                state_preview = (
-                    repr(state_val)[:OAUTH_DEBUG_PREVIEW_LENGTH]
-                )
+                if isinstance(state_val, str):
+                    state_len = len(state_val)
+                else:
+                    state_len = 'N/A'
+                max_preview = OAUTH_DEBUG_PREVIEW_LENGTH
+                state_preview = repr(state_val)[:max_preview]
+                state_empty = not bool(state_val)
+                state_type = type(state_val).__name__
                 logger.info(
-                    f"[OAuth Debug] state field - "
-                    f"type: {type(state_val).__name__}, "
+                    f"[OAuth Debug] state - "
+                    f"type: {state_type}, "
                     f"len: {state_len}, "
-                    f"empty: {not bool(state_val)}, "
+                    f"empty: {state_empty}, "
                     f"preview: {state_preview}"
                 )
             else:
                 logger.warning(
-                    "[OAuth Debug] 'state' field MISSING from body!"
+                    "[OAuth Debug] 'state' MISSING from body!"
                 )
 
             if 'code' in body_json:
                 code_val = body_json['code']
-                code_len = (
-                    len(code_val)
-                    if isinstance(code_val, str)
-                    else 'N/A'
-                )
+                if isinstance(code_val, str):
+                    code_len = len(code_val)
+                else:
+                    code_len = 'N/A'
+                code_empty = not bool(code_val)
+                code_type = type(code_val).__name__
                 logger.info(
-                    f"[OAuth Debug] code field - "
-                    f"type: {type(code_val).__name__}, "
+                    f"[OAuth Debug] code - "
+                    f"type: {code_type}, "
                     f"len: {code_len}, "
-                    f"empty: {not bool(code_val)}"
+                    f"empty: {code_empty}"
                 )
             else:
                 logger.warning(
-                    "[OAuth Debug] 'code' field MISSING from body!"
+                    "[OAuth Debug] 'code' MISSING from body!"
                 )
 
         except json.JSONDecodeError:
-            logger.exception("[OAuth Debug] Failed to parse body as JSON")
+            logger.exception("[OAuth Debug] Parse failed")
+            body_preview = body_str[:200]
             logger.info(
-                f"[OAuth Debug] Raw body (first 200 chars): "
-                f"{body_str[:200]}"
+                f"[OAuth Debug] Raw body (200 chars): "
+                f"{body_preview}"
             )
         except Exception:
-            logger.exception("[OAuth Debug] Error inspecting body")
+            logger.exception("[OAuth Debug] Inspection error")
 
         # IMPORTANT: We need to make the body available again
         # Create a new request with the body we read
@@ -1560,16 +1563,21 @@ async def initiate_oauth(
 
         # Generate state token for CSRF protection
         state = oauth_service.generate_state_token()
+        state_len = len(state)
+        preview_len = OAUTH_DEBUG_PREVIEW_LENGTH
+        state_preview = state[:preview_len]
         logger.info(
-            f"[OAuth Debug] Generated state token - "
-            f"length: {len(state)}, "
-            f"preview: {state[:OAUTH_DEBUG_PREVIEW_LENGTH]}..."
+            f"[OAuth Debug] Generated state - "
+            f"len: {state_len}, "
+            f"preview: {state_preview}..."
         )
 
-        # Store state in database for validation during callback
-        state_repo.store_state(state_token=state, redirect_uri=redirect_uri)
+        # Store state in database for callback validation
+        state_repo.store_state(
+            state_token=state, redirect_uri=redirect_uri
+        )
         logger.info(
-            f"[OAuth Debug] Stored state token in database with "
+            f"[OAuth Debug] Stored state with "
             f"redirect_uri: {redirect_uri}"
         )
 
@@ -1580,26 +1588,27 @@ async def initiate_oauth(
             login_hint=login_hint,
         )
 
-        # Log the state parameter in the URL to verify it's included
+        # Verify state parameter in URL
         if 'state=' in authorization_url:
             # Extract state from URL for verification
-            parsed_url = urllib.parse.urlparse(authorization_url)
-            query_params = urllib.parse.parse_qs(parsed_url.query)
-            url_state = query_params.get('state', [''])[0]
+            parsed = urllib.parse.urlparse(authorization_url)
+            params = urllib.parse.parse_qs(parsed.query)
+            url_state = params.get('state', [''])[0]
+            url_state_len = len(url_state)
+            matches = url_state == state
             logger.info(
-                f"[OAuth Debug] State in authorization URL - "
-                f"length: {len(url_state)}, "
-                f"matches generated: {url_state == state}"
+                f"[OAuth Debug] URL state - "
+                f"len: {url_state_len}, "
+                f"matches: {matches}"
             )
         else:
             logger.warning(
-                "[OAuth Debug] State parameter NOT found "
-                "in authorization URL!"
+                "[OAuth Debug] State NOT in auth URL!"
             )
 
         logger.info(
-            f"Generated OAuth authorization URL for "
-            f"redirect_uri: {redirect_uri}"
+            f"Generated OAuth URL for "
+            f"redirect: {redirect_uri}"
         )
 
         return OAuthAuthorizeResponse(
