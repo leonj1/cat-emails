@@ -100,11 +100,12 @@ class OAuthStateRepository:
         """
         # Debug logging for state token lookup
         token_len = len(state_token) if state_token else 0
+        token_preview = state_token[:20] + '...' if state_token and len(state_token) > 20 else state_token
         logger.info(
             f"Looking up OAuth state - "
             f"token length: {token_len}, "
             f"token empty: {not bool(state_token)}, "
-            f"token repr: {repr(state_token[:20] + '...' if state_token and len(state_token) > 20 else state_token)}"
+            f"token repr: {token_preview!r}"
         )
 
         connection = get_db_connection()
