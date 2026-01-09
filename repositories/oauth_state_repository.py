@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from sqlalchemy import Engine, text
+from sqlalchemy.exc import SQLAlchemyError
 import json
 import logging
 
@@ -75,7 +76,7 @@ class OAuthStateRepository:
 
             logger.debug(f"Stored OAuth state token (expires in {self.STATE_TTL_MINUTES} minutes)")
 
-        except Exception:
+        except SQLAlchemyError:
             connection.rollback()
             logger.exception("Failed to store OAuth state")
             raise
@@ -157,7 +158,7 @@ class OAuthStateRepository:
                 **metadata
             }
 
-        except Exception:
+        except SQLAlchemyError:
             logger.exception("Failed to retrieve OAuth state")
             raise
         finally:
@@ -190,7 +191,7 @@ class OAuthStateRepository:
             else:
                 return False
 
-        except Exception:
+        except SQLAlchemyError:
             connection.rollback()
             logger.exception("Failed to delete OAuth state")
             return False
@@ -221,7 +222,7 @@ class OAuthStateRepository:
             else:
                 return 0
 
-        except Exception:
+        except SQLAlchemyError:
             connection.rollback()
             logger.exception("Failed to cleanup expired OAuth states")
             return 0
