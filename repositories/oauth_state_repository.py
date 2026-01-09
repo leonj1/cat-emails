@@ -49,8 +49,8 @@ class OAuthStateRepository:
         """
         Store an OAuth state token with associated metadata.
 
-        Implements upsert behavior: if the state token already exists,
-        it will be deleted first, then a new entry will be created.
+        Implements atomic upsert behavior using INSERT ... ON DUPLICATE KEY UPDATE
+        to avoid race conditions in concurrent scenarios.
 
         Args:
             state_token: The CSRF state token
@@ -62,27 +62,27 @@ class OAuthStateRepository:
         """
         connection = get_db_connection()
         try:
-            # Delete existing state token if present (upsert behavior)
-            delete_query = text("""
-                DELETE FROM oauth_state
-                WHERE state_token = :state_token
-            """)
-            connection.execute(delete_query, {'state_token': state_token})
-
             expires_at = datetime.now(timezone.utc) + timedelta(minutes=self.STATE_TTL_MINUTES)
+            created_at = datetime.now(timezone.utc)
             metadata_json = json.dumps(metadata) if metadata else None
 
-            insert_query = text("""
+            # Use INSERT ... ON DUPLICATE KEY UPDATE for atomic upsert
+            upsert_query = text("""
                 INSERT INTO oauth_state (state_token, redirect_uri, created_at, expires_at, metadata)
                 VALUES (:state_token, :redirect_uri, :created_at, :expires_at, :metadata)
+                ON DUPLICATE KEY UPDATE
+                    redirect_uri = VALUES(redirect_uri),
+                    created_at = VALUES(created_at),
+                    expires_at = VALUES(expires_at),
+                    metadata = VALUES(metadata)
             """)
 
             connection.execute(
-                insert_query,
+                upsert_query,
                 {
                     'state_token': state_token,
                     'redirect_uri': redirect_uri,
-                    'created_at': datetime.now(timezone.utc),
+                    'created_at': created_at,
                     'expires_at': expires_at,
                     'metadata': metadata_json
                 }
