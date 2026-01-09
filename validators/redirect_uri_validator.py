@@ -65,12 +65,10 @@ class RedirectUriValidator:
 
         # Check if HTTP is used with non-localhost domain
         if parsed.scheme == 'http':
-            # Allow HTTP only for localhost and 127.0.0.1
-            netloc_lower = parsed.netloc.lower()
-            is_localhost = (
-                netloc_lower.startswith('localhost') or
-                netloc_lower.startswith('127.0.0.1')
-            )
+            # Allow HTTP only for exact localhost, 127.0.0.1, and ::1 (IPv6 localhost)
+            # Extract hostname without port for exact matching
+            hostname = (parsed.hostname or '').lower()
+            is_localhost = hostname in {'localhost', '127.0.0.1', '::1'}
             if not is_localhost:
                 return "invalid_redirect_uri", "Redirect URI must use HTTPS (or HTTP for localhost)"
 
