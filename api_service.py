@@ -57,10 +57,13 @@ from models.summary_response import SummaryResponse
 from models.create_account_request import CreateAccountRequest
 from models.oauth_models import (
     OAuthAuthorizeResponse, OAuthCallbackRequest, OAuthCallbackResponse,
-    OAuthStatusResponse, OAuthRevokeResponse
+    OAuthStatusResponse, OAuthRevokeResponse, OAuthStateInitRequest, OAuthStateInitResponse
 )
 from services.oauth_flow_service import OAuthFlowService
+from services.ip_rate_limiter import IPRateLimiter
 from repositories.oauth_state_repository import OAuthStateRepository
+from validators.state_token_validator import StateTokenValidator
+from validators.redirect_uri_validator import RedirectUriValidator
 from models.standard_response import StandardResponse
 from models.error_response import ErrorResponse
 from models.processing_current_status_response import (
@@ -380,6 +383,10 @@ BACKGROUND_PROCESS_HOURS = int(os.getenv("BACKGROUND_PROCESS_HOURS", "2"))  # Lo
 # Category aggregation configuration
 ENABLE_CATEGORY_AGGREGATION = os.getenv("ENABLE_CATEGORY_AGGREGATION", "true").lower() == "true"
 CATEGORY_AGGREGATION_BUFFER_SIZE = int(os.getenv("CATEGORY_AGGREGATION_BUFFER_SIZE", "100"))
+
+# OAuth configuration
+OAUTH_STATE_TTL_MINUTES = 10  # OAuth state tokens expire after 10 minutes
+TRUSTED_PROXY_ENABLED = os.getenv("TRUSTED_PROXY", "false").lower() == "true"  # Enable X-Forwarded-For trust
 
 # Minimum delay to ensure healthchecks pass (seconds)
 MIN_BACKGROUND_START_DELAY = 1
@@ -1542,6 +1549,14 @@ async def trigger_monthly_summary(x_api_key: Optional[str] = Header(None)):
 
 # ==================== OAuth Endpoints ====================
 
+# Global IP rate limiter for OAuth state init endpoint
+ip_rate_limiter = IPRateLimiter(max_requests=10, window_seconds=60)
+
+# Global OAuth state repository for dependency injection
+# Uses the shared engine from settings_service.repository to avoid creating separate connection pools
+oauth_state_repo = OAuthStateRepository(engine=settings_service.repository.engine)
+
+
 def get_oauth_service() -> OAuthFlowService:
     """Get OAuth flow service instance."""
     return OAuthFlowService()
@@ -1549,7 +1564,114 @@ def get_oauth_service() -> OAuthFlowService:
 
 def get_oauth_state_repository() -> OAuthStateRepository:
     """Get OAuth state repository instance."""
-    return OAuthStateRepository()
+    return oauth_state_repo
+
+
+@app.post("/api/auth/gmail/init", response_model=OAuthStateInitResponse, tags=["oauth"])
+async def oauth_state_init(
+    request_body: OAuthStateInitRequest,
+    http_request: Request,
+    x_api_key: Optional[str] = Header(None),
+    state_repo: OAuthStateRepository = Depends(get_oauth_state_repository),  # noqa: B008
+):
+    """
+    Pre-register a client-generated OAuth state token.
+
+    Allows frontends to pre-register state tokens for popup-based OAuth flows,
+    enabling state correlation between the popup window and the main application.
+
+    Args:
+        request_body: Contains state_token and redirect_uri
+        http_request: FastAPI Request object for IP extraction
+
+    Returns:
+        OAuthStateInitResponse with success status and expiration timestamp
+
+    Raises:
+        HTTPException: 400 for validation errors, 429 for rate limiting
+    """
+    verify_api_key(x_api_key)
+
+    # Extract client IP for rate limiting (handle proxy scenarios)
+    # When behind a proxy/load balancer, use X-Forwarded-For header if TRUSTED_PROXY is enabled
+    # Format: X-Forwarded-For: client, proxy1, proxy2
+    # Take the first (leftmost) IP which is the original client
+    client_ip = http_request.client.host if http_request.client else "unknown"
+
+    if TRUSTED_PROXY_ENABLED:
+        forwarded_for = http_request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            # Take the first IP from the comma-separated list
+            candidate_ip = forwarded_for.split(",")[0].strip()
+            # Validate the IP address format
+            try:
+                import ipaddress
+                ipaddress.ip_address(candidate_ip)
+                client_ip = candidate_ip
+            except ValueError:
+                # Invalid IP format, fall back to client.host
+                logger.warning(f"Invalid X-Forwarded-For IP: {candidate_ip}, using client.host")
+
+    # Atomically check and record rate limit (counts all attempts, prevents race conditions)
+    allowed, wait_time = ip_rate_limiter.allow_request(client_ip)
+    if not allowed:
+        logger.warning(f"Rate limit exceeded for IP {client_ip}, wait time: {wait_time}s")
+        return JSONResponse(
+            status_code=429,
+            headers={"Retry-After": str(int(wait_time))} if wait_time else {},
+            content={
+                "error": "rate_limit_exceeded",
+                "message": "Too many state token registration requests. Try again later."
+            }
+        )
+
+    # Validate state token
+    state_validator = StateTokenValidator()
+    error_code, error_message = state_validator.validate(request_body.state_token)
+    if error_code:
+        return JSONResponse(
+            status_code=400,
+            content={"error": error_code, "message": error_message}
+        )
+
+    # Validate redirect URI
+    uri_validator = RedirectUriValidator()
+    error_code, error_message = uri_validator.validate(request_body.redirect_uri)
+    if error_code:
+        return JSONResponse(
+            status_code=400,
+            content={"error": error_code, "message": error_message}
+        )
+
+    try:
+        # Store state token with configured expiration
+        state_repo.store_state(
+            state_token=request_body.state_token,
+            redirect_uri=request_body.redirect_uri
+        )
+
+        # Calculate expiration timestamp using configured TTL
+        from datetime import timezone as tz
+        expires_at = datetime.now(tz.utc) + timedelta(minutes=OAUTH_STATE_TTL_MINUTES)
+        expires_at_iso = expires_at.isoformat().replace('+00:00', 'Z')
+
+        logger.info(f"State token registered successfully (IP: {client_ip})")
+
+        return OAuthStateInitResponse(
+            success=True,
+            state_token=request_body.state_token,
+            expires_at=expires_at_iso
+        )
+
+    except Exception:
+        logger.exception("Failed to store OAuth state token")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "server_error",
+                "message": "Failed to register state token. Please try again."
+            }
+        )
 
 
 @app.get("/api/auth/gmail/authorize", response_model=OAuthAuthorizeResponse, tags=["oauth"])
@@ -3055,6 +3177,40 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     # Log detailed information about the validation error
     logger.error(f"Request validation error on {request.method} {request.url.path}")
     logger.error(f"Validation errors: {exc.errors()}")
+
+    # Special handling for OAuth state init endpoint - missing fields
+    if "/api/auth/gmail/init" in str(request.url.path):
+        errors = exc.errors()
+        for error in errors:
+            if error.get("type") == "missing" and "loc" in error:
+                field = error["loc"][-1]
+                if field == "state_token":
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error": "invalid_request",
+                            "message": "State token is required"
+                        }
+                    )
+                elif field == "redirect_uri":
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error": "invalid_request",
+                            "message": "Redirect URI is required"
+                        }
+                    )
+
+        # For invalid JSON
+        for error in errors:
+            if "json" in error.get("type", "").lower():
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error": "invalid_request",
+                        "message": "Invalid JSON body"
+                    }
+                )
 
     # Log request details for OAuth callback specifically (sanitized - no sensitive data)
     if "/api/auth/gmail/callback" in str(request.url.path):

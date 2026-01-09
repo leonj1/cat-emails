@@ -81,3 +81,26 @@ class OAuthRevokeResponse(BaseModel):
     message: str = Field(
         description="Human-readable status message"
     )
+
+
+class OAuthStateInitRequest(BaseModel):
+    """Request model for pre-registering OAuth state tokens."""
+    state_token: str = Field(
+        description="Client-generated state token (16-64 chars, alphanumeric + dashes)"
+    )
+    redirect_uri: str = Field(
+        description="Redirect URI for OAuth callback (HTTPS required except localhost)"
+    )
+
+
+class OAuthStateInitResponse(BaseModel):
+    """Response after successful state token registration."""
+    success: bool = Field(
+        description="Whether the state token was successfully registered"
+    )
+    state_token: str = Field(
+        description="The registered state token"
+    )
+    expires_at: str = Field(
+        description="ISO 8601 timestamp when the state token expires"
+    )
