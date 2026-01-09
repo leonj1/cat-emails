@@ -1485,3 +1485,91 @@ Active Task from architects_digest.md:
 
 Next: Invoking architect agent to create spec for the fix
 ---
+
+=== Session 20260109-220800 ===
+Workflow: debugger
+Task: OAuth state token not found during Gmail registration - user receives "state token not found or expired" error when attempting to complete Gmail OAuth callback
+Status: Initialized
+Context: Explored project structure, identified OAuth state token flow
+
+Log Evidence:
+```
+2026-01-09 22:08:08,047 - repositories.oauth_state_repository - INFO - Looking up OAuth state - token length: 32, token empty: False, token repr: '4ff7fb1436d497d0b165...'
+2026-01-09 22:08:08,128 - repositories.oauth_state_repository - WARNING - OAuth state token not found in database - token_prefix: 4ff7fb1436...
+2026-01-09 22:08:08,130 - __main__ - WARNING - OAuth callback failed - state token not found or expired
+```
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API (api_service.py - ~109k lines)
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- AI/ML: OpenAI SDK for LLM-based email categorization
+- Email: IMAP (imapclient) for Gmail integration, OAuth 2.0 support
+- Testing: pytest with BDD (Gherkin feature files in tests/bdd/)
+- Build: Docker with Tini entrypoint, Makefile
+
+Branch: terragon/debug-gmail-oauth-registration-v31d9y
+
+Key Files Identified for OAuth State Token Flow:
+
+1. /root/repo/api_service.py (lines 1554-1649) - GET /api/auth/gmail/authorize
+   - Line 1584: state = oauth_service.generate_state_token()
+   - Line 1595-1596: state_repo.store_state(state_token=state, redirect_uri=redirect_uri)
+   - Stores state token in oauth_state table with 10-minute TTL
+
+2. /root/repo/api_service.py (lines 1651-1789) - POST /api/auth/gmail/callback
+   - Line 1694: state_data = state_repo.get_state(request.state)
+   - Line 1695-1700: Returns error if state not found or expired
+   - Deletes state after successful use (line 1785)
+
+3. /root/repo/repositories/oauth_state_repository.py - State Token Storage
+   - Line 41: STATE_TTL_MINUTES = 10 (tokens expire after 10 minutes)
+   - Line 43-89: store_state() - INSERT into oauth_state table
+   - Line 91-170: get_state() - SELECT with expiry check
+   - Line 17-30: _get_engine() creates engine singleton using DATABASE_URL env
+
+4. /root/repo/sql/V6__add_oauth_state_table.sql - Table Schema
+   - state_token VARCHAR(255) PRIMARY KEY
+   - redirect_uri TEXT NOT NULL
+   - created_at TIMESTAMP
+   - expires_at TIMESTAMP
+   - metadata JSON
+
+5. /root/repo/services/oauth_flow_service.py (line 72-74) - State Token Generation
+   - secrets.token_urlsafe(32) generates 32-byte URL-safe token
+
+Initial Observations:
+- Token is 32 characters long (valid)
+- Token is not empty (valid)
+- Token prefix shows '4ff7fb1436...' (looks like valid token format)
+- Token was NOT found in database
+
+Potential Root Causes to Investigate:
+1. State token was never stored (store_state() failed silently)
+2. State token was stored in wrong database (different MySQL connection)
+3. State token expired (unlikely - only 81ms between store and lookup)
+4. Transaction was not committed after store
+5. Connection pooling issue - different connections for store vs lookup
+6. Database table oauth_state doesn't exist (migration V6 not applied)
+7. OAuth state repository using different database than main app
+
+Evidence Pattern:
+- The token IS being generated (32 chars, valid format)
+- The token IS being sent to callback (present in request)
+- The token is NOT being found in database
+- Time gap is minimal (not a TTL issue)
+
+Related Previous Sessions:
+- Session 20260107-115735: Gmail authentication failure (different issue - IMAP auth)
+- Session 20260107-121247: Fix Gmail OAuth auth method corruption bug (BDD in progress)
+- Session 20260106-222849: Add OAuth status visual indicator (in progress)
+
+Active Task from architects_digest.md:
+3. Fix Gmail OAuth Auth Method Corruption Bug (BDD Scenarios Complete)
+   - 24 Gherkin scenarios generated and approved
+   - Feature Files exist in tests/bdd/
+
+Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from Gmail via API)
+
+Next: Invoking debugger agent for CRASH-RCA forensic analysis
+---
