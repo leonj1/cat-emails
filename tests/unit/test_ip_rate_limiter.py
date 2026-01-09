@@ -165,7 +165,6 @@ class TestIPRateLimiterTimeWindow:
             # Set current time to 61 seconds in the future
             future_time = datetime.now() + timedelta(seconds=61)
             mock_datetime.now.return_value = future_time
-            mock_datetime.side_effect = lambda *args, **kw: datetime(*args, **kw)
 
             # Act - request after window elapsed
             allowed, wait_time = limiter.check_rate_limit(ip_address)
