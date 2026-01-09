@@ -49,6 +49,9 @@ class OAuthStateRepository:
         """
         Store an OAuth state token with associated metadata.
 
+        Implements upsert behavior: if the state token already exists,
+        it will be deleted first, then a new entry will be created.
+
         Args:
             state_token: The CSRF state token
             redirect_uri: The redirect URI for the OAuth flow
@@ -59,16 +62,23 @@ class OAuthStateRepository:
         """
         connection = get_db_connection()
         try:
+            # Delete existing state token if present (upsert behavior)
+            delete_query = text("""
+                DELETE FROM oauth_state
+                WHERE state_token = :state_token
+            """)
+            connection.execute(delete_query, {'state_token': state_token})
+
             expires_at = datetime.now(timezone.utc) + timedelta(minutes=self.STATE_TTL_MINUTES)
             metadata_json = json.dumps(metadata) if metadata else None
 
-            query = text("""
+            insert_query = text("""
                 INSERT INTO oauth_state (state_token, redirect_uri, created_at, expires_at, metadata)
                 VALUES (:state_token, :redirect_uri, :created_at, :expires_at, :metadata)
             """)
 
             connection.execute(
-                query,
+                insert_query,
                 {
                     'state_token': state_token,
                     'redirect_uri': redirect_uri,
