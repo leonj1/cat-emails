@@ -2,6 +2,23 @@
 > Status: In Progress
 
 ## Active Stack
+4. Add OAuth State Init Endpoint for Popup Flow (In Progress)
+   - **Task**: Create POST /api/auth/gmail/init endpoint for popup-based OAuth flow
+   - **Problem**: Current OAuth flow generates state tokens server-side, but popup-based frontend flows need client-controlled state tokens
+   - **Solution (Option B)**: Allow frontend to pre-register a client-generated state token before OAuth flow
+   - **Key Files**:
+     - api_service.py (lines 1555-1649) - existing /api/auth/gmail/authorize endpoint
+     - api_service.py (lines 1651-1789) - existing /api/auth/gmail/callback endpoint
+     - repositories/oauth_state_repository.py - state token storage
+     - sql/V6__add_oauth_state_table.sql - oauth_state table schema
+   - **Workflow**:
+     1. Frontend generates state token (e.g., crypto.randomUUID())
+     2. Frontend calls POST /api/auth/gmail/init with {state_token, redirect_uri}
+     3. Backend stores state_token in oauth_state table with TTL
+     4. Frontend opens popup with OAuth URL containing registered state
+     5. Google redirects to callback with same state
+     6. Backend validates state (existing flow)
+
 3. Fix Gmail OAuth Auth Method Corruption Bug (BDD Scenarios Complete)
    - Root Cause: /root/repo/services/gmail_fetcher_service.py line 78 always sets auth_method='imap'
    - Fix Part 1: Conditionally set auth_method based on connection_service presence
@@ -117,7 +134,47 @@
 
 ## Context
 
-### Current Task Description (Task 3 - NEW from CRASH-RCA)
+### Current Task Description (Task 4 - OAuth State Init Endpoint)
+Create POST /api/auth/gmail/init endpoint to support frontend popup-based OAuth flows.
+
+**Problem:**
+The current OAuth flow generates state tokens server-side in /api/auth/gmail/authorize, but this doesn't
+work well with popup-based OAuth flows where the frontend needs to control the state token to correlate
+the OAuth response with the original popup window.
+
+**Solution (Option B):**
+Create a new endpoint /api/auth/gmail/init that allows the frontend to:
+1. Generate a state token client-side
+2. Pre-register that state token with the backend via POST /api/auth/gmail/init
+3. Use the pre-registered state token when constructing the OAuth authorization URL
+4. Complete the OAuth flow via popup
+5. Backend validates the state token during callback (existing flow)
+
+**Implementation Requirements:**
+1. **New Endpoint**: POST /api/auth/gmail/init
+   - Request body: { state_token: string, redirect_uri: string }
+   - Validate state_token format (non-empty, reasonable length 16-64 chars)
+   - Store state_token in oauth_state table with 10-minute TTL
+   - Return: { success: true, expires_at: timestamp }
+
+2. **Security Considerations:**
+   - Rate limiting to prevent state token flooding
+   - State token format validation
+   - Reuse existing OAuthStateRepository.store_state() method
+   - Same TTL as server-generated tokens (10 minutes)
+
+3. **Integration:**
+   - No changes needed to /api/auth/gmail/callback (validates any registered state)
+   - Frontend can choose between:
+     - Old flow: GET /api/auth/gmail/authorize (server-generated state)
+     - New flow: POST /api/auth/gmail/init + client-constructed OAuth URL
+
+**Key Files:**
+- api_service.py - Add new endpoint
+- repositories/oauth_state_repository.py - Reuse store_state() method
+- models/oauth_models.py - May need new request/response models
+
+### Previous Task Context (Task 3 - OAuth Auth Method Bug)
 Fix the Gmail OAuth authentication corruption bug identified in the CRASH-RCA investigation.
 
 **Root Cause:**
@@ -126,52 +183,15 @@ At `/root/repo/services/gmail_fetcher_service.py` line 78:
 self.account_service.get_or_create_account(self.email_address, None, app_password, 'imap', None)
 ```
 
-This line ALWAYS sets `auth_method='imap'` regardless of whether the account uses OAuth authentication. When an OAuth account is processed:
-1. GmailFetcher is created with a `connection_service` (OAuth connection)
-2. Line 78 calls get_or_create_account with `auth_method='imap'`
-3. The database updates `auth_method` from 'oauth' to 'imap'
-4. Next time the account is processed, it tries IMAP authentication instead of OAuth
-5. IMAP authentication fails because there's no valid app_password for OAuth accounts
+This line ALWAYS sets `auth_method='imap'` regardless of whether the account uses OAuth authentication.
 
 **Fix Requirements:**
-1. **Part 1 - Code Fix:** Modify `/root/repo/services/gmail_fetcher_service.py` line 78:
-   - If `connection_service` is provided (OAuth), don't overwrite auth_method
-   - If no `connection_service` (IMAP), set `auth_method='imap'` and pass app_password
-
-2. **Part 2 - Database Migration:** Restore corrupted OAuth accounts:
-   - Find accounts with `oauth_refresh_token IS NOT NULL` but `auth_method='imap'`
-   - Update their `auth_method` to 'oauth'
-
-**Key Files:**
-- `/root/repo/services/gmail_fetcher_service.py:78` - Bug location
-- `/root/repo/clients/account_category_client.py:137-250` - get_or_create_account implementation
-- `/root/repo/models/database.py:31-60` - EmailAccount model with auth_method column
-
-### Previous Task Context (Task 2)
-Add a visual indicator on the Accounts page showing Gmail OAuth connection status:
-- Display "OAuth Connected" (green badge) for accounts using OAuth authentication
-- Display "IMAP" (gray badge) for accounts using IMAP credentials
-- Efficient implementation: Include auth_method in /api/accounts response to avoid N+1 queries
-
-### Implementation Strategy (Recommended)
-**Option A - Include auth_method in accounts list response (Efficient)**
-1. Add auth_method field to EmailAccountInfo response model
-2. Update GET /api/accounts to include account.auth_method in response
-3. Update frontend accounts.html to display badge based on auth_method value
-4. Single API call serves all data - no N+1 queries
-
-**Option B - Per-account OAuth status calls (Not Recommended)**
-- Would require N+1 API calls using existing /api/accounts/{email}/oauth-status endpoint
-- Less efficient, more network overhead
-
-### Key Files to Modify
-1. models/account_models.py - Add auth_method to EmailAccountInfo
-2. api_service.py - Include auth_method in GET /api/accounts response (lines 1846-1857)
-3. frontend/templates/accounts.html - Add Auth Method column with badge styling
-4. frontend/templates/accounts.html - Update renderAccountsTable() JavaScript function
+1. **Part 1 - Code Fix:** Modify `/root/repo/services/gmail_fetcher_service.py` line 78
+2. **Part 2 - Database Migration:** Restore corrupted OAuth accounts
 
 ### Existing OAuth Infrastructure
 - EmailAccount model has auth_method column (models/database.py:45)
-- OAuthStatusResponse model exists (models/oauth_models.py:42-57)
-- GET /api/accounts/{email}/oauth-status endpoint exists (api_service.py:1596-1642)
-- OAuth columns in database: auth_method, oauth_client_id, oauth_client_secret, oauth_refresh_token, oauth_access_token, oauth_token_expiry, oauth_scopes
+- OAuthStateRepository for state token storage
+- GET /api/auth/gmail/authorize - server-generated state flow
+- POST /api/auth/gmail/callback - validates state and completes OAuth
+- OAuth state table with 10-minute TTL

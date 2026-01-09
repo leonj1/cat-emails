@@ -1573,3 +1573,83 @@ Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from
 
 Next: Invoking debugger agent for CRASH-RCA forensic analysis
 ---
+
+=== Session 20260109-222550 ===
+Workflow: architect
+Task: Implement Option B for OAuth state synchronization - Create /api/auth/gmail/init endpoint for popup-based OAuth flow
+Status: Initialized
+Context: Explored project structure, identified OAuth state token flow architecture
+
+Branch: terragon/debug-gmail-oauth-registration-v31d9y
+
+Tech Stack:
+- Language: Python 3.12
+- Framework: FastAPI for REST API (api_service.py - ~109k lines)
+- Database: SQLAlchemy with MySQL/SQLite support, Flyway for SQL migrations
+- AI/ML: OpenAI SDK for LLM-based email categorization
+- Email: IMAP (imapclient) for Gmail integration, OAuth 2.0 support
+- Testing: pytest with BDD (Gherkin feature files in tests/bdd/)
+- Build: Docker with Tini entrypoint, Makefile
+
+Task Analysis:
+The user wants to implement "Option B" for OAuth state synchronization to support frontend popup-based OAuth flows.
+
+**Current Problem:**
+The current OAuth flow generates state tokens server-side in /api/auth/gmail/authorize, but this doesn't work
+well with popup-based OAuth flows where the frontend needs to control the state token to correlate the OAuth
+response with the original popup window.
+
+**Proposed Solution (Option B):**
+Create a new endpoint /api/auth/gmail/init that allows the frontend to:
+1. Generate a state token client-side
+2. Pre-register that state token with the backend via the new /api/auth/gmail/init endpoint
+3. Use the pre-registered state token when constructing the OAuth authorization URL
+4. Complete the OAuth flow via popup
+5. Backend validates the state token during callback (existing flow)
+
+**Key Files Identified:**
+1. /root/repo/api_service.py (lines 1555-1649) - GET /api/auth/gmail/authorize
+   - Currently generates state server-side and stores in oauth_state table
+   - Returns authorization_url with state embedded
+
+2. /root/repo/api_service.py (lines 1651-1789) - POST /api/auth/gmail/callback
+   - Validates state token from oauth_state table
+   - Deletes state after successful use
+
+3. /root/repo/repositories/oauth_state_repository.py
+   - STATE_TTL_MINUTES = 10 (tokens expire after 10 minutes)
+   - store_state() - INSERT into oauth_state table
+   - get_state() - SELECT with expiry check
+
+4. /root/repo/sql/V6__add_oauth_state_table.sql - Table Schema
+   - state_token VARCHAR(255) PRIMARY KEY
+   - redirect_uri TEXT NOT NULL
+   - created_at, expires_at TIMESTAMP
+   - metadata JSON
+
+**Implementation Plan:**
+1. Create new POST /api/auth/gmail/init endpoint that:
+   - Accepts client-provided state_token and redirect_uri
+   - Validates state_token format (non-empty, reasonable length)
+   - Stores state_token in oauth_state table with TTL
+   - Returns success/confirmation
+
+2. The frontend workflow becomes:
+   - Frontend generates state token (e.g., crypto.randomUUID())
+   - Frontend calls POST /api/auth/gmail/init with {state, redirect_uri}
+   - Frontend opens popup with OAuth URL (constructed client-side) including the registered state
+   - Google redirects to callback with same state
+   - Backend validates state (existing /api/auth/gmail/callback flow)
+
+Active Task from architects_digest.md:
+3. Fix Gmail OAuth Auth Method Corruption Bug (BDD Scenarios Complete)
+4. Add OAuth State Init Endpoint for Popup Flow (NEW)
+
+Previous Session (20260109-220800):
+- Investigated OAuth state token not found error
+- Identified that state tokens generated server-side don't sync with popup-based frontend flows
+
+Features: 0/1 complete (feature_list.md - FEAT-001: User can process emails from Gmail via API)
+
+Next: Invoking architect agent to create spec for /api/auth/gmail/init endpoint
+---
