@@ -3,7 +3,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 import os
 import json
 import logging
@@ -67,14 +66,14 @@ class OAuthStateRepository:
             metadata_json = json.dumps(metadata) if metadata else None
 
             # Use INSERT ... ON DUPLICATE KEY UPDATE for atomic upsert
+            # Note: created_at is intentionally NOT updated on duplicate to preserve original timestamp
             upsert_query = text("""
                 INSERT INTO oauth_state (state_token, redirect_uri, created_at, expires_at, metadata)
-                VALUES (:state_token, :redirect_uri, :created_at, :expires_at, :metadata)
+                VALUES (:state_token, :redirect_uri, :created_at, :expires_at, :metadata) AS new_row
                 ON DUPLICATE KEY UPDATE
-                    redirect_uri = VALUES(redirect_uri),
-                    created_at = VALUES(created_at),
-                    expires_at = VALUES(expires_at),
-                    metadata = VALUES(metadata)
+                    redirect_uri = new_row.redirect_uri,
+                    expires_at = new_row.expires_at,
+                    metadata = new_row.metadata
             """)
 
             connection.execute(
