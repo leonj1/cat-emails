@@ -1589,11 +1589,19 @@ async def oauth_state_init(
     """
     verify_api_key(x_api_key)
 
-    # Extract client IP for rate limiting
-    client_ip = http_request.client.host if http_request.client else "unknown"
+    # Extract client IP for rate limiting (handle proxy scenarios)
+    # When behind a proxy/load balancer, use X-Forwarded-For header
+    # Format: X-Forwarded-For: client, proxy1, proxy2
+    # Take the first (leftmost) IP which is the original client
+    forwarded_for = http_request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # Take the first IP from the comma-separated list
+        client_ip = forwarded_for.split(",")[0].strip()
+    else:
+        client_ip = http_request.client.host if http_request.client else "unknown"
 
-    # Check rate limit
-    allowed, wait_time = ip_rate_limiter.check_rate_limit(client_ip)
+    # Atomically check and record rate limit (counts all attempts, prevents race conditions)
+    allowed, wait_time = ip_rate_limiter.allow_request(client_ip)
     if not allowed:
         logger.warning(f"Rate limit exceeded for IP {client_ip}, wait time: {wait_time}s")
         return JSONResponse(
@@ -1629,9 +1637,6 @@ async def oauth_state_init(
             redirect_uri=request_body.redirect_uri
         )
 
-        # Record successful request for rate limiting
-        ip_rate_limiter.record_request(client_ip)
-
         # Calculate expiration timestamp
         from datetime import timezone as tz
         expires_at = datetime.now(tz.utc) + timedelta(minutes=10)
@@ -1647,10 +1652,13 @@ async def oauth_state_init(
 
     except Exception as e:
         logger.exception("Failed to store OAuth state token")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to register state token: {str(e)}"
-        ) from e
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "server_error",
+                "message": "Failed to register state token. Please try again."
+            }
+        )
 
 
 @app.get("/api/auth/gmail/authorize", response_model=OAuthAuthorizeResponse, tags=["oauth"])
