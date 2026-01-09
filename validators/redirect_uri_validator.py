@@ -45,30 +45,31 @@ class RedirectUriValidator:
             return "invalid_redirect_uri", f"Redirect URI must not exceed {self.MAX_LENGTH} characters"
 
         # Parse and validate URL format
-        try:
-            parsed = urlparse(uri)
+        # Note: urlparse() doesn't typically raise exceptions, so no try/except needed
+        parsed = urlparse(uri)
 
-            # Check if scheme exists (if not, URL is invalid)
-            if not parsed.scheme:
-                return "invalid_redirect_uri", "Redirect URI must be a valid URL"
+        # Check if scheme exists (if not, URL is invalid)
+        if not parsed.scheme:
+            return "invalid_redirect_uri", "Redirect URI must be a valid URL"
 
-            # Check scheme (must be http or https)
-            if parsed.scheme not in ('http', 'https'):
-                return "invalid_redirect_uri", "Redirect URI must use HTTPS (or HTTP for localhost)"
+        # Check scheme (must be http or https)
+        if parsed.scheme not in ("http", "https"):
+            return "invalid_redirect_uri", "Redirect URI must use HTTPS (or HTTP for localhost)"
 
-            # Check for valid netloc (host) - must exist for http/https
-            if not parsed.netloc:
-                return "invalid_redirect_uri", "Redirect URI must be a valid URL"
+        # Require a real hostname (netloc alone can be misleading, e.g. "https://:80/path")
+        if not parsed.netloc or not parsed.hostname:
+            return "invalid_redirect_uri", "Redirect URI must be a valid URL"
 
-        except Exception:
+        # Reject userinfo (username/password) and fragments (commonly invalid for OAuth redirect URIs)
+        if parsed.username or parsed.password or parsed.fragment:
             return "invalid_redirect_uri", "Redirect URI must be a valid URL"
 
         # Check if HTTP is used with non-localhost domain
-        if parsed.scheme == 'http':
+        if parsed.scheme == "http":
             # Allow HTTP only for exact localhost, 127.0.0.1, and ::1 (IPv6 localhost)
             # Extract hostname without port for exact matching
-            hostname = (parsed.hostname or '').lower()
-            is_localhost = hostname in {'localhost', '127.0.0.1', '::1'}
+            hostname = parsed.hostname.lower()  # Already validated above, safe to access
+            is_localhost = hostname in {"localhost", "127.0.0.1", "::1"}
             if not is_localhost:
                 return "invalid_redirect_uri", "Redirect URI must use HTTPS (or HTTP for localhost)"
 

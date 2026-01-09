@@ -384,6 +384,10 @@ BACKGROUND_PROCESS_HOURS = int(os.getenv("BACKGROUND_PROCESS_HOURS", "2"))  # Lo
 ENABLE_CATEGORY_AGGREGATION = os.getenv("ENABLE_CATEGORY_AGGREGATION", "true").lower() == "true"
 CATEGORY_AGGREGATION_BUFFER_SIZE = int(os.getenv("CATEGORY_AGGREGATION_BUFFER_SIZE", "100"))
 
+# OAuth configuration
+OAUTH_STATE_TTL_MINUTES = 10  # OAuth state tokens expire after 10 minutes
+TRUSTED_PROXY_ENABLED = os.getenv("TRUSTED_PROXY", "false").lower() == "true"  # Enable X-Forwarded-For trust
+
 # Minimum delay to ensure healthchecks pass (seconds)
 MIN_BACKGROUND_START_DELAY = 1
 
@@ -1560,9 +1564,7 @@ def get_oauth_service() -> OAuthFlowService:
 
 def get_oauth_state_repository() -> OAuthStateRepository:
     """Get OAuth state repository instance."""
-    # Import api_service to allow mocking in tests
-    import api_service as self_module
-    return self_module.oauth_state_repo
+    return oauth_state_repo
 
 
 @app.post("/api/auth/gmail/init", response_model=OAuthStateInitResponse, tags=["oauth"])
@@ -1570,7 +1572,7 @@ async def oauth_state_init(
     request_body: OAuthStateInitRequest,
     http_request: Request,
     x_api_key: Optional[str] = Header(None),
-    state_repo: OAuthStateRepository = Depends(get_oauth_state_repository),
+    state_repo: OAuthStateRepository = Depends(get_oauth_state_repository),  # noqa: B008
 ):
     """
     Pre-register a client-generated OAuth state token.
@@ -1591,15 +1593,24 @@ async def oauth_state_init(
     verify_api_key(x_api_key)
 
     # Extract client IP for rate limiting (handle proxy scenarios)
-    # When behind a proxy/load balancer, use X-Forwarded-For header
+    # When behind a proxy/load balancer, use X-Forwarded-For header if TRUSTED_PROXY is enabled
     # Format: X-Forwarded-For: client, proxy1, proxy2
     # Take the first (leftmost) IP which is the original client
-    forwarded_for = http_request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        # Take the first IP from the comma-separated list
-        client_ip = forwarded_for.split(",")[0].strip()
-    else:
-        client_ip = http_request.client.host if http_request.client else "unknown"
+    client_ip = http_request.client.host if http_request.client else "unknown"
+
+    if TRUSTED_PROXY_ENABLED:
+        forwarded_for = http_request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            # Take the first IP from the comma-separated list
+            candidate_ip = forwarded_for.split(",")[0].strip()
+            # Validate the IP address format
+            try:
+                import ipaddress
+                ipaddress.ip_address(candidate_ip)
+                client_ip = candidate_ip
+            except ValueError:
+                # Invalid IP format, fall back to client.host
+                logger.warning(f"Invalid X-Forwarded-For IP: {candidate_ip}, using client.host")
 
     # Atomically check and record rate limit (counts all attempts, prevents race conditions)
     allowed, wait_time = ip_rate_limiter.allow_request(client_ip)
@@ -1607,6 +1618,7 @@ async def oauth_state_init(
         logger.warning(f"Rate limit exceeded for IP {client_ip}, wait time: {wait_time}s")
         return JSONResponse(
             status_code=429,
+            headers={"Retry-After": str(int(wait_time))} if wait_time else {},
             content={
                 "error": "rate_limit_exceeded",
                 "message": "Too many state token registration requests. Try again later."
@@ -1632,15 +1644,15 @@ async def oauth_state_init(
         )
 
     try:
-        # Store state token with 10-minute expiration
+        # Store state token with configured expiration
         state_repo.store_state(
             state_token=request_body.state_token,
             redirect_uri=request_body.redirect_uri
         )
 
-        # Calculate expiration timestamp
+        # Calculate expiration timestamp using configured TTL
         from datetime import timezone as tz
-        expires_at = datetime.now(tz.utc) + timedelta(minutes=10)
+        expires_at = datetime.now(tz.utc) + timedelta(minutes=OAUTH_STATE_TTL_MINUTES)
         expires_at_iso = expires_at.isoformat().replace('+00:00', 'Z')
 
         logger.info(f"State token registered successfully (IP: {client_ip})")
@@ -1651,7 +1663,7 @@ async def oauth_state_init(
             expires_at=expires_at_iso
         )
 
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to store OAuth state token")
         return JSONResponse(
             status_code=500,
