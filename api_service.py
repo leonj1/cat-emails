@@ -1549,7 +1549,8 @@ async def trigger_monthly_summary(x_api_key: Optional[str] = Header(None)):
 ip_rate_limiter = IPRateLimiter(max_requests=10, window_seconds=60)
 
 # Global OAuth state repository for dependency injection
-oauth_state_repo = OAuthStateRepository()
+# Uses the shared engine from settings_service.repository to avoid creating separate connection pools
+oauth_state_repo = OAuthStateRepository(engine=settings_service.repository.engine)
 
 
 def get_oauth_service() -> OAuthFlowService:

@@ -2,42 +2,26 @@
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
-from sqlalchemy import create_engine, text
-import os
+from sqlalchemy import Engine, text
 import json
 import logging
 
 logger = logging.getLogger(__name__)
-
-# Module-level engine singleton for connection pooling
-_engine = None
-
-
-def _get_engine():
-    """Get or create the SQLAlchemy engine singleton."""
-    global _engine
-    if _engine is None:
-        db_url = os.getenv(
-            'DATABASE_URL',
-            f"mysql+pymysql://{os.getenv('MYSQL_USER', 'cat_emails')}:"
-            f"{os.getenv('MYSQL_PASSWORD', 'password')}@"
-            f"{os.getenv('MYSQL_HOST', 'localhost')}:"
-            f"{os.getenv('MYSQL_PORT', '3306')}/"
-            f"{os.getenv('MYSQL_DATABASE', 'cat_emails')}"
-        )
-        _engine = create_engine(db_url, pool_pre_ping=True)
-    return _engine
-
-
-def get_db_connection():
-    """Get a database connection for OAuth state repository."""
-    return _get_engine().connect()
 
 
 class OAuthStateRepository:
     """Manages OAuth state tokens in the database for CSRF protection."""
 
     STATE_TTL_MINUTES = 10  # State tokens expire after 10 minutes
+
+    def __init__(self, engine: Engine):
+        """
+        Initialize repository with a shared SQLAlchemy engine.
+
+        Args:
+            engine: SQLAlchemy Engine instance to use for database connections
+        """
+        self.engine = engine
 
     def store_state(
         self,
@@ -59,7 +43,7 @@ class OAuthStateRepository:
         Raises:
             Exception: If database storage fails
         """
-        connection = get_db_connection()
+        connection = self.engine.connect()
         try:
             expires_at = datetime.now(timezone.utc) + timedelta(minutes=self.STATE_TTL_MINUTES)
             created_at = datetime.now(timezone.utc)
@@ -117,7 +101,7 @@ class OAuthStateRepository:
             f"token repr: {token_preview!r}"
         )
 
-        connection = get_db_connection()
+        connection = self.engine.connect()
         try:
             query = text("""
                 SELECT redirect_uri, created_at, expires_at, metadata
@@ -188,7 +172,7 @@ class OAuthStateRepository:
         Returns:
             True if deleted, False otherwise
         """
-        connection = get_db_connection()
+        connection = self.engine.connect()
         try:
             query = text("""
                 DELETE FROM oauth_state
@@ -219,7 +203,7 @@ class OAuthStateRepository:
         Returns:
             Number of expired tokens deleted
         """
-        connection = get_db_connection()
+        connection = self.engine.connect()
         try:
             query = text("""
                 DELETE FROM oauth_state
