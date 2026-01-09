@@ -200,7 +200,7 @@ class TestIPRateLimiterTimeWindow:
             mock_datetime.now.return_value = base_time + timedelta(seconds=61)
 
             # Act - should now be allowed
-            allowed, wait_time = limiter.check_rate_limit(ip_address)
+            allowed, _ = limiter.check_rate_limit(ip_address)
 
             # Assert
             assert allowed is True, "Should be allowed after old requests expire"
@@ -395,7 +395,7 @@ class TestIPRateLimiterReset:
 
         # Assert - all should be allowed now
         for ip in ips:
-            allowed, wait_time = limiter.check_rate_limit(ip)
+            allowed, _ = limiter.check_rate_limit(ip)
             assert allowed is True, f"Request from {ip} should be allowed after reset_all"
 
 
@@ -480,11 +480,11 @@ class TestIPRateLimiterThreadSafety:
 
         def make_request():
             try:
-                allowed, wait_time = limiter.check_rate_limit(ip_address)
+                allowed, _ = limiter.check_rate_limit(ip_address)
                 if allowed:
                     limiter.record_request(ip_address)
                 results.append(allowed)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 errors.append(str(e))
 
         # Act - create 20 concurrent threads

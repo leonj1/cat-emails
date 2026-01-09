@@ -45,8 +45,9 @@ class OAuthStateRepository:
         """
         connection = self.engine.connect()
         try:
-            expires_at = datetime.now(timezone.utc) + timedelta(minutes=self.STATE_TTL_MINUTES)
-            created_at = datetime.now(timezone.utc)
+            now_utc = datetime.now(timezone.utc)
+            created_at = now_utc
+            expires_at = now_utc + timedelta(minutes=self.STATE_TTL_MINUTES)
             metadata_json = json.dumps(metadata) if metadata else None
 
             # Use INSERT ... ON DUPLICATE KEY UPDATE for atomic upsert
