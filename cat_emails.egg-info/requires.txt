@@ -1,3 +1,4 @@
 requests>=2.26.0
 requests-mock>=1.11.0
 pydantic>=2.9.2
+urllib3>=2.6.0 # not directly required, pinned by Snyk to avoid a vulnerability
