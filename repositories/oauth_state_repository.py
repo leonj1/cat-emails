@@ -91,10 +91,10 @@ class OAuthStateRepository:
         Returns:
             Dict with state data if valid and not expired, None otherwise
         """
-        # Debug logging for state token lookup
+        # Log state token lookup details
         token_len = len(state_token) if state_token else 0
-        token_preview = state_token[:20] + '...' if state_token and len(state_token) > 20 else state_token
-        logger.info(
+        token_preview = state_token[:10] + '...' if state_token and len(state_token) > 10 else state_token
+        logger.debug(
             f"Looking up OAuth state - "
             f"token length: {token_len}, "
             f"token empty: {not bool(state_token)}, "
@@ -139,7 +139,7 @@ class OAuthStateRepository:
                     else:
                         logger.warning(
                             f"OAuth state token not found in database - "
-                            f"token_prefix: {state_token[:10] if state_token else 'empty'}..."
+                            f"token_prefix: {state_token[:10] + '...' if len(state_token) > 10 else state_token}"
                         )
                 else:
                     logger.warning("OAuth state lookup with empty/None token")
