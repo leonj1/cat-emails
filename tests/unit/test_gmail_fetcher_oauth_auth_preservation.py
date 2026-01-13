@@ -528,22 +528,14 @@ class TestAccountServiceFailureHandledGracefully(unittest.TestCase):
         mock_account_client_class.side_effect = Exception("Database connection failed")
 
         # Act: Should not raise - should handle gracefully
-        try:
-            fetcher = GmailFetcher(
-                email_address="any-user@gmail.com",
-                app_password="test-password",
-                api_token="test-api-token",
-                connection_service=None,
-            )
-            initialization_succeeded = True
-        except Exception as e:
-            initialization_succeeded = False
-
-        # Assert
-        self.assertTrue(
-            initialization_succeeded,
-            "GmailFetcher should initialize successfully even when AccountCategoryClient fails"
+        # If this raises, the test fails automatically
+        _ = GmailFetcher(
+            email_address="any-user@gmail.com",
+            app_password="test-password",
+            api_token="test-api-token",
+            connection_service=None,
         )
+        # If we reach here, initialization succeeded (graceful degradation)
 
     @patch('services.gmail_fetcher_service.AccountCategoryClient')
     @patch('services.gmail_fetcher_service.DomainService')

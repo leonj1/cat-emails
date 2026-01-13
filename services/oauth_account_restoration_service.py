@@ -25,6 +25,27 @@ from typing import List, Dict, Protocol
 from utils.logger import get_logger
 
 
+class RestorationError(Exception):
+    """Error during OAuth account restoration.
+
+    Attributes:
+        email_address: Email of the account that failed to restore
+        cause: The underlying exception that caused the failure
+    """
+
+    def __init__(self, email_address: str, cause: Exception):
+        """
+        Initialize restoration error.
+
+        Args:
+            email_address: Email of the account that failed to restore
+            cause: The underlying exception that caused the failure
+        """
+        self.email_address = email_address
+        self.cause = cause
+        super().__init__(f"Database error during restoration for {email_address}")
+
+
 class DatabaseRepositoryProtocol(Protocol):
     """Protocol for database repository interface."""
 
@@ -173,9 +194,7 @@ class OAuthAccountRestorationService:
                         self.logger.exception(
                             f"Database error restoring account {account.email_address}"
                         )
-                        raise Exception(
-                            f"Database error during restoration for {account.email_address}"
-                        ) from e
+                        raise RestorationError(account.email_address, e) from e
 
             self.logger.info(f"Restoration complete. Total accounts restored: {restored_count}")
             return restored_count
