@@ -40,3 +40,4 @@ uvicorn[standard]>=0.24.0
 # Optional email provider dependencies
 # Uncomment the providers you want to use:
 # mailtrap>=2.0.0  # For Mailtrap email provider
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
