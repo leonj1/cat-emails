@@ -16,7 +16,7 @@ alembic>=1.13.0
 
 # MySQL database support
 pymysql>=1.1.0
-cryptography>=41.0.0  # Required by PyMySQL for secure connections
+cryptography>=46.0.5  # Required by PyMySQL for secure connections
 
 # Ensure explicit websockets support in case environment ignores uvicorn extras
 websockets>=11.0.0
